@@ -1,4 +1,4 @@
-import { createMemo, For, Match, Switch } from "solid-js"
+import { createMemo, For, Match, Show, Switch } from "solid-js"
 import { Button } from "@opencode-ai/ui/button"
 import { Logo } from "@opencode-ai/ui/logo"
 import { useLayout } from "@/context/layout"
@@ -85,6 +85,11 @@ export default function Home() {
         />
         {server.name}
       </Button>
+      <Show when={platform.platform === "ios"}>
+        <p class="block text-center mt-2 text-12-regular text-text-dimmed">
+          Need help connecting? Run <code class="bg-surface-raised-base text-text-secondary-base px-1.5 py-0.5 rounded-sm break-all">opencode web --hostname 0.0.0.0 --cors app-local://localhost</code> on your server.
+        </p>
+      </Show>
       <Switch>
         <Match when={sync.data.project.length > 0}>
           <div class="mt-20 w-full flex flex-col gap-4">

@@ -4,11 +4,15 @@
 <dict>
   <key>NSMicrophoneUsageDescription</key>
   <string>OpenCode uses the microphone for voice-to-text input.</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>OpenCode uses speech recognition for voice-to-text input.</string>
   <key>NSLocalNetworkUsageDescription</key>
   <string>OpenCode connects to local servers on your network.</string>
   <key>NSAppTransportSecurity</key>
   <dict>
     <key>NSAllowsArbitraryLoadsInWebContent</key>
+    <true/>
+    <key>NSAllowsLocalNetworking</key>
     <true/>
   </dict>
 </dict>
