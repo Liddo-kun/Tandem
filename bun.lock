@@ -364,6 +364,22 @@
         "@typescript/native-preview": "catalog:",
       },
     },
+    "packages/ios": {
+      "name": "@opencode-ai/ios",
+      "version": "1.2.4",
+      "dependencies": {
+        "@opencode-ai/app": "workspace:*",
+        "@opencode-ai/ui": "workspace:*",
+        "@solid-primitives/storage": "catalog:",
+        "solid-js": "catalog:",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "@typescript/native-preview": "catalog:",
+        "typescript": "catalog:",
+        "vite": "catalog:",
+      },
+    },
     "packages/llm": {
       "name": "@opencode-ai/llm",
       "version": "1.15.0",
@@ -1545,6 +1561,8 @@
     "@opencode-ai/function": ["@opencode-ai/function@workspace:packages/function"],
 
     "@opencode-ai/http-recorder": ["@opencode-ai/http-recorder@workspace:packages/http-recorder"],
+
+    "@opencode-ai/ios": ["@opencode-ai/ios@workspace:packages/ios"],
 
     "@opencode-ai/llm": ["@opencode-ai/llm@workspace:packages/llm"],
 

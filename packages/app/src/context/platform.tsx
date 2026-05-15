@@ -11,10 +11,10 @@ type UpdateInfo = { updateAvailable: boolean; version?: string }
 
 export type Platform = {
   /** Platform discriminator */
-  platform: "web" | "desktop"
+  platform: "web" | "desktop" | "ios"
 
   /** Desktop OS (Tauri only) */
-  os?: "macos" | "windows" | "linux"
+  os?: "macos" | "windows" | "linux" | "ios"
 
   /** App version */
   version?: string
@@ -87,6 +87,18 @@ export type Platform = {
 
   /** Read image from clipboard (desktop only) */
   readClipboardImage?(): Promise<File | null>
+
+  /** Start voice input (iOS only) */
+  startVoiceInput?(): void
+
+  /** Stop voice input and return transcription (iOS only) */
+  stopVoiceInput?(): Promise<string>
+
+  /** Haptic feedback (iOS only) */
+  haptic?(style: "light" | "medium" | "heavy" | "success" | "warning" | "error"): void
+
+  /** Share content (iOS only) */
+  share?(data: { text?: string; url?: string }): Promise<boolean>
 }
 
 export type DisplayBackend = "auto" | "wayland"
