@@ -23,6 +23,7 @@ import {
   loadPathQuery,
   loadProjectsQuery,
   loadProvidersQuery,
+  warmSessions,
 } from "./global-sync/bootstrap"
 import { createChildStoreManager } from "./global-sync/child-store"
 import { applyDirectoryEvent, applyGlobalEvent, cleanupDroppedSessionCaches } from "./global-sync/event-reducer"
@@ -396,6 +397,14 @@ function createGlobalSync() {
         void queryClient.fetchQuery(queryOptionsApi.lsp(key))
       },
     })
+    if (event.type === "permission.asked" || event.type === "question.asked") {
+      const sessionID = (event.properties as { sessionID?: string })?.sessionID
+      if (sessionID) {
+        void warmSessions({ ids: [sessionID], store, setStore, sdk: sdkFor(directory) }).catch((err) => {
+          console.error("Failed to warm prompt session", err)
+        })
+      }
+    }
   })
 
   onCleanup(unsub)

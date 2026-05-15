@@ -158,24 +158,37 @@ function mergeSession(setStore: SetStoreFunction<State>, session: Session) {
   })
 }
 
-function warmSessions(input: {
+export function warmSessions(input: {
   ids: string[]
   store: Store<State>
   setStore: SetStoreFunction<State>
   sdk: OpencodeClient
 }) {
   const known = new Set(input.store.session.map((item) => item.id))
+  const seen = new Set<string>()
+
+  const load = async (sessionID: string): Promise<void> => {
+    if (!sessionID || seen.has(sessionID)) return
+    seen.add(sessionID)
+
+    const existing = input.store.session.find((item) => item.id === sessionID)
+    if (existing) {
+      known.add(existing.id)
+      if (existing.parentID) await load(existing.parentID)
+      return
+    }
+
+    const x = await retry(() => input.sdk.session.get({ sessionID }))
+    const session = x.data
+    if (!session?.id) return
+    known.add(session.id)
+    mergeSession(input.setStore, session)
+    if (session.parentID) await load(session.parentID)
+  }
+
   const ids = [...new Set(input.ids)].filter((id) => !!id && !known.has(id))
-  if (ids.length === 0) return Promise.resolve()
-  return Promise.all(
-    ids.map((sessionID) =>
-      retry(() => input.sdk.session.get({ sessionID })).then((x) => {
-        const session = x.data
-        if (!session?.id) return
-        mergeSession(input.setStore, session)
-      }),
-    ),
-  ).then(() => undefined)
+  const existing = [...new Set(input.ids)].filter((id) => !!id && known.has(id))
+  return Promise.all([...ids, ...existing].map(load)).then(() => undefined)
 }
 
 export const loadProvidersQuery = (directory: string | null, sdk: OpencodeClient) =>

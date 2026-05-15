@@ -8,7 +8,7 @@ import { type ComponentProps, createEffect, createMemo, onCleanup, onMount, spli
 import { SerializeAddon } from "@/addons/serialize"
 import { matchKeybind, parseKeybind } from "@/context/command"
 import { useLanguage } from "@/context/language"
-import { usePlatform } from "@/context/platform"
+import { usePlatform, type Platform } from "@/context/platform"
 import { useSDK } from "@/context/sdk"
 import { useServer } from "@/context/server"
 import { terminalFontFamily, useSettings } from "@/context/settings"
@@ -68,13 +68,38 @@ const debugTerminal = (...values: unknown[]) => {
   console.debug("[terminal]", ...values)
 }
 
+export const terminalTouchScrollAmount = (input: { deltaY: number; lineHeight: number; remainder: number }) => {
+  const lineHeight = Math.max(8, input.lineHeight)
+  const raw = input.remainder + input.deltaY / lineHeight
+  const lines = raw < 0 ? Math.ceil(raw) : Math.floor(raw)
+  return {
+    amount: lines === 0 ? 0 : -lines,
+    remainder: raw - lines,
+  }
+}
+
+const terminalLineHeight = (container: HTMLDivElement, term: Term) => {
+  if (term.rows <= 0) return 16
+  const canvas = container.querySelector("canvas")
+  if (canvas instanceof HTMLCanvasElement) {
+    const height = canvas.getBoundingClientRect().height
+    if (height > 0) return height / term.rows
+  }
+  return container.clientHeight > 0 ? container.clientHeight / term.rows : 16
+}
+
 const useTerminalUiBindings = (input: {
   container: HTMLDivElement
+  platform: Platform
   term: Term
   cleanups: VoidFunction[]
   handlePointerDown: () => void
   handleLinkClick: (event: MouseEvent) => void
 }) => {
+  const isMobile = input.platform.platform === "ios" || input.platform.platform === "android"
+  let touchY: number | undefined
+  let touchRemainder = 0
+
   const handleCopy = (event: ClipboardEvent) => {
     const selection = input.term.getSelection()
     if (!selection) return
@@ -103,6 +128,44 @@ const useTerminalUiBindings = (input: {
     input.term.options.cursorBlink = false
   }
 
+  const handleTouchStart = (event: TouchEvent) => {
+    if (!isMobile) return
+    if (event.touches.length !== 1) {
+      touchY = undefined
+      touchRemainder = 0
+      return
+    }
+    touchY = event.touches[0]?.clientY
+    touchRemainder = 0
+  }
+
+  const handleTouchMove = (event: TouchEvent) => {
+    if (!isMobile) return
+    if (event.touches.length !== 1 || touchY === undefined) return
+
+    const next = event.touches[0]?.clientY
+    if (next === undefined) return
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const deltaY = next - touchY
+    touchY = next
+
+    const result = terminalTouchScrollAmount({
+      deltaY,
+      lineHeight: terminalLineHeight(input.container, input.term),
+      remainder: touchRemainder,
+    })
+    touchRemainder = result.remainder
+    if (result.amount !== 0) input.term.scrollLines(result.amount)
+  }
+
+  const handleTouchEnd = () => {
+    touchY = undefined
+    touchRemainder = 0
+  }
+
   input.container.addEventListener("copy", handleCopy, true)
   input.cleanups.push(() => input.container.removeEventListener("copy", handleCopy, true))
 
@@ -120,6 +183,15 @@ const useTerminalUiBindings = (input: {
       capture: true,
     }),
   )
+
+  input.container.addEventListener("touchstart", handleTouchStart, { passive: true })
+  input.container.addEventListener("touchmove", handleTouchMove, { passive: false })
+  input.container.addEventListener("touchend", handleTouchEnd)
+  input.container.addEventListener("touchcancel", handleTouchEnd)
+  input.cleanups.push(() => input.container.removeEventListener("touchstart", handleTouchStart))
+  input.cleanups.push(() => input.container.removeEventListener("touchmove", handleTouchMove))
+  input.cleanups.push(() => input.container.removeEventListener("touchend", handleTouchEnd))
+  input.cleanups.push(() => input.container.removeEventListener("touchcancel", handleTouchEnd))
 
   input.term.textarea?.addEventListener("focus", handleTextareaFocus)
   input.term.textarea?.addEventListener("blur", handleTextareaBlur)
@@ -400,6 +472,7 @@ export const Terminal = (props: TerminalProps) => {
       t.open(container)
       useTerminalUiBindings({
         container,
+        platform,
         term: t,
         cleanups,
         handlePointerDown,

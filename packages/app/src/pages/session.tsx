@@ -1,4 +1,4 @@
-import type { Project, UserMessage } from "@opencode-ai/sdk/v2"
+import type { Project, UserMessage, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { createQuery, skipToken, useMutation, useQueryClient } from "@tanstack/solid-query"
 import {
@@ -61,6 +61,7 @@ import { useSessionCommands } from "@/pages/session/use-session-commands"
 import { useSessionHashScroll } from "@/pages/session/use-session-hash-scroll"
 import { Identifier } from "@/utils/id"
 import { diffs as list } from "@/utils/diffs"
+import { diffCount, MOBILE_REVIEW_FILE_LIMIT, mobileReviewLimit } from "@/utils/mobile-review-limit"
 import { Persist, persisted } from "@/utils/persist"
 import { extractPromptFromParts } from "@/utils/prompt"
 import { same } from "@/utils/same"
@@ -73,6 +74,7 @@ const emptyFollowups: FollowupItem[] = []
 
 type ChangeMode = "git" | "branch" | "turn"
 type VcsMode = "git" | "branch"
+type ReviewLimit = { mode: ChangeMode; count: number; limit: number }
 
 type SessionHistoryWindowInput = {
   sessionID: () => string | undefined
@@ -519,6 +521,7 @@ export default function Page() {
     changes: "git" as ChangeMode,
     newSessionWorktree: "main",
     deferRender: false,
+    reviewLimit: undefined as ReviewLimit | undefined,
   })
 
   const [followup, setFollowup] = persisted(
@@ -568,7 +571,30 @@ export default function Page() {
     return open
   }, desktopReviewOpen())
 
-  const turnDiffs = createMemo(() => list(lastUserMessage()?.summary?.diffs))
+  const turnDiffSource = createMemo(() => lastUserMessage()?.summary?.diffs)
+  const turnDiffs = createMemo(() => list(turnDiffSource()))
+  const mobilePlatform = () => platform.platform === "ios" || platform.platform === "android"
+  const setReviewLimit = (mode: ChangeMode, count: number) => {
+    const limit = mobileReviewLimit(count, mobilePlatform())
+    if (!limit) {
+      if (store.reviewLimit?.mode === mode) setStore("reviewLimit", undefined)
+      return false
+    }
+
+    setStore("reviewLimit", { mode, ...limit })
+    return true
+  }
+  const activeReviewLimit = createMemo<ReviewLimit | undefined>(() => {
+    if (!mobilePlatform()) return
+
+    if (store.changes === "turn") {
+      const limit = mobileReviewLimit(diffCount(turnDiffSource()), true)
+      if (limit) return { mode: "turn", ...limit }
+    }
+
+    const limit = store.reviewLimit
+    if (limit?.mode === store.changes) return limit
+  })
   const nogit = createMemo(() => !!sync.project && sync.project.vcs !== "git")
   const changesOptions = createMemo<ChangeMode[]>(() => {
     const list: ChangeMode[] = []
@@ -596,6 +622,72 @@ export default function Page() {
   const vcsKey = createMemo(
     () => ["session-vcs", sdk.directory, sync.data.vcs?.branch ?? "", sync.data.vcs?.default_branch ?? ""] as const,
   )
+  const fallbackGitDiff = async () => {
+    const status = await sdk.client.file
+      .status()
+      .then((result) => result.data ?? [])
+      .catch(() => [])
+    if (setReviewLimit("git", status.length)) return []
+
+    const diffs = await Promise.all(
+      status.map(async (item): Promise<VcsFileDiff | undefined> => {
+        if (item.status === "deleted") {
+          const diff = list({
+            file: item.path,
+            before: "",
+            after: "",
+            additions: item.added,
+            deletions: item.removed,
+            status: item.status,
+          })[0]
+          if (!diff) return
+          return {
+            file: item.path,
+            patch: diff.patch,
+            additions: item.added,
+            deletions: item.removed,
+            status: item.status,
+          }
+        }
+
+        const content = await sdk.client.file
+          .read({ path: item.path })
+          .then((result) => result.data)
+          .catch(() => undefined)
+        if (!content || content.type !== "text") return
+
+        if (content.diff) {
+          return {
+            file: item.path,
+            patch: content.diff,
+            additions: item.added,
+            deletions: item.removed,
+            status: item.status,
+          }
+        }
+
+        if (item.status !== "added") return
+        const diff = list({
+          file: item.path,
+          before: "",
+          after: content.content,
+          additions: item.added,
+          deletions: item.removed,
+          status: item.status,
+        })[0]
+        if (!diff) return
+        return {
+          file: item.path,
+          patch: diff.patch,
+          additions: item.added,
+          deletions: item.removed,
+          status: item.status,
+        }
+      }),
+    )
+
+    return diffs.filter((item): item is VcsFileDiff => item !== undefined)
+  }
   const vcsQuery = createQuery(() => {
     const mode = vcsMode()
     const enabled = wantsReview() && sync.project?.vcs === "git"
@@ -606,19 +698,41 @@ export default function Page() {
       staleTime: Number.POSITIVE_INFINITY,
       gcTime: 60 * 1000,
       queryFn: mode
-        ? () =>
-            sdk.client.vcs
+        ? async () => {
+            if (mode === "git" && mobilePlatform()) {
+              const status = await sdk.client.file
+                .status()
+                .then((result) => result.data ?? [])
+                .catch(() => [])
+              if (setReviewLimit("git", status.length)) return []
+            }
+
+            return sdk.client.vcs
               .diff({ mode })
-              .then((result) => list(result.data))
+              .then((result) => {
+                const diffs = list(result.data ?? [])
+                if (setReviewLimit(mode, diffs.length)) return []
+                if (diffs.length > 0 || mode !== "git") return diffs
+                return fallbackGitDiff()
+              })
               .catch((error) => {
                 console.debug("[session-review] failed to load vcs diff", { mode, error })
-                return []
+                return mode === "git" ? fallbackGitDiff() : []
               })
+          }
         : skipToken,
     }
   })
   const refreshVcs = () => void queryClient.invalidateQueries({ queryKey: vcsKey() })
+  createEffect(
+    on([sessionKey, wantsReview, () => store.changes] as const, ([, wants, changes]) => {
+      if (!wants) return
+      if (changes !== "git" && changes !== "branch") return
+      refreshVcs()
+    }),
+  )
   const reviewDiffs = () => {
+    if (activeReviewLimit()) return []
     if (store.changes === "git" || store.changes === "branch")
       // avoids suspense
       return vcsQuery.isFetched ? (vcsQuery.data ?? []) : []
@@ -1114,6 +1228,20 @@ export default function Page() {
   })
 
   const reviewEmpty = (input: { loadingClass: string; emptyClass: string }) => {
+    const limit = activeReviewLimit()
+    if (limit) {
+      return (
+        <div class={input.emptyClass}>
+          <div class="text-14-regular text-text-weak max-w-72">
+            {language.t("session.review.tooManyFilesMobile", {
+              count: limit.count,
+              limit: MOBILE_REVIEW_FILE_LIMIT,
+            })}
+          </div>
+        </div>
+      )
+    }
+
     if (store.changes === "git" || store.changes === "branch") {
       if (!reviewReady()) return <div class={input.loadingClass}>{language.t("session.review.loadingChanges")}</div>
       return empty(reviewEmptyText())
@@ -1275,6 +1403,8 @@ export default function Page() {
     if (!id) return
 
     if (!wantsReview()) return
+    if (mobilePlatform() && store.changes !== "turn") return
+    if (mobilePlatform() && activeReviewLimit()) return
     if (sync.data.session_diff[id] !== undefined) return
     if (sync.status === "loading") return
 
@@ -1290,6 +1420,8 @@ export default function Page() {
         diffFrame = undefined
         diffTimer = undefined
         if (!wants) return
+        if (mobilePlatform() && store.changes !== "turn") return
+        if (mobilePlatform() && activeReviewLimit()) return
 
         const id = params.id
         if (!id) return
@@ -1347,14 +1479,17 @@ export default function Page() {
 
   const jumpThreshold = (el: HTMLDivElement) => Math.max(400, el.clientHeight)
   const reverseScrollTop = () => platform.platform !== "ios" && platform.platform !== "android"
-  const distanceFromBottom = (el: HTMLDivElement) =>
-    reverseScrollTop() ? Math.abs(el.scrollTop) : el.scrollHeight - el.clientHeight - el.scrollTop
+  const distanceFromBottom = (el: HTMLDivElement) => {
+    const max = Math.max(0, el.scrollHeight - el.clientHeight)
+    if (reverseScrollTop()) return Math.abs(el.scrollTop)
+    return Math.max(0, max - el.scrollTop)
+  }
 
   const updateScrollState = (el: HTMLDivElement) => {
-    const max = el.scrollHeight - el.clientHeight
+    const max = Math.max(0, el.scrollHeight - el.clientHeight)
     const distance = distanceFromBottom(el)
     const overflow = max > 1
-    const bottom = !overflow || distance <= 2
+    const bottom = !overflow || distance <= 2 || !autoScroll.userScrolled()
     const jump = overflow && distance > jumpThreshold(el)
 
     if (ui.scroll.overflow === overflow && ui.scroll.bottom === bottom && ui.scroll.jump === jump) return
@@ -1831,23 +1966,25 @@ export default function Page() {
       <div class="flex-1 min-h-0 flex flex-col md:flex-row">
         <Show when={!isDesktop() && !!params.id}>
           <Tabs value={store.mobileTab} class="h-auto">
-            <Tabs.List>
+            <Tabs.List class="!h-9 !px-2 !py-1 !bg-background-stronger">
               <Tabs.Trigger
                 value="session"
-                class="!w-1/2 !max-w-none"
-                classes={{ button: "w-full" }}
+                class="!w-1/2 !max-w-none !h-full text-13-medium"
+                classes={{ button: "w-full !h-full !px-2 !py-0" }}
                 onClick={() => setStore("mobileTab", "session")}
               >
                 {language.t("session.tab.session")}
               </Tabs.Trigger>
               <Tabs.Trigger
                 value="changes"
-                class="!w-1/2 !max-w-none !border-r-0"
-                classes={{ button: "w-full" }}
+                class="!w-1/2 !max-w-none !h-full !border-r-0 text-13-medium"
+                classes={{ button: "w-full !h-full !px-2 !py-0" }}
                 onClick={() => setStore("mobileTab", "changes")}
               >
                 {hasReview()
-                  ? language.t("session.review.filesChanged", { count: reviewCount() })
+                  ? `${reviewCount()} ${language.t(
+                      reviewCount() === 1 ? "session.review.change.one" : "session.review.change.other",
+                    )}`
                   : language.t("session.review.change.other")}
               </Tabs.Trigger>
             </Tabs.List>

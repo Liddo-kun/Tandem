@@ -271,6 +271,15 @@ function useFileViewer(config: ViewerConfig) {
     config.onDragReset()
   }
 
+  const handlePointerCancel = () => {
+    dragStart = undefined
+    dragEnd = undefined
+    dragMoved = false
+    pendingSelectionEnd = false
+    config.onDragReset()
+    bridge.reset()
+  }
+
   const handleSelectionChange = () => {
     if (!config.enableLineSelection()) return
     if (dragStart === undefined) return
@@ -302,9 +311,16 @@ function useFileViewer(config: ViewerConfig) {
   createEffect(() => {
     if (!config.enableLineSelection()) return
 
-    makeEventListener(container, "mousedown", handleMouseDown)
-    makeEventListener(container, "mousemove", handleMouseMove)
-    makeEventListener(window, "mouseup", handleMouseUp)
+    if (typeof window !== "undefined" && "PointerEvent" in window) {
+      makeEventListener(container, "pointerdown", handleMouseDown)
+      makeEventListener(container, "pointermove", handleMouseMove)
+      makeEventListener(window, "pointerup", handleMouseUp)
+      makeEventListener(window, "pointercancel", handlePointerCancel)
+    } else {
+      makeEventListener(container, "mousedown", handleMouseDown)
+      makeEventListener(container, "mousemove", handleMouseMove)
+      makeEventListener(window, "mouseup", handleMouseUp)
+    }
     makeEventListener(document, "selectionchange", handleSelectionChange)
   })
 

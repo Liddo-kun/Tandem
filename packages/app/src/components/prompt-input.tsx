@@ -1369,7 +1369,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           onMouseDown={(e) => {
             const target = e.target
             if (!(target instanceof HTMLElement)) return
-            if (target.closest('[data-action="prompt-attach"], [data-action="prompt-submit"]')) {
+            if (target.closest('[data-action="prompt-attach"], [data-action="prompt-voice"], [data-action="prompt-submit"]')) {
               return
             }
             editorRef?.focus()
@@ -1445,6 +1445,31 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             />
 
             <div class="flex items-center gap-1 pointer-events-auto">
+              <Show
+                when={
+                  store.mode === "normal" &&
+                  (platform.platform === "ios" || platform.platform === "android") &&
+                  platform.startVoiceInput
+                }
+              >
+                <Tooltip placement="top" value="Voice input">
+                  <Button
+                    data-action="prompt-voice"
+                    type="button"
+                    variant="ghost"
+                    class="size-8 p-0"
+                    onClick={() => void platform.startVoiceInput?.()}
+                    disabled={
+                      platform.voiceStatus
+                        ? platform.voiceStatus().state === "recording" || platform.voiceStatus().state === "processing"
+                        : false
+                    }
+                    aria-label="Voice input"
+                  >
+                    <Icon name="microphone" class="size-5" />
+                  </Button>
+                </Tooltip>
+              </Show>
               <Tooltip placement="top" inactive={!working() && blank()} value={tip()}>
                 <IconButton
                   data-action="prompt-submit"
@@ -1463,7 +1488,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           <div class="pointer-events-none absolute bottom-2 left-2">
             <div
               aria-hidden={store.mode !== "normal"}
-              class="pointer-events-auto"
+              class="pointer-events-auto flex h-8 items-center gap-1"
               style={{
                 "pointer-events": buttonsSpring() > 0.5 ? "auto" : "none",
               }}
@@ -1487,25 +1512,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   <Icon name="plus" class="size-4.5" />
                 </Button>
               </TooltipKeybind>
-
-              <Show when={(platform.platform === "ios" || platform.platform === "android") && platform.startVoiceInput}>
-                <Tooltip placement="top" value="Voice input">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    class="size-8 p-0"
-                    onClick={() => void platform.startVoiceInput?.()}
-                    disabled={
-                      platform.voiceStatus
-                        ? platform.voiceStatus().state === "recording" || platform.voiceStatus().state === "processing"
-                        : false
-                    }
-                    aria-label="Voice input"
-                  >
-                    <Icon name="microphone" class="size-4.5" />
-                  </Button>
-                </Tooltip>
-              </Show>
             </div>
           </div>
         </div>

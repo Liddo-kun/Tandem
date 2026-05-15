@@ -77,14 +77,12 @@ final class BridgeController: NSObject, WKScriptMessageHandler, WKNavigationDele
   var configuration: WKWebViewConfiguration {
     let config = WKWebViewConfiguration()
     config.userContentController = userContent
-#if !DEBUG
     let handler = Self.resolveWebAssets()
     if let handler {
       config.setURLSchemeHandler(handler, forURLScheme: "tauri")
       schemeHandler = handler
       print("[OpenCode] Registered tauri:// scheme handler")
     }
-#endif
     return config
   }
 
@@ -133,7 +131,7 @@ final class BridgeController: NSObject, WKScriptMessageHandler, WKNavigationDele
 
   private func loadStartPage(in webView: WKWebView) {
 #if DEBUG
-    if let url = URL(string: "http://192.168.50.251:1421") {
+    if ProcessInfo.processInfo.environment["OPENCODE_USE_DEV_SERVER"] == "1", let url = URL(string: "http://localhost:1421") {
       webView.load(URLRequest(url: url))
       return
     }

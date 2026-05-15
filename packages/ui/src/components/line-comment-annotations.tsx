@@ -1,4 +1,5 @@
 import { type DiffLineAnnotation, type SelectedLineRange } from "@pierre/diffs"
+import { createMediaQuery } from "@solid-primitives/media"
 import { createEffect, createMemo, createSignal, onCleanup, Show, type Accessor, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { render as renderSolid } from "solid-js/web"
@@ -342,6 +343,7 @@ export function createLineCommentController<T extends LineCommentShape>(
   props: LineCommentControllerProps<T> | LineCommentControllerWithSideProps<T>,
 ) {
   const i18n = useI18n()
+  const touchDraft = createMediaQuery("(hover: none), (pointer: coarse)")
   const note = createLineCommentState<string>(props.state)
 
   const annotations =
@@ -449,6 +451,11 @@ export function createLineCommentController<T extends LineCommentShape>(
     if (!range) {
       if (props.clearSelectionOnSelectionEndNull) note.select(null)
       note.cancelDraft()
+      return
+    }
+
+    if (touchDraft()) {
+      note.openDraft(range)
       return
     }
 

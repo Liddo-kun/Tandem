@@ -68,6 +68,11 @@ export function ScrollView(props: ScrollViewProps) {
     const value = document.documentElement.dataset.platform
     return value === "ios" || value === "android"
   }
+  const scrollMax = () => Math.max(0, viewportRef.scrollHeight - viewportRef.clientHeight)
+  const scrollEndpoint = (edge: "start" | "end") => {
+    if (reverse() && !mobile()) return edge === "start" ? -scrollMax() : 0
+    return edge === "start" ? 0 : scrollMax()
+  }
 
   const updateThumb = () => {
     if (!viewportRef) return
@@ -175,14 +180,11 @@ export function ScrollView(props: ScrollViewProps) {
         break
       case "home":
         e.preventDefault()
-        viewportRef.scrollTo({
-          top: reverse() && !mobile() ? -(viewportRef.scrollHeight - viewportRef.clientHeight) : 0,
-          behavior: "smooth",
-        })
+        viewportRef.scrollTo({ top: scrollEndpoint("start"), behavior: "smooth" })
         break
       case "end":
         e.preventDefault()
-        viewportRef.scrollTo({ top: reverse() && !mobile() ? 0 : viewportRef.scrollHeight, behavior: "smooth" })
+        viewportRef.scrollTo({ top: scrollEndpoint("end"), behavior: "smooth" })
         break
       case "up":
         e.preventDefault()
