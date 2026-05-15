@@ -542,6 +542,7 @@ export const dict = {
   "session.new.lastModified": "最后修改",
   "session.header.search.placeholder": "搜索 {{project}}",
   "session.header.searchFiles": "搜索文件",
+  "session.header.refresh": "Refresh",
   "session.header.openIn": "打开方式",
   "session.header.open.action": "打开 {{app}}",
   "session.header.open.ariaLabel": "在 {{app}} 中打开",
@@ -614,6 +615,13 @@ export const dict = {
 
   "settings.tab.general": "通用",
   "settings.tab.shortcuts": "快捷键",
+  "settings.general.row.speechLocale.title": "Voice input language",
+  "settings.general.row.speechLocale.description": "Choose the language used for speech-to-text on mobile",
+  "voice.processing": "Processing...",
+  "voice.listeningFor": "Listening for {{label}}...",
+  "voice.editLangInSettings": "Edit language in Settings",
+  "voice.processingShort": "Processing",
+  "voice.stop": "Stop",
 
   "settings.desktop.section.wsl": "WSL",
   "settings.desktop.wsl.title": "WSL 集成",

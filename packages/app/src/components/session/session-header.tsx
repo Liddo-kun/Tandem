@@ -158,6 +158,7 @@ export function SessionHeader() {
   const tree = createMemo(() => !isDesktopBeta || settings.general.showFileTree())
   const term = createMemo(() => !isDesktopBeta || settings.general.showTerminal())
   const status = createMemo(() => !isDesktopBeta || settings.general.showStatus())
+  const mobile = createMemo(() => platform.platform === "ios" || platform.platform === "android")
 
   const [exists, setExists] = createStore<Partial<Record<OpenApp, boolean>>>({
     finder: true,
@@ -212,6 +213,11 @@ export function SessionHeader() {
     const id = terminal.active()
     if (!id) return
     focusTerminalById(id)
+  }
+
+  const refresh = () => {
+    platform.haptic?.("light")
+    void platform.restart()
   }
 
   const [prefs, setPrefs] = persisted(Persist.global("open.app"), createStore({ app: "finder" as OpenApp }))
@@ -315,6 +321,16 @@ export function SessionHeader() {
         {(mount) => (
           <Portal mount={mount()}>
             <div class="flex items-center gap-2">
+              <Show when={mobile()}>
+                <IconButton
+                  icon="refresh"
+                  variant="ghost"
+                  class="titlebar-icon w-6 h-6 p-0 box-border shrink-0"
+                  onClick={refresh}
+                  aria-label={language.t("session.header.refresh")}
+                  data-action="session-refresh"
+                />
+              </Show>
               <Show when={projectDirectory()}>
                 <div class="hidden xl:flex items-center">
                   <Show

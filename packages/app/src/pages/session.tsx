@@ -37,6 +37,7 @@ import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { usePrompt } from "@/context/prompt"
+import { usePlatform } from "@/context/platform"
 import { useSDK } from "@/context/sdk"
 import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
@@ -58,8 +59,6 @@ import { SessionSidePanel } from "@/pages/session/session-side-panel"
 import { TerminalPanel } from "@/pages/session/terminal-panel"
 import { useSessionCommands } from "@/pages/session/use-session-commands"
 import { useSessionHashScroll } from "@/pages/session/use-session-hash-scroll"
-import { usePullToRefresh } from "@/hooks/use-pull-to-refresh"
-import { usePlatform } from "@/context/platform"
 import { Identifier } from "@/utils/id"
 import { diffs as list } from "@/utils/diffs"
 import { Persist, persisted } from "@/utils/persist"
@@ -325,6 +324,7 @@ export default function Page() {
   const layout = useLayout()
   const local = useLocal()
   const file = useFile()
+  const platform = usePlatform()
   const sync = useSync()
   const queryClient = useQueryClient()
   const dialog = useDialog()
@@ -334,7 +334,6 @@ export default function Page() {
   const prompt = usePrompt()
   const comments = useComments()
   const terminal = useTerminal()
-  const platform = usePlatform()
   const [searchParams, setSearchParams] = useSearchParams<{ prompt?: string }>()
   const { params, sessionKey, tabs, view } = useSessionLayout()
 
@@ -751,22 +750,9 @@ export default function Page() {
     if (now - lastResumeSync < 1000) return
     lastResumeSync = now
     void sync.session.sync(id, { force: true })
+    void sync.session.todo(id, { force: true })
     void sync.session.status()
   }
-
-  const pullToRefresh = usePullToRefresh({
-    scrollElement: () => scroller,
-    onRefresh: async () => {
-      await platform.restart()
-    },
-    onHaptic: () => platform.haptic?.("light"),
-    isNestedScrollable: (target) => {
-      const el = target instanceof Element ? target : undefined
-      const nested = el?.closest("[data-scrollable]")
-      if (!nested || !scroller || nested === scroller || !(nested instanceof HTMLElement)) return false
-      return nested.scrollTop > 0
-    },
-  })
 
   const scrollGestureWindowMs = 250
 
@@ -1352,6 +1338,7 @@ export default function Page() {
   const autoScroll = createAutoScroll({
     working: () => true,
     overflowAnchor: "dynamic",
+    reverseScrollTop: platform.platform !== "ios" && platform.platform !== "android",
   })
 
   let scrollStateFrame: number | undefined
@@ -1359,10 +1346,13 @@ export default function Page() {
   let fillFrame: number | undefined
 
   const jumpThreshold = (el: HTMLDivElement) => Math.max(400, el.clientHeight)
+  const reverseScrollTop = () => platform.platform !== "ios" && platform.platform !== "android"
+  const distanceFromBottom = (el: HTMLDivElement) =>
+    reverseScrollTop() ? Math.abs(el.scrollTop) : el.scrollHeight - el.clientHeight - el.scrollTop
 
   const updateScrollState = (el: HTMLDivElement) => {
     const max = el.scrollHeight - el.clientHeight
-    const distance = max - el.scrollTop
+    const distance = distanceFromBottom(el)
     const overflow = max > 1
     const bottom = !overflow || distance <= 2
     const jump = overflow && distance > jumpThreshold(el)
@@ -1756,9 +1746,7 @@ export default function Page() {
 
       const el = scroller
       const delta = next - dockHeight
-      const stick = el
-        ? !autoScroll.userScrolled() || el.scrollHeight - el.clientHeight - el.scrollTop < 10 + Math.max(0, delta)
-        : false
+      const stick = el ? !autoScroll.userScrolled() || distanceFromBottom(el) < 10 + Math.max(0, delta) : false
 
       dockHeight = next
 
@@ -1840,7 +1828,7 @@ export default function Page() {
     <div class="relative bg-background-base size-full overflow-hidden flex flex-col">
       {sessionSync() ?? ""}
       <SessionHeader />
-      <div ref={pullToRefresh.setRef} class="flex-1 min-h-0 flex flex-col md:flex-row">
+      <div class="flex-1 min-h-0 flex flex-col md:flex-row">
         <Show when={!isDesktop() && !!params.id}>
           <Tabs value={store.mobileTab} class="h-auto">
             <Tabs.List>
@@ -1894,6 +1882,7 @@ export default function Page() {
                       emptyClass: "h-full pb-64 -mt-4 flex flex-col items-center justify-center text-center gap-6",
                     })}
                     actions={actions}
+                    reverseScroll
                     scroll={ui.scroll}
                     onResumeScroll={resumeScroll}
                     setScrollRef={setScrollRef}
@@ -1920,12 +1909,6 @@ export default function Page() {
                     }}
                     renderedUserMessages={historyWindow.renderedUserMessages()}
                     anchor={anchor}
-                    pullToRefresh={{
-                      pulling: pullToRefresh.pulling(),
-                      progress: pullToRefresh.progress(),
-                      refreshing: pullToRefresh.refreshing(),
-                      pullDistance: pullToRefresh.pullDistance(),
-                    }}
                   />
                 </Show>
               </Match>

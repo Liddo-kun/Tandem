@@ -14,6 +14,7 @@ import { useSDK } from "./sdk"
 import type { Message, Part } from "@opencode-ai/sdk/v2/client"
 import { SESSION_CACHE_LIMIT, dropSessionCaches, pickSessionCacheEvictions } from "./global-sync/session-cache"
 import { diffs as list, message as clean } from "@/utils/diffs"
+import { copyTodos, todoMode } from "./todo-store"
 
 const SKIP_PARTS = new Set(["patch", "step-start", "step-finish"])
 
@@ -529,23 +530,29 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           touch(directory, setStore, sessionID)
           const existing = store.todo[sessionID]
           const cached = globalSync.data.session_todo[sessionID]
-          if (existing !== undefined) {
+          const mode = todoMode({
+            force: opts?.force === true,
+            store: existing,
+            cache: cached,
+          })
+
+          if (mode === "store") {
             if (cached === undefined) {
               globalSync.todo.set(sessionID, existing)
             }
-            if (!opts?.force) return
+            return
           }
 
-          if (cached !== undefined) {
-            setStore("todo", sessionID, reconcile(cached, { key: "id" }))
+          if (mode === "cache" && cached !== undefined) {
+            setStore("todo", sessionID, copyTodos(cached))
           }
 
           const key = keyFor(directory, sessionID)
           return runInflight(inflightTodo, key, () =>
             retry(() => client.session.todo({ sessionID })).then((todo) => {
               if (!tracked(directory, sessionID)) return
-              const list = todo.data ?? []
-              setStore("todo", sessionID, reconcile(list, { key: "id" }))
+              const list = copyTodos(todo.data ?? [])
+              setStore("todo", sessionID, list)
               globalSync.todo.set(sessionID, list)
             }),
           )

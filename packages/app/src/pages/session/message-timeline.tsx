@@ -20,7 +20,6 @@ import { getFilename } from "@opencode-ai/core/util/path"
 import { Popover as KobaltePopover } from "@kobalte/core/popover"
 import { shouldMarkBoundaryGesture, normalizeWheelDelta } from "@/pages/session/message-gesture"
 import { SessionContextUsage } from "@/components/session-context-usage"
-import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { useLanguage } from "@/context/language"
@@ -212,6 +211,7 @@ export function MessageTimeline(props: {
   mobileChanges: boolean
   mobileFallback: JSX.Element
   actions?: UserActions
+  reverseScroll?: boolean
   scroll: { overflow: boolean; bottom: boolean; jump: boolean }
   onResumeScroll: () => void
   setScrollRef: (el: HTMLDivElement | undefined) => void
@@ -230,12 +230,6 @@ export function MessageTimeline(props: {
   onLoadEarlier: () => void
   renderedUserMessages: UserMessage[]
   anchor: (id: string) => string
-  pullToRefresh: {
-    pulling: boolean
-    progress: number
-    refreshing: boolean
-    pullDistance: number
-  }
 }) {
   let touchGesture: number | undefined
 
@@ -660,6 +654,7 @@ export function MessageTimeline(props: {
           </button>
         </div>
         <ScrollView
+          reverse={props.reverseScroll}
           viewportRef={props.setScrollRef}
           onWheel={(e) => {
             const root = e.currentTarget
@@ -712,12 +707,6 @@ export function MessageTimeline(props: {
             "overscroll-behavior-y": "contain",
           }}
         >
-          <PullToRefreshIndicator
-            pulling={props.pullToRefresh.pulling}
-            progress={props.pullToRefresh.progress}
-            refreshing={props.pullToRefresh.refreshing}
-            pullDistance={props.pullToRefresh.pullDistance}
-          />
           <div ref={props.setContentRef} class="min-w-0 w-full">
             <Show when={showHeader()}>
               <div

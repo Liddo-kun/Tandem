@@ -1,6 +1,6 @@
 // @refresh reload
 import { render } from "solid-js/web"
-import { createResource, createSignal, onCleanup, onMount, Show } from "solid-js"
+import { createMemo, createResource, createSignal, onCleanup, onMount, Show } from "solid-js"
 import { AppBaseProviders, AppInterface, PlatformProvider, ServerConnection, type Platform } from "@opencode-ai/app"
 import { showToast } from "@opencode-ai/ui/toast"
 import { bridge } from "./bridge"
@@ -28,6 +28,7 @@ type VoiceStopResult = {
 type ServerConfig = { url: string; displayName?: string; username?: string; password?: string }
 
 const credentialStorage = createBridgeStorage("opencode.settings.dat")
+const settingsStorage = createBridgeStorage()
 
 const normalizeServerUrl = (input: string) => {
   const trimmed = input.trim()
@@ -43,6 +44,8 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
 
 const App = () => {
   const [voice, setVoice] = createSignal<VoiceStatus>({ state: "prewarming", ready: false })
+  const [speechLocale, setSpeechLocale] = createSignal("en-US")
+  const speechLabel = createMemo(() => localeLabel(speechLocale()))
 
   const emitTranscription = (text: string, isFinal?: boolean) => {
     if (!text) return
@@ -89,6 +92,16 @@ const App = () => {
     const status = normalizeStatus(result)
     if (!status) return
     setVoice(status)
+  }
+
+  const refreshSpeechLocale = async () => {
+    const raw = await settingsStorage.getItem("settings.v3").catch(() => null)
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw) as { speech?: { locale?: unknown } }
+      const locale = parsed.speech?.locale
+      if (typeof locale === "string" && locale) setSpeechLocale(locale)
+    } catch {}
   }
 
   const startVoiceInput = async (): Promise<VoiceStartResult> => {
@@ -146,6 +159,18 @@ const App = () => {
     voiceStatus: voice,
     startVoiceInput,
     stopVoiceInput,
+    getSpeechLocales: async () => {
+      const result = await bridge.sendAsync<unknown[]>("getSpeechLocales")
+      if (!Array.isArray(result)) return []
+      return result.filter((value): value is string => typeof value === "string")
+    },
+    setSpeechLocale: async (locale: string) => {
+      const result = await bridge.sendAsync<string>("setSpeechLocale", { locale })
+      await refreshVoice()
+      const applied = typeof result === "string" ? result : "en-US"
+      setSpeechLocale(applied)
+      return applied
+    },
     haptic: (style: "light" | "medium" | "heavy" | "success" | "warning" | "error") => {
       bridge.send("haptic", { style })
     },
@@ -196,13 +221,21 @@ const App = () => {
   }
 
   onMount(() => {
+    document.documentElement.dataset.platform = "ios"
     void refreshVoice()
+    void refreshSpeechLocale()
 
     const handleClick = (event: MouseEvent) => {
       const link = (event.target as HTMLElement | null)?.closest("a.external-link") as HTMLAnchorElement | null
       if (!link?.href) return
       event.preventDefault()
       platform.openLink(link.href)
+    }
+
+    const onFocus = () => emitResume()
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return
+      emitResume()
     }
 
     const stopListening = bridge.on("transcription", (payload) => {
@@ -257,8 +290,12 @@ const App = () => {
     })
 
     document.addEventListener("click", handleClick)
+    window.addEventListener("focus", onFocus)
+    document.addEventListener("visibilitychange", onVisible)
     onCleanup(() => {
       document.removeEventListener("click", handleClick)
+      window.removeEventListener("focus", onFocus)
+      document.removeEventListener("visibilitychange", onVisible)
       stopListening()
       stopVoiceState()
       stopLifecycle()
@@ -272,14 +309,15 @@ const App = () => {
   return (
     <PlatformProvider value={platform}>
       <AppBaseProviders>
-        <VoiceInputOverlay
-          state={() => {
-            const state = voice().state
-            if (state === "recording" || state === "processing") return state
-            return "hidden"
-          }}
-          onStop={() => void stopVoiceInput()}
-        />
+                    <VoiceInputOverlay
+                      state={() => {
+                        const state = voice().state
+                        if (state === "recording" || state === "processing") return state
+                        return "hidden"
+                      }}
+                      speechLabel={speechLabel}
+                      onStop={() => void stopVoiceInput()}
+                    />
         <Show when={!defaultServer.loading}>
           <Show
             when={defaultServer() ?? completedServer()}
@@ -302,6 +340,19 @@ const App = () => {
       </AppBaseProviders>
     </PlatformProvider>
   )
+}
+
+function localeLabel(identifier: string) {
+  try {
+    const locale = new Intl.Locale(identifier)
+    const languageNames = new Intl.DisplayNames(undefined, { type: "language" })
+    const regionNames = new Intl.DisplayNames(undefined, { type: "region" })
+    const language = locale.language ? languageNames.of(locale.language) : undefined
+    const region = locale.region ? regionNames.of(locale.region) : undefined
+    if (language && region) return `${language} (${region})`
+    if (language) return language
+  } catch {}
+  return identifier
 }
 
 if (root instanceof HTMLElement) {

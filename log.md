@@ -22,6 +22,7 @@ Commits:
 - Added an `app-local://localhost` custom URL scheme handler in `packages/ios/OpenCode/WebView/BridgeController.swift`.
 - Bundled iOS web assets can now be served through the custom scheme instead of direct `file://` loading.
 - The WebView notifies the native platform bridge when web content finishes loading.
+- The iOS Vite build now emits assets at the `WebAssets` root with `assetsDir: "."`.
 
 ### iOS Server Connection Help
 
@@ -97,6 +98,7 @@ opencode web --hostname 0.0.0.0 --cors app-local://localhost
 - Added `NSSpeechRecognitionUsageDescription` to `packages/ios/OpenCode/Info.plist`.
 - Kept `NSMicrophoneUsageDescription` for recording.
 - Added local networking allowance in App Transport Security.
+- Added `packages/ios/OpenCode/PrivacyInfo.xcprivacy` declaring UserDefaults access for App Store privacy metadata.
 
 ### iOS Keyboard Toolbar
 
@@ -113,7 +115,7 @@ opencode web --hostname 0.0.0.0 --cors app-local://localhost
 
 ## Mobile iOS Onboarding, Resume, And Pull-To-Refresh
 
-Whisper commits processed: `d7154863d` through `cedb90b15`.
+Whisper 99-count commits reviewed: 26 through 37. Functional imports came from 27-28 and 34, plus pull-to-refresh from 36-37. Android side-branch commit 35 was handled in the later Android batch.
 
 ### Imported
 
@@ -125,7 +127,7 @@ Whisper commits processed: `d7154863d` through `cedb90b15`.
 - Added forced session/global refresh on mobile resume/focus/visibility/online events.
 - Added iOS first-run onboarding for server setup and connection.
 - Added iOS LAN scanning for OpenCode servers on port `4096`.
-- Added mobile pull-to-refresh in the session timeline.
+- Added mobile pull-to-refresh in the session timeline. This was later superseded by the header refresh button imported from corrected commit 60.
 
 ### Skipped
 
@@ -142,7 +144,9 @@ Whisper commits processed: `d7154863d` through `cedb90b15`.
 
 ## Mobile Android Support And Onboarding Health Checks
 
-Whisper commits processed: `1893c8c68` through `21b6868f2`.
+Whisper 99-count commits processed/covered: 35 through 43.
+
+The requested 36-40 range used the 99-count `dev..whisper/dev` list, not first-parent history. The Android side-branch commits in that list were covered through the Android merge import.
 
 ### Imported
 
@@ -160,6 +164,7 @@ Whisper commits processed: `1893c8c68` through `21b6868f2`.
 - Imported onboarding health-check fixes:
   - iOS network scan now checks `/global/health`.
   - iOS onboarding uses native `checkHealth`.
+  - iOS ATS now allows native HTTP LAN health checks via `NSAllowsArbitraryLoads`.
   - Android onboarding checks `/global/health` before falling back to `/health`.
 - Added `ANDROID_BUILD.md` with adapted release-build notes.
 - Ran `bun install` to update workspace dependencies and `bun.lock`.
@@ -179,9 +184,35 @@ Whisper commits processed: `1893c8c68` through `21b6868f2`.
 - Ran `git diff --check` successfully.
 - Native Swift/Xcode, Rust, Gradle, and APK builds were not verified because the work was done on Windows.
 
+## Corrected Mobile Scroll, Resume, And Todo Completion
+
+Corrected Whisper 99-commit imports completed for commits 45, 47, 50, and 53:
+
+- 45 `60374e63b` iOS scroll fix.
+- 47 `e6dcfab7d` Android mobile scroll fix.
+- 50 `b6c1372c2` stale thinking/resume refresh fix, excluding Beam/TestFlight files.
+- 53 `ea3cbd7bf` refresh-button/todo-store follow-up, excluding already imported prompt keyboard/model truncation pieces.
+
+### Imported
+
+- Added platform-aware reverse session scroll support while keeping normal scroll behavior on iOS and Android.
+- Marked the iOS web root with `data-platform="ios"` and added iOS focus/visibility resume events.
+- Kept Android root platform marking from the earlier import.
+- Ensured active-session resume refresh also forces session todos and session status refresh.
+- Added the shared todo copy/cache helper and used copied todo arrays for global todo cache, directory todo events, and forced todo fetches.
+- Confirmed the pull-to-refresh hook and indicator are no longer referenced after the mobile header refresh button replacement.
+
+### Verification
+
+- Ran `bun typecheck` in `packages/app` successfully.
+- Ran `bun typecheck` in `packages/ios` successfully.
+- Ran `bun typecheck` in `packages/android` successfully.
+- Ran `git diff --check` successfully.
+- Native Swift/Xcode, Rust, Gradle, and APK builds were not verified because the work was done on Windows.
+
 ## Mobile Onboarding Credentials And Keyboard Refinements
 
-Whisper commits processed: `e4c2f4630` through `c923e83ac`.
+Whisper 99-count commits reviewed: 44 through 62. Functional mobile imports came from 46 and 48-53, with selected pieces from 60 already covered by this batch and completed in the corrected 56-76 review.
 
 ### Imported
 
@@ -209,6 +240,41 @@ Whisper commits processed: `e4c2f4630` through `c923e83ac`.
 
 - Ran `bun typecheck` in `packages/app` successfully.
 - Ran `bun typecheck` in `packages/ios` successfully after fixing the onboarding prop type.
+- Ran `bun typecheck` in `packages/android` successfully.
+- Ran `git diff --check` successfully.
+- Native Swift/Xcode, Rust, Gradle, and APK builds were not verified because the work was done on Windows.
+
+## Mobile Voice Language Selection
+
+Whisper 99-commit numbering reviewed: commits 56 through 76, `4345ac43e` through `0eb0dae5d`.
+Voice language selection from commits 79 through 81 was also imported during the initial pass because the earlier review used first-parent numbering instead of the 99-commit list.
+
+### Imported
+
+- Added shared speech locale settings under `settings.v3` with a default of `en-US`.
+- Added optional mobile platform APIs for supported speech locales and active speech locale selection.
+- Added `packages/app/.gitignore` coverage for `.env.local` from the skipped notification branch.
+- Added `script/deploy-relay` to the root `.gitignore` from commit 76.
+- Replaced the mobile pull-to-refresh session gesture with a mobile-visible refresh button in the session header from commit 60.
+- Removed the pull-to-refresh hook and indicator files after adding the header refresh button.
+- Active-session resume refresh now also refreshes session todos.
+- Added a mobile-only voice input language row in General settings when the platform exposes speech locale support.
+- Added iOS bridge methods `getSpeechLocales` and `setSpeechLocale`.
+- Updated native iOS speech recognition to use the selected `SFSpeechRecognizer` locale.
+- Kept WhisperKit usage limited to English locales and fall back to `SFSpeechRecognizer` for other supported locales.
+- Updated the iOS voice overlay to show the selected language and localized voice status strings.
+
+### Skipped
+
+- Push notification package, relay, pairing, APNS, entitlement, and settings UI changes from commits 57-59, 61, and 63-75; this remains a separate large feature import.
+- Abortable iOS bridge calls, iOS `envDir`, and Bun test type changes from the notification branch because they support the deferred push pairing/tests rather than current standalone mobile behavior.
+- Generated Android Gradle output from commit 56 because `packages/android/src-tauri/gen/` remains intentionally ignored/generated. The non-generated debug build script change was already present.
+- iOS build-number metadata from commit 62 because native project metadata was not verified on Windows.
+
+### Verification
+
+- Ran `bun typecheck` in `packages/app` successfully.
+- Ran `bun typecheck` in `packages/ios` successfully after exporting `useLanguage` from the shared app package.
 - Ran `bun typecheck` in `packages/android` successfully.
 - Ran `git diff --check` successfully.
 - Native Swift/Xcode, Rust, Gradle, and APK builds were not verified because the work was done on Windows.

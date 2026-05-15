@@ -1,6 +1,7 @@
 import { createStore, reconcile } from "solid-js/store"
 import { createEffect, createMemo } from "solid-js"
 import { createSimpleContext } from "@opencode-ai/ui/context"
+import { usePlatform } from "@/context/platform"
 import { persisted } from "@/utils/persist"
 
 export interface NotificationSettings {
@@ -48,6 +49,9 @@ export interface Settings {
   }
   notifications: NotificationSettings
   sounds: SoundSettings
+  speech: {
+    locale: string
+  }
 }
 
 export const monoDefault = "System Mono"
@@ -144,6 +148,9 @@ const defaultSettings: Settings = {
     errorsEnabled: true,
     errors: "nope-03",
   },
+  speech: {
+    locale: "en-US",
+  },
 }
 
 function withFallback<T>(read: () => T | undefined, fallback: T) {
@@ -153,6 +160,7 @@ function withFallback<T>(read: () => T | undefined, fallback: T) {
 export const { use: useSettings, provider: SettingsProvider } = createSimpleContext({
   name: "Settings",
   init: () => {
+    const platform = usePlatform()
     const [store, setStore, _, ready] = persisted("settings.v3", createStore<Settings>(defaultSettings))
 
     createEffect(() => {
@@ -165,6 +173,17 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
     createEffect(() => {
       if (store.general?.followup !== "queue") return
       setStore("general", "followup", "steer")
+    })
+
+    createEffect(() => {
+      const locale = store.speech?.locale ?? defaultSettings.speech.locale
+      if (!platform.setSpeechLocale) return
+      void Promise.resolve(platform.setSpeechLocale(locale))
+        .then((applied) => {
+          if (typeof applied !== "string" || applied === locale) return
+          setStore("speech", "locale", applied)
+        })
+        .catch(() => undefined)
     })
 
     return {
@@ -325,6 +344,12 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         errors: withFallback(() => store.sounds?.errors, defaultSettings.sounds.errors),
         setErrors(value: string) {
           setStore("sounds", "errors", value)
+        },
+      },
+      speech: {
+        locale: withFallback(() => store.speech?.locale, defaultSettings.speech.locale),
+        setLocale(value: string) {
+          setStore("speech", "locale", value)
         },
       },
     }

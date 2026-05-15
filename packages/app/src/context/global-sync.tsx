@@ -36,6 +36,7 @@ import { queryOptions, useMutation, useQueries, useQuery, useQueryClient } from 
 import { createRefreshQueue } from "./global-sync/queue"
 import { directoryKey } from "./global-sync/utils"
 import { PathKey } from "@/utils/path-key"
+import { copyTodos } from "./todo-store"
 
 type GlobalStore = {
   ready: boolean
@@ -191,7 +192,7 @@ function createGlobalSync() {
       )
       return
     }
-    setGlobalStore("session_todo", sessionID, reconcile(todos, { key: "id" }))
+    setGlobalStore("session_todo", sessionID, copyTodos(todos))
   }
 
   const paused = () => untrack(() => globalStore.reload) !== undefined

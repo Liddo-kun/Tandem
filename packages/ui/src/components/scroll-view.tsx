@@ -6,6 +6,7 @@ import { useI18n } from "../context/i18n"
 export interface ScrollViewProps extends ComponentProps<"div"> {
   viewportRef?: (el: HTMLDivElement) => void
   orientation?: "vertical" | "horizontal" // currently only vertical is fully implemented for thumb
+  reverse?: boolean
 }
 
 export const scrollKey = (event: Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">) => {
@@ -32,7 +33,7 @@ export function ScrollView(props: ScrollViewProps) {
   const merged = mergeProps({ orientation: "vertical" }, props)
   const [local, events, rest] = splitProps(
     merged,
-    ["class", "children", "viewportRef", "orientation", "style"],
+    ["class", "children", "viewportRef", "orientation", "style", "reverse"],
     [
       "onScroll",
       "onWheel",
@@ -62,6 +63,11 @@ export function ScrollView(props: ScrollViewProps) {
   const thumbHeight = () => state.thumbHeight
   const thumbTop = () => state.thumbTop
   const showThumb = () => state.showThumb
+  const reverse = () => local.reverse === true
+  const mobile = () => {
+    const value = document.documentElement.dataset.platform
+    return value === "ios" || value === "android"
+  }
 
   const updateThumb = () => {
     if (!viewportRef) return
@@ -84,7 +90,11 @@ export function ScrollView(props: ScrollViewProps) {
     const maxScrollTop = scrollHeight - clientHeight
     const maxThumbTop = trackHeight - height
 
-    const top = maxScrollTop > 0 ? (scrollTop / maxScrollTop) * maxThumbTop : 0
+    const top = (() => {
+      if (maxScrollTop <= 0) return 0
+      if (!reverse() || mobile()) return (scrollTop / maxScrollTop) * maxThumbTop
+      return ((maxScrollTop + scrollTop) / maxScrollTop) * maxThumbTop
+    })()
 
     // Ensure thumb stays within bounds (shouldn't be necessary due to math above, but good for safety)
     const boundedTop = trackPadding + Math.max(0, Math.min(top, maxThumbTop))
@@ -165,11 +175,14 @@ export function ScrollView(props: ScrollViewProps) {
         break
       case "home":
         e.preventDefault()
-        viewportRef.scrollTo({ top: 0, behavior: "smooth" })
+        viewportRef.scrollTo({
+          top: reverse() && !mobile() ? -(viewportRef.scrollHeight - viewportRef.clientHeight) : 0,
+          behavior: "smooth",
+        })
         break
       case "end":
         e.preventDefault()
-        viewportRef.scrollTo({ top: viewportRef.scrollHeight, behavior: "smooth" })
+        viewportRef.scrollTo({ top: reverse() && !mobile() ? 0 : viewportRef.scrollHeight, behavior: "smooth" })
         break
       case "up":
         e.preventDefault()
@@ -195,6 +208,7 @@ export function ScrollView(props: ScrollViewProps) {
       <div
         ref={viewportRef}
         class="scroll-view__viewport"
+        data-reverse={reverse() ? "true" : undefined}
         onScroll={(e) => {
           updateThumb()
           if (typeof events.onScroll === "function") events.onScroll(e as any)

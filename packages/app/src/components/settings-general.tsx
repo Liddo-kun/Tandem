@@ -193,6 +193,12 @@ export const SettingsGeneral: Component = () => {
     { initialValue: null as DisplayBackend | null },
   )
 
+  const [speechLocales] = createResource(
+    () => (platform.getSpeechLocales ? true : false),
+    () => platform.getSpeechLocales?.().catch(() => []) ?? [],
+    { initialValue: [] as string[] },
+  )
+
   onMount(() => {
     void theme.loadThemes()
   })
@@ -252,6 +258,13 @@ export const SettingsGeneral: Component = () => {
     })),
   )
 
+  const speechOptions = createMemo(() =>
+    speechLocales.latest.map((locale) => ({
+      value: locale,
+      label: speechLocaleLabel(locale),
+    })),
+  )
+
   const noneSound = { id: "none", label: "sound.option.none" } as const
   const soundOptions = [noneSound, ...SOUND_OPTIONS]
   const mono = () => monoInput(settings.appearance.font())
@@ -307,6 +320,26 @@ export const SettingsGeneral: Component = () => {
             triggerVariant="settings"
           />
         </SettingsRow>
+
+        <Show when={platform.setSpeechLocale && speechOptions().length > 0}>
+          <SettingsRow
+            title={language.t("settings.general.row.speechLocale.title")}
+            description={language.t("settings.general.row.speechLocale.description")}
+          >
+            <Select
+              data-action="settings-speech-locale"
+              options={speechOptions()}
+              current={speechOptions().find((o) => o.value === settings.speech.locale())}
+              value={(o) => o.value}
+              label={(o) => o.label}
+              onSelect={(option) => option && settings.speech.setLocale(option.value)}
+              variant="secondary"
+              size="small"
+              triggerVariant="settings"
+              triggerStyle={{ "min-width": "180px" }}
+            />
+          </SettingsRow>
+        </Show>
 
         <SettingsRow
           title={language.t("command.permissions.autoaccept.enable")}
@@ -781,6 +814,19 @@ export const SettingsGeneral: Component = () => {
       </div>
     </div>
   )
+}
+
+function speechLocaleLabel(identifier: string) {
+  try {
+    const locale = new Intl.Locale(identifier)
+    const languageNames = new Intl.DisplayNames(undefined, { type: "language" })
+    const regionNames = new Intl.DisplayNames(undefined, { type: "region" })
+    const language = locale.language ? languageNames.of(locale.language) : undefined
+    const region = locale.region ? regionNames.of(locale.region) : undefined
+    if (language && region) return `${language} (${region})`
+    if (language) return language
+  } catch {}
+  return identifier
 }
 
 interface SettingsRowProps {
