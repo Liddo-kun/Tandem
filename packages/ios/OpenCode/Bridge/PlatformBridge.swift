@@ -10,7 +10,37 @@ final class PlatformBridge {
   private let haptics = HapticBridge()
   private var whisper: WhisperBridge?
   private let config = ServerConfig()
+  private let networkScan = NetworkScanBridge()
   private var didKickoffPreload = false
+  private var activeObserver: NSObjectProtocol?
+  private var backgroundObserver: NSObjectProtocol?
+
+  init() {
+    activeObserver = NotificationCenter.default.addObserver(
+      forName: UIApplication.didBecomeActiveNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      self?.onEvent?("appLifecycle", ["state": "active"])
+    }
+
+    backgroundObserver = NotificationCenter.default.addObserver(
+      forName: UIApplication.didEnterBackgroundNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      self?.onEvent?("appLifecycle", ["state": "background"])
+    }
+  }
+
+  deinit {
+    if let activeObserver {
+      NotificationCenter.default.removeObserver(activeObserver)
+    }
+    if let backgroundObserver {
+      NotificationCenter.default.removeObserver(backgroundObserver)
+    }
+  }
 
   private func voice() -> WhisperBridge {
     if let whisper {
@@ -85,9 +115,65 @@ final class PlatformBridge {
         let result = await voice().status()
         reply(result, nil)
       }
+    case "checkHealth":
+      Self.nativeHealthCheck(
+        urlString: params["url"] as? String ?? "",
+        username: params["username"] as? String,
+        password: params["password"] as? String
+      ) { healthy in
+        Task { @MainActor in
+          reply(["healthy": healthy], nil)
+        }
+      }
+    case "scanNetwork":
+      networkScan.cancel()
+      networkScan.onFound = { [weak self] result in
+        self?.onEvent?("scanResult", result)
+      }
+      networkScan.onComplete = { [weak self] in
+        self?.onEvent?("scanComplete", nil)
+      }
+      networkScan.scan()
+      reply(nil, nil)
+    case "cancelScan":
+      networkScan.cancel()
+      reply(nil, nil)
+    case "reload":
+      if let webView, webView.url?.scheme == "tauri", let url = URL(string: "tauri://localhost/") {
+        webView.load(URLRequest(url: url))
+      } else {
+        webView?.reload()
+      }
+      reply(nil, nil)
     default:
       reply(nil, "Unknown method")
     }
+  }
+
+  private static func nativeHealthCheck(
+    urlString: String,
+    username: String?,
+    password: String?,
+    completion: @escaping @Sendable (Bool) -> Void
+  ) {
+    guard !urlString.isEmpty,
+          let url = URL(string: "\(urlString)/global/health") else {
+      completion(false)
+      return
+    }
+    var request = URLRequest(url: url)
+    request.httpMethod = "GET"
+    request.timeoutInterval = 5
+    if let password, !password.isEmpty {
+      let value = "\(username?.isEmpty == false ? username! : "opencode"):\(password)"
+      if let data = value.data(using: .utf8) {
+        request.setValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
+      }
+    }
+    URLSession.shared.dataTask(with: request) { _, response, _ in
+      let http = response as? HTTPURLResponse
+      DispatchQueue.main.async { completion(http?.statusCode == 200) }
+    }.resume()
   }
 
   private func share(params: [String: Any]) -> Bool {

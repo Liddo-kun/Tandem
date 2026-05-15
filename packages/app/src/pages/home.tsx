@@ -85,9 +85,9 @@ export default function Home() {
         />
         {server.name}
       </Button>
-      <Show when={platform.platform === "ios"}>
+      <Show when={platform.platform === "ios" || platform.platform === "android"}>
         <p class="block text-center mt-2 text-12-regular text-text-dimmed">
-          Need help connecting? Run <code class="bg-surface-raised-base text-text-secondary-base px-1.5 py-0.5 rounded-sm break-all">opencode web --hostname 0.0.0.0 --cors app-local://localhost</code> on your server.
+          Need help connecting? Run <code class="bg-surface-raised-base text-text-secondary-base px-1.5 py-0.5 rounded-sm break-all">opencode web --hostname 0.0.0.0</code> on your server.
         </p>
       </Show>
       <Switch>

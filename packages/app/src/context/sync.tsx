@@ -499,6 +499,14 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             await Promise.all([sessionReq, messagesReq])
           })
         },
+        async status() {
+          const directory = sdk.directory
+          const client = sdk.client
+          const [, setStore] = globalSync.child(directory)
+          return retry(() => client.session.status()).then((status) => {
+            setStore("session_status", reconcile(status.data ?? {}))
+          })
+        },
         async diff(sessionID: string, opts?: { force?: boolean }) {
           const directory = sdk.directory
           const client = sdk.client

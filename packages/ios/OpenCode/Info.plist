@@ -8,6 +8,8 @@
   <string>OpenCode uses speech recognition for voice-to-text input.</string>
   <key>NSLocalNetworkUsageDescription</key>
   <string>OpenCode connects to local servers on your network.</string>
+  <key>ITSAppUsesNonExemptEncryption</key>
+  <false/>
   <key>NSAppTransportSecurity</key>
   <dict>
     <key>NSAllowsArbitraryLoadsInWebContent</key>

@@ -35,7 +35,16 @@ import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { createSessionTabs } from "@/pages/session/helpers"
-import { createTextFragment, getCursorPosition, setCursorPosition, setRangeEdge } from "./prompt-input/editor-dom"
+import {
+  createTextFragment,
+  getCursorPosition,
+  getDeleteWordRange,
+  getEditorText,
+  getSelectionRange,
+  setCursorPosition,
+  setRangeEdge,
+  setSelectionRange,
+} from "./prompt-input/editor-dom"
 import { createPromptAttachments } from "./prompt-input/attachments"
 import { ACCEPTED_FILE_TYPES } from "./prompt-input/files"
 import {
@@ -566,8 +575,28 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       addPart({ type: "text", content: detail.text, start: 0, end: 0 })
     }
 
+    const handleKeyboardDeleteWord = () => {
+      if (!editorRef) return
+      const selection = window.getSelection()
+      if (!selection || selection.rangeCount === 0) return
+      const range = selection.getRangeAt(0)
+      const deleteRange = getDeleteWordRange(getEditorText(editorRef), getSelectionRange(editorRef))
+      if (!deleteRange) return
+
+      editorRef.focus()
+      setSelectionRange(editorRef, range, deleteRange.start, deleteRange.end)
+      selection.removeAllRanges()
+      selection.addRange(range)
+      range.deleteContents()
+      handleInput()
+    }
+
     window.addEventListener("opencode:transcription", handleTranscription)
-    onCleanup(() => window.removeEventListener("opencode:transcription", handleTranscription))
+    window.addEventListener("opencode:keyboard-delete-word", handleKeyboardDeleteWord)
+    onCleanup(() => {
+      window.removeEventListener("opencode:transcription", handleTranscription)
+      window.removeEventListener("opencode:keyboard-delete-word", handleKeyboardDeleteWord)
+    })
   })
 
   const agentList = createMemo(() =>
@@ -1459,7 +1488,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 </Button>
               </TooltipKeybind>
 
-              <Show when={platform.platform === "ios" && platform.startVoiceInput}>
+              <Show when={(platform.platform === "ios" || platform.platform === "android") && platform.startVoiceInput}>
                 <Tooltip placement="top" value="Voice input">
                   <Button
                     type="button"
@@ -1569,7 +1598,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                                   style={{ "will-change": "opacity", transform: "translateZ(0)" }}
                                 />
                               </Show>
-                              <span class="truncate">
+                              <span
+                                class="block min-w-0 max-w-[8ch] truncate"
+                                title={local.model.current()?.name ?? language.t("dialog.model.select.title")}
+                              >
                                 {local.model.current()?.name ?? language.t("dialog.model.select.title")}
                               </span>
                               <Icon name="chevron-down" size="small" class="shrink-0" />
@@ -1602,7 +1634,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                                 style={{ "will-change": "opacity", transform: "translateZ(0)" }}
                               />
                             </Show>
-                            <span class="truncate">
+                            <span
+                              class="block min-w-0 max-w-[8ch] truncate"
+                              title={local.model.current()?.name ?? language.t("dialog.model.select.title")}
+                            >
                               {local.model.current()?.name ?? language.t("dialog.model.select.title")}
                             </span>
                             <Icon name="chevron-down" size="small" class="shrink-0" />

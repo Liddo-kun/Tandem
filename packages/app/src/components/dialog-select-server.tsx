@@ -641,9 +641,12 @@ export function DialogSelectServer() {
                   ? language.t("dialog.server.add.button")
                   : language.t("common.save")}
             </Button>
-            <Show when={platform.platform === "ios"}>
+            <Show when={platform.platform === "ios" || platform.platform === "android"}>
               <p class="text-text-dimmed text-12-regular mt-2">
-                Can't find your server? Make sure you're serving with CORS: <code class="bg-surface-raised-base text-text-secondary-base px-1.5 py-0.5 rounded-sm break-all">opencode web --hostname 0.0.0.0 --cors app-local://localhost</code>
+                Can't find your server? Make sure you're serving with:{" "}
+                <code class="bg-surface-raised-base text-text-secondary-base px-1.5 py-0.5 rounded-sm break-all">
+                  opencode web --hostname 0.0.0.0
+                </code>
               </p>
             </Show>
           </Show>

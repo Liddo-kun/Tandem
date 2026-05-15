@@ -15,7 +15,11 @@ final class LocalFileSchemeHandler: NSObject, WKURLSchemeHandler {
     }
 
     let path = url.path.isEmpty || url.path == "/" ? "index.html" : String(url.path.drop(while: { $0 == "/" }))
-    let fileURL = baseDirectory.appendingPathComponent(path)
+    var fileURL = baseDirectory.appendingPathComponent(path)
+
+    if !FileManager.default.fileExists(atPath: fileURL.path) && fileURL.pathExtension.isEmpty {
+      fileURL = baseDirectory.appendingPathComponent("index.html")
+    }
 
     guard let data = try? Data(contentsOf: fileURL) else {
       print("[OpenCode] SchemeHandler 404: \(path)")
@@ -76,9 +80,9 @@ final class BridgeController: NSObject, WKScriptMessageHandler, WKNavigationDele
 #if !DEBUG
     let handler = Self.resolveWebAssets()
     if let handler {
-      config.setURLSchemeHandler(handler, forURLScheme: "app-local")
+      config.setURLSchemeHandler(handler, forURLScheme: "tauri")
       schemeHandler = handler
-      print("[OpenCode] Registered app-local:// scheme handler")
+      print("[OpenCode] Registered tauri:// scheme handler")
     }
 #endif
     return config
@@ -106,6 +110,9 @@ final class BridgeController: NSObject, WKScriptMessageHandler, WKNavigationDele
     keyboard.onClear = { [weak self] in
       self?.sendEvent(type: "keyboardClear", payload: nil)
     }
+    keyboard.onDeleteWord = { [weak self] in
+      self?.sendEvent(type: "keyboardDeleteWord", payload: nil)
+    }
     keyboard.onNewline = { [weak self] in
       self?.sendEvent(type: "keyboardNewline", payload: nil)
     }
@@ -132,8 +139,8 @@ final class BridgeController: NSObject, WKScriptMessageHandler, WKNavigationDele
     }
 #endif
 
-    if schemeHandler != nil, let url = URL(string: "app-local://localhost/index.html") {
-      print("[OpenCode] Loading via app-local:// scheme")
+    if schemeHandler != nil, let url = URL(string: "tauri://localhost/") {
+      print("[OpenCode] Loading via tauri:// scheme")
       webView.load(URLRequest(url: url))
       return
     }

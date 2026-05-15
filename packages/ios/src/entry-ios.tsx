@@ -1,10 +1,11 @@
 // @refresh reload
 import { render } from "solid-js/web"
-import { createResource, createSignal, onCleanup, onMount } from "solid-js"
+import { createResource, createSignal, onCleanup, onMount, Show } from "solid-js"
 import { AppBaseProviders, AppInterface, PlatformProvider, ServerConnection, type Platform } from "@opencode-ai/app"
 import { showToast } from "@opencode-ai/ui/toast"
 import { bridge } from "./bridge"
 import { createBridgeStorage } from "./ios-storage"
+import { Onboarding } from "./onboarding"
 import { VoiceInputOverlay } from "./voice-input"
 import pkg from "../package.json"
 
@@ -24,6 +25,16 @@ type VoiceStopResult = {
   code?: string
   message?: string
 }
+type ServerConfig = { url: string; displayName?: string; username?: string; password?: string }
+
+const credentialStorage = createBridgeStorage("opencode.settings.dat")
+
+const normalizeServerUrl = (input: string) => {
+  const trimmed = input.trim()
+  if (!trimmed) return
+  const withProtocol = /^https?:\/\//.test(trimmed) ? trimmed : `http://${trimmed}`
+  return withProtocol.replace(/\/+$/, "")
+}
 
 const root = document.getElementById("root")
 if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
@@ -36,6 +47,10 @@ const App = () => {
   const emitTranscription = (text: string, isFinal?: boolean) => {
     if (!text) return
     window.dispatchEvent(new CustomEvent("opencode:transcription", { detail: { text, isFinal } }))
+  }
+
+  const emitResume = () => {
+    window.dispatchEvent(new Event("opencode:resume"))
   }
 
   const showVoiceError = (message?: string) => {
@@ -125,7 +140,9 @@ const App = () => {
     },
     back: () => window.history.back(),
     forward: () => window.history.forward(),
-    restart: async () => window.location.reload(),
+    restart: async () => {
+      await bridge.sendAsync("reload")
+    },
     voiceStatus: voice,
     startVoiceInput,
     stopVoiceInput,
@@ -142,14 +159,41 @@ const App = () => {
     },
     setDefaultServer: async (url: ServerConnection.Key | null) => {
       await bridge.sendAsync("setDefaultServerUrl", { url })
+      await credentialStorage.removeItem("displayName")
+      await credentialStorage.removeItem("username")
+      await credentialStorage.removeItem("password")
     },
     storage: (name?: string) => createBridgeStorage(name),
   }
 
   const [defaultServer] = createResource(async () => {
     const result = await Promise.resolve(platform.getDefaultServer?.()).catch(() => null)
-    return result ?? null
+    if (!result) return null
+    const displayName = await credentialStorage.getItem("displayName").catch(() => null)
+    const username = await credentialStorage.getItem("username").catch(() => null)
+    const password = await credentialStorage.getItem("password").catch(() => null)
+    return {
+      url: result,
+      displayName: displayName || undefined,
+      username: username || undefined,
+      password: password || undefined,
+    } satisfies ServerConfig
   })
+  const [completedServer, setCompletedServer] = createSignal<ServerConfig | null>(null)
+
+  const handleOnboardingComplete = async (server: ServerConfig) => {
+    const normalized = normalizeServerUrl(server.url)
+    if (!normalized) return
+    const key = ServerConnection.Key.make(normalized)
+    await platform.setDefaultServer?.(key)
+    if (server.displayName) await credentialStorage.setItem("displayName", server.displayName)
+    else await credentialStorage.removeItem("displayName")
+    if (server.username) await credentialStorage.setItem("username", server.username)
+    else await credentialStorage.removeItem("username")
+    if (server.password) await credentialStorage.setItem("password", server.password)
+    else await credentialStorage.removeItem("password")
+    setCompletedServer({ url: normalized, displayName: server.displayName, username: server.username, password: server.password })
+  }
 
   onMount(() => {
     void refreshVoice()
@@ -175,6 +219,17 @@ const App = () => {
       if (status.state === "error") showVoiceError(status.message)
     })
 
+    const stopLifecycle = bridge.on("appLifecycle", (payload) => {
+      const state =
+        typeof payload === "string"
+          ? payload
+          : typeof payload === "object" && payload
+            ? (payload as { state?: unknown }).state
+            : undefined
+      if (state !== "active") return
+      emitResume()
+    })
+
     const stopKeyboardNav = bridge.on("keyboardNavigation", (payload) => {
       if (!payload || typeof payload !== "object") return
       const { direction } = payload as { direction?: string }
@@ -191,6 +246,10 @@ const App = () => {
       document.execCommand("delete")
     })
 
+    const stopKeyboardDeleteWord = bridge.on("keyboardDeleteWord", () => {
+      window.dispatchEvent(new Event("opencode:keyboard-delete-word"))
+    })
+
     const stopKeyboardNewline = bridge.on("keyboardNewline", () => {
       const el = document.activeElement
       if (!el || !(el instanceof HTMLElement) || !el.isContentEditable) return
@@ -202,8 +261,10 @@ const App = () => {
       document.removeEventListener("click", handleClick)
       stopListening()
       stopVoiceState()
+      stopLifecycle()
       stopKeyboardNav()
       stopKeyboardClear()
+      stopKeyboardDeleteWord()
       stopKeyboardNewline()
     })
   })
@@ -219,7 +280,25 @@ const App = () => {
           }}
           onStop={() => void stopVoiceInput()}
         />
-        <AppInterface defaultServer={defaultServer() ?? ServerConnection.Key.make("http://localhost:4096")} />
+        <Show when={!defaultServer.loading}>
+          <Show
+            when={defaultServer() ?? completedServer()}
+            fallback={<Onboarding onComplete={handleOnboardingComplete} />}
+          >
+            {(server) => {
+              const conn = (): ServerConnection.Http => ({
+                type: "http",
+                displayName: server().displayName,
+                http: {
+                  url: server().url,
+                  username: server().username,
+                  password: server().password,
+                },
+              })
+              return <AppInterface defaultServer={ServerConnection.key(conn())} servers={[conn()]} />
+            }}
+          </Show>
+        </Show>
       </AppBaseProviders>
     </PlatformProvider>
   )

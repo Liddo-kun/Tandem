@@ -202,6 +202,22 @@ function createGlobalSync() {
     bootstrap: () => queryClient.fetchQuery({ queryKey: ["bootstrap"] }),
     bootstrapInstance,
   })
+  let lastResumeRefresh = 0
+
+  const queueDirectories = (clearMeta = false) => {
+    for (const directory of Object.keys(children.children)) {
+      if (clearMeta) sessionMeta.delete(directory)
+      queue.push(directory)
+    }
+  }
+
+  const refreshOnResume = () => {
+    const now = Date.now()
+    if (now - lastResumeRefresh < 1000) return
+    lastResumeRefresh = now
+    queue.refresh()
+    queueDirectories(true)
+  }
 
   const children = createChildStoreManager({
     owner,
@@ -358,9 +374,7 @@ function createGlobalSync() {
       })
       if (event.type === "server.connected" || event.type === "global.disposed") {
         if (recent) return
-        for (const directory of Object.keys(children.children)) {
-          queue.push(directory)
-        }
+        queueDirectories(true)
       }
       return
     }
@@ -408,6 +422,27 @@ function createGlobalSync() {
         void globalSDK.event.start()
       }, 0)
     }
+
+    if (typeof window === "undefined") return
+    const onResume = () => refreshOnResume()
+    const onVisibility = () => {
+      if (typeof document === "undefined") return
+      if (document.visibilityState !== "visible") return
+      onResume()
+    }
+    window.addEventListener("focus", onResume)
+    window.addEventListener("pageshow", onResume)
+    window.addEventListener("online", onResume)
+    window.addEventListener("opencode:resume", onResume)
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisibility)
+
+    onCleanup(() => {
+      window.removeEventListener("focus", onResume)
+      window.removeEventListener("pageshow", onResume)
+      window.removeEventListener("online", onResume)
+      window.removeEventListener("opencode:resume", onResume)
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisibility)
+    })
   })
 
   const projectApi = {

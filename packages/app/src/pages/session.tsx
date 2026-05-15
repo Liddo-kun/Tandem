@@ -58,6 +58,8 @@ import { SessionSidePanel } from "@/pages/session/session-side-panel"
 import { TerminalPanel } from "@/pages/session/terminal-panel"
 import { useSessionCommands } from "@/pages/session/use-session-commands"
 import { useSessionHashScroll } from "@/pages/session/use-session-hash-scroll"
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh"
+import { usePlatform } from "@/context/platform"
 import { Identifier } from "@/utils/id"
 import { diffs as list } from "@/utils/diffs"
 import { Persist, persisted } from "@/utils/persist"
@@ -332,6 +334,7 @@ export default function Page() {
   const prompt = usePrompt()
   const comments = useComments()
   const terminal = useTerminal()
+  const platform = usePlatform()
   const [searchParams, setSearchParams] = useSearchParams<{ prompt?: string }>()
   const { params, sessionKey, tabs, view } = useSessionLayout()
 
@@ -739,6 +742,31 @@ export default function Page() {
   let content: HTMLDivElement | undefined
   let scrollMark = 0
   let messageMark = 0
+  let lastResumeSync = 0
+
+  const refreshActiveSession = () => {
+    const id = params.id
+    if (!id) return
+    const now = Date.now()
+    if (now - lastResumeSync < 1000) return
+    lastResumeSync = now
+    void sync.session.sync(id, { force: true })
+    void sync.session.status()
+  }
+
+  const pullToRefresh = usePullToRefresh({
+    scrollElement: () => scroller,
+    onRefresh: async () => {
+      await platform.restart()
+    },
+    onHaptic: () => platform.haptic?.("light"),
+    isNestedScrollable: (target) => {
+      const el = target instanceof Element ? target : undefined
+      const nested = el?.closest("[data-scrollable]")
+      if (!nested || !scroller || nested === scroller || !(nested instanceof HTMLElement)) return false
+      return nested.scrollTop > 0
+    },
+  })
 
   const scrollGestureWindowMs = 250
 
@@ -1773,6 +1801,27 @@ export default function Page() {
 
   onMount(() => {
     makeEventListener(document, "keydown", handleKeyDown)
+    const onResume = () => {
+      if (document.visibilityState === "hidden") return
+      refreshActiveSession()
+    }
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return
+      onResume()
+    }
+    const stopFocus = makeEventListener(window, "focus", onResume)
+    const stopPageShow = makeEventListener(window, "pageshow", onResume)
+    const stopOnline = makeEventListener(window, "online", onResume)
+    const stopResume = makeEventListener(window, "opencode:resume", onResume)
+    const stopVisibility = makeEventListener(document, "visibilitychange", onVisibility)
+
+    onCleanup(() => {
+      stopFocus()
+      stopPageShow()
+      stopOnline()
+      stopResume()
+      stopVisibility()
+    })
   })
 
   onCleanup(() => {
@@ -1791,7 +1840,7 @@ export default function Page() {
     <div class="relative bg-background-base size-full overflow-hidden flex flex-col">
       {sessionSync() ?? ""}
       <SessionHeader />
-      <div class="flex-1 min-h-0 flex flex-col md:flex-row">
+      <div ref={pullToRefresh.setRef} class="flex-1 min-h-0 flex flex-col md:flex-row">
         <Show when={!isDesktop() && !!params.id}>
           <Tabs value={store.mobileTab} class="h-auto">
             <Tabs.List>
@@ -1871,6 +1920,12 @@ export default function Page() {
                     }}
                     renderedUserMessages={historyWindow.renderedUserMessages()}
                     anchor={anchor}
+                    pullToRefresh={{
+                      pulling: pullToRefresh.pulling(),
+                      progress: pullToRefresh.progress(),
+                      refreshing: pullToRefresh.refreshing(),
+                      pullDistance: pullToRefresh.pullDistance(),
+                    }}
                   />
                 </Show>
               </Match>

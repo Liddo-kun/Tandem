@@ -20,6 +20,7 @@ import { getFilename } from "@opencode-ai/core/util/path"
 import { Popover as KobaltePopover } from "@kobalte/core/popover"
 import { shouldMarkBoundaryGesture, normalizeWheelDelta } from "@/pages/session/message-gesture"
 import { SessionContextUsage } from "@/components/session-context-usage"
+import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { useLanguage } from "@/context/language"
@@ -229,6 +230,12 @@ export function MessageTimeline(props: {
   onLoadEarlier: () => void
   renderedUserMessages: UserMessage[]
   anchor: (id: string) => string
+  pullToRefresh: {
+    pulling: boolean
+    progress: number
+    refreshing: boolean
+    pullDistance: number
+  }
 }) {
   let touchGesture: number | undefined
 
@@ -702,8 +709,15 @@ export function MessageTimeline(props: {
           style={{
             "--session-title-height": showHeader() ? "40px" : "0px",
             "--sticky-accordion-top": showHeader() ? "48px" : "0px",
+            "overscroll-behavior-y": "contain",
           }}
         >
+          <PullToRefreshIndicator
+            pulling={props.pullToRefresh.pulling}
+            progress={props.pullToRefresh.progress}
+            refreshing={props.pullToRefresh.refreshing}
+            pullDistance={props.pullToRefresh.pullDistance}
+          />
           <div ref={props.setContentRef} class="min-w-0 w-full">
             <Show when={showHeader()}>
               <div

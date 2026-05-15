@@ -218,6 +218,10 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
         if (Date.now() - lastEventAt < HEARTBEAT_TIMEOUT_MS) return
         attempt?.abort()
       })
+      makeEventListener(window, "opencode:resume", () => {
+        if (!started) return
+        attempt?.abort()
+      })
     })
 
     onCleanup(() => {
