@@ -12,6 +12,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$deviceSpecified = $PSBoundParameters.ContainsKey("Device")
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $buildGradle = Join-Path $scriptDir "src-tauri/gen/android/app/build.gradle.kts"
 $stringsXml = Join-Path $scriptDir "src-tauri/gen/android/app/src/main/res/values/strings.xml"
@@ -51,13 +53,52 @@ function Invoke-LoggedCommand {
     [string]$LogPath,
 
     [Parameter(Mandatory = $true)]
-    [scriptblock]$Command
+    [string]$CommandText
   )
 
-  & $Command *> $LogPath
-  if ($LASTEXITCODE -ne 0) {
-    throw "Command failed with exit code $LASTEXITCODE. See log: $LogPath"
+  & $env:ComSpec /d /c "$CommandText >> `"$LogPath`" 2>&1"
+  $exitCode = $LASTEXITCODE
+  if ($exitCode -ne 0) {
+    throw "Command failed with exit code $exitCode. See log: $LogPath"
   }
+}
+
+function Get-ConnectedDevices {
+  @(adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "\sdevice$" } | ForEach-Object {
+    ($_ -split "\s+")[0]
+  })
+}
+
+function Resolve-Device {
+  param(
+    [string]$Requested,
+    [bool]$Strict
+  )
+
+  if ($Requested) {
+    $state = adb -s $Requested get-state 2>$null
+    if ($LASTEXITCODE -eq 0 -and $state -eq "device") {
+      return $Requested
+    }
+
+    if ($Strict) {
+      throw "Device '$Requested' is not connected. Run 'adb devices' and pass -Device <serial>."
+    }
+  }
+
+  $devices = @(Get-ConnectedDevices)
+  if ($devices.Count -eq 1) {
+    if ($Requested -and $Requested -ne $devices[0]) {
+      [Console]::WriteLine("Configured device '$Requested' is unavailable. Using connected device '$($devices[0])'.")
+    }
+    return $devices[0]
+  }
+
+  if ($devices.Count -eq 0) {
+    throw "No connected Android devices found. Connect the Y700 or pass -Device <serial>."
+  }
+
+  throw "Multiple Android devices found: $($devices -join ', '). Pass -Device <serial>."
 }
 
 function Require-AndroidProject {
@@ -69,7 +110,7 @@ function Require-AndroidProject {
   "Generated Android project missing. Running tauri android init; log: $initLog"
   Push-Location $scriptDir
   try {
-    Invoke-LoggedCommand -LogPath $initLog -Command { bun run tauri android init --ci }
+    Invoke-LoggedCommand -LogPath $initLog -CommandText "bun run tauri android init --ci"
   }
   finally {
     Pop-Location
@@ -120,6 +161,7 @@ function Set-VariantMetadata {
 
 try {
   New-Item -ItemType Directory -Path $workDir | Out-Null
+  $resolvedDevice = Resolve-Device -Requested $Device -Strict $deviceSpecified
   Require-AndroidProject
   Copy-Item -LiteralPath $buildGradle -Destination $backupBuildGradle -Force
   Copy-Item -LiteralPath $stringsXml -Destination $backupStringsXml -Force
@@ -130,7 +172,7 @@ try {
     "Building $appName ($packageId); log: $buildLog"
     Push-Location $scriptDir
     try {
-      Invoke-LoggedCommand -LogPath $buildLog -Command { bun run tauri android build --apk --debug --target $Target }
+      Invoke-LoggedCommand -LogPath $buildLog -CommandText "bun run tauri android build --apk --debug --target $Target"
     }
     finally {
       Pop-Location
@@ -143,13 +185,13 @@ try {
     Copy-Item -LiteralPath $sourceApk -Destination $renamedApk -Force
     "Created APK: $renamedApk"
 
-    "Installing on $Device"
-    adb -s $Device install -r $renamedApk
+    "Installing on $resolvedDevice"
+    adb -s $resolvedDevice install -r $renamedApk
     if ($LASTEXITCODE -ne 0) {
       throw "adb install failed with exit code $LASTEXITCODE"
     }
 
-    adb -s $Device shell pm path $packageId
+    adb -s $resolvedDevice shell pm path $packageId
     if ($LASTEXITCODE -ne 0) {
       throw "Installed package verification failed for $packageId"
     }
