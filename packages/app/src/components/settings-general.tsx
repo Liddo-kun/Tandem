@@ -25,6 +25,9 @@ import {
   terminalFontFamily,
   terminalInput,
   useSettings,
+  displayScaleMax,
+  displayScaleMin,
+  displayScaleStep,
 } from "@/context/settings"
 import { decode64 } from "@/utils/base64"
 import { playSoundById, SOUND_OPTIONS } from "@/utils/sound"
@@ -270,6 +273,11 @@ export const SettingsGeneral: Component = () => {
   const mono = () => monoInput(settings.appearance.font())
   const sans = () => sansInput(settings.appearance.uiFont())
   const terminal = () => terminalInput(settings.appearance.terminalFont())
+  const pageZoom = () => settings.appearance.displayScale()
+  const pageZoomLabel = () => `${Math.round(pageZoom() * 100)}%`
+  const setPageZoomStep = (direction: -1 | 1) => {
+    settings.appearance.setDisplayScale(pageZoom() + direction * displayScaleStep)
+  }
 
   const soundSelectProps = (
     enabled: () => boolean,
@@ -548,6 +556,37 @@ export const SettingsGeneral: Component = () => {
             triggerVariant="settings"
           />
         </SettingsRow>
+
+        <Show when={platform.setWebviewZoom}>
+          <SettingsRow
+            title={language.t("settings.general.row.pageZoom.title")}
+            description={language.t("settings.general.row.pageZoom.description")}
+          >
+            <div data-action="settings-page-zoom" class="flex items-center gap-2">
+              <Button
+                aria-label={language.t("settings.general.row.pageZoom.decrease")}
+                disabled={pageZoom() <= displayScaleMin}
+                onClick={() => setPageZoomStep(-1)}
+                variant="secondary"
+                size="small"
+                class="w-8"
+              >
+                -
+              </Button>
+              <span class="min-w-10 text-center text-12-medium text-text-strong tabular-nums">{pageZoomLabel()}</span>
+              <Button
+                aria-label={language.t("settings.general.row.pageZoom.increase")}
+                disabled={pageZoom() >= displayScaleMax}
+                onClick={() => setPageZoomStep(1)}
+                variant="secondary"
+                size="small"
+                class="w-8"
+              >
+                +
+              </Button>
+            </div>
+          </SettingsRow>
+        </Show>
 
         <SettingsRow
           title={language.t("settings.general.row.uiFont.title")}

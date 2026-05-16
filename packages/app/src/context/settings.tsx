@@ -1,5 +1,5 @@
 import { createStore, reconcile } from "solid-js/store"
-import { createEffect, createMemo } from "solid-js"
+import { createEffect, createMemo, onCleanup } from "solid-js"
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { usePlatform } from "@/context/platform"
 import { persisted } from "@/utils/persist"
@@ -42,6 +42,7 @@ export interface Settings {
     mono: string
     sans: string
     terminal: string
+    displayScale: DisplayScale
   }
   keybinds: Record<string, string>
   permissions: {
@@ -57,6 +58,12 @@ export interface Settings {
 export const monoDefault = "System Mono"
 export const sansDefault = "System Sans"
 export const terminalDefault = "JetBrainsMono Nerd Font Mono"
+export const displayScaleMin = 0.8
+export const displayScaleMax = 1.5
+export const displayScaleStep = 0.02
+export type DisplayScale = number
+
+const displayScaleDefault: DisplayScale = 1
 
 const monoFallback =
   'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
@@ -130,6 +137,7 @@ const defaultSettings: Settings = {
     mono: "",
     sans: "",
     terminal: "",
+    displayScale: displayScaleDefault,
   },
   keybinds: {},
   permissions: {
@@ -155,6 +163,12 @@ const defaultSettings: Settings = {
 
 function withFallback<T>(read: () => T | undefined, fallback: T) {
   return createMemo(() => read() ?? fallback)
+}
+
+function normalizeDisplayScale(value: number | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return displayScaleDefault
+  const clamped = Math.min(displayScaleMax, Math.max(displayScaleMin, value))
+  return Math.round((displayScaleMin + Math.round((clamped - displayScaleMin) / displayScaleStep) * displayScaleStep) * 100) / 100
 }
 
 export const { use: useSettings, provider: SettingsProvider } = createSimpleContext({
@@ -185,6 +199,28 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         })
         .catch(() => undefined)
     })
+
+    createEffect(() => {
+      const scale = normalizeDisplayScale(store.appearance?.displayScale)
+      if (!platform.setWebviewZoom) return
+      void Promise.resolve(platform.setWebviewZoom(scale)).catch(() => undefined)
+    })
+
+    if (typeof window !== "undefined" && platform.setWebviewZoom) {
+      const onHardwareZoom = (event: Event) => {
+        const direction = event instanceof CustomEvent ? event.detail?.direction : undefined
+        if (direction !== -1 && direction !== 1) return
+        setStore(
+          "appearance",
+          "displayScale",
+          normalizeDisplayScale(
+            normalizeDisplayScale(store.appearance?.displayScale) + direction * displayScaleStep,
+          ),
+        )
+      }
+      window.addEventListener("opencode:hardware-zoom", onHardwareZoom)
+      onCleanup(() => window.removeEventListener("opencode:hardware-zoom", onHardwareZoom))
+    }
 
     return {
       ready,
@@ -278,6 +314,13 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         terminalFont: withFallback(() => store.appearance?.terminal, defaultSettings.appearance.terminal),
         setTerminalFont(value: string) {
           setStore("appearance", "terminal", value.trim() ? value : "")
+        },
+        displayScale: withFallback(
+          () => normalizeDisplayScale(store.appearance?.displayScale),
+          defaultSettings.appearance.displayScale,
+        ),
+        setDisplayScale(value: DisplayScale) {
+          setStore("appearance", "displayScale", normalizeDisplayScale(value))
         },
       },
       keybinds: {

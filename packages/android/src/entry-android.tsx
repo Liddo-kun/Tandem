@@ -107,8 +107,34 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
   throw new Error("Root element not found")
 }
 
+let safeAreaProbe: HTMLDivElement | undefined
+
+const safeAreaInset = () => {
+  if (!document.body) return { top: 0, bottom: 0 }
+  if (!safeAreaProbe) {
+    safeAreaProbe = document.createElement("div")
+    safeAreaProbe.style.cssText =
+      "position:fixed;inset:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)"
+    document.body.append(safeAreaProbe)
+  }
+  const style = getComputedStyle(safeAreaProbe)
+  return {
+    top: Number.parseFloat(style.paddingTop) || 0,
+    bottom: Number.parseFloat(style.paddingBottom) || 0,
+  }
+}
+
+const syncAndroidViewport = (zoom: number) => {
+  const height = window.visualViewport?.height ?? window.innerHeight
+  const safeArea = safeAreaInset()
+  document.documentElement.style.setProperty("--android-viewport-height", `${height / zoom}px`)
+  document.documentElement.style.setProperty("--android-safe-area-top", `${safeArea.top / zoom}px`)
+  document.documentElement.style.setProperty("--android-safe-area-bottom", `${safeArea.bottom / zoom}px`)
+}
+
 const App = () => {
   const [voice, setVoice] = createSignal<VoiceStatus>({ state: "prewarming", ready: false })
+  const [webviewZoom, setWebviewZoomValue] = createSignal(1)
 
   const emitTranscription = (text: string, isFinal?: boolean) => {
     if (!text) return
@@ -197,6 +223,13 @@ const App = () => {
     return result
   }
 
+  const setWebviewZoom = (scale: number) => {
+    const zoom = Number.isFinite(scale) && scale > 0 ? scale : 1
+    setWebviewZoomValue(zoom)
+    root?.style.setProperty("zoom", `${zoom}`)
+    syncAndroidViewport(zoom)
+  }
+
   const platform: Platform = {
     platform: "android",
     os: "android",
@@ -220,6 +253,8 @@ const App = () => {
     back: () => window.history.back(),
     forward: () => window.history.forward(),
     restart: async () => window.location.reload(),
+    webviewZoom,
+    setWebviewZoom,
     voiceStatus: voice,
     startVoiceInput,
     stopVoiceInput,
@@ -263,10 +298,7 @@ const App = () => {
     document.documentElement.dataset.platform = "android"
     void refreshVoice()
 
-    const syncViewport = () => {
-      const height = window.visualViewport?.height ?? window.innerHeight
-      document.documentElement.style.setProperty("--android-viewport-height", `${height}px`)
-    }
+    const syncViewport = () => syncAndroidViewport(webviewZoom())
     syncViewport()
 
     const handleClick = (event: MouseEvent) => {

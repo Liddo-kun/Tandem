@@ -15,15 +15,16 @@
     <meta property="twitter:image" content="/social-share.png" />
     <script id="oc-theme-preload-script" src="/oc-theme-preload.js"></script>
   </head>
-  <body class="antialiased overscroll-none text-12-regular overflow-hidden">
+  <body class="antialiased overscroll-none text-12-regular overflow-hidden" style="background-color: var(--background-base)">
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div
       id="root"
       class="flex flex-col h-dvh"
-      style="
+       style="
+        background-color: var(--background-base);
         height: var(--android-viewport-height, 100dvh);
-        padding-top: env(safe-area-inset-top);
-        padding-bottom: env(safe-area-inset-bottom);
+        padding-top: var(--android-safe-area-top, env(safe-area-inset-top));
+        padding-bottom: var(--android-safe-area-bottom, env(safe-area-inset-bottom));
       "
     ></div>
     <script src="/src/entry-android.tsx" type="module"></script>

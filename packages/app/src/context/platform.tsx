@@ -95,8 +95,11 @@ export type Platform = {
   /** Parse markdown to HTML using native parser (desktop only, returns unprocessed code blocks) */
   parseMarkdown?(markdown: string): Promise<string>
 
-  /** Webview zoom level (desktop only) */
+  /** Webview zoom level */
   webviewZoom?: Accessor<number>
+
+  /** Set the webview zoom level (platform-specific) */
+  setWebviewZoom?(scale: number): Promise<void> | void
 
   /** Check if an editor app exists (desktop only) */
   checkAppExists?(appName: string): Promise<boolean>

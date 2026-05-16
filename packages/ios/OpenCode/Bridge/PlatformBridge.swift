@@ -81,6 +81,9 @@ final class PlatformBridge {
     case "setDefaultServerUrl":
       config.setDefaultServerUrl(params["url"] as? String)
       reply(nil, nil)
+    case "setWebviewZoom":
+      setWebviewZoom(scale: (params["scale"] as? NSNumber)?.doubleValue ?? 1)
+      reply(nil, nil)
     case "storageGet":
       reply(config.storageGet(name: params["name"] as? String, key: params["key"] as? String), nil)
     case "storageSet":
@@ -204,5 +207,12 @@ final class PlatformBridge {
     }
 
     return true
+  }
+
+  private func setWebviewZoom(scale: Double) {
+    guard scale.isFinite, scale > 0 else { return }
+    if #available(iOS 14.0, *) {
+      webView?.pageZoom = CGFloat(scale)
+    }
   }
 }

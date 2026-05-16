@@ -44,6 +44,7 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
 
 const App = () => {
   const [voice, setVoice] = createSignal<VoiceStatus>({ state: "prewarming", ready: false })
+  const [webviewZoom, setWebviewZoomValue] = createSignal(1)
   const [speechLocale, setSpeechLocale] = createSignal("en-US")
   const speechLabel = createMemo(() => localeLabel(speechLocale()))
 
@@ -143,6 +144,12 @@ const App = () => {
     return result
   }
 
+  const setWebviewZoom = async (scale: number) => {
+    const zoom = Number.isFinite(scale) && scale > 0 ? scale : 1
+    setWebviewZoomValue(zoom)
+    await bridge.sendAsync("setWebviewZoom", { scale: zoom }).catch(() => undefined)
+  }
+
   const platform: Platform = {
     platform: "ios",
     os: "ios",
@@ -156,6 +163,8 @@ const App = () => {
     restart: async () => {
       await bridge.sendAsync("reload")
     },
+    webviewZoom,
+    setWebviewZoom,
     voiceStatus: voice,
     startVoiceInput,
     stopVoiceInput,
