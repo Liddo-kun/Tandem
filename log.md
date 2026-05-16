@@ -71,3 +71,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 
 - Compacts chat feed spacing by reducing user bubble padding, assistant text spacing, copy-row reserve height, assistant content gap, and turn-list gap. Files: `packages/ui/src/components/message-part.css`, `packages/ui/src/components/session-turn.css`.
 - Adds compact multiline tool summary triggers for Bash and `apply_patch`, including status dots, command/file subjects, and first-line output/change previews while preserving existing expanded details. Files: `packages/ui/src/components/basic-tool.tsx`, `packages/ui/src/components/basic-tool.css`, `packages/ui/src/components/collapsible.css`, `packages/ui/src/components/message-part.tsx`, `packages/ui/src/components/tool-error-card.tsx`.
+
+## Backend Tool Defaults
+
+- Enables Exa-backed websearch by default by making `OPENCODE_ENABLE_EXA` default to true while keeping the explicit env override path. Files: `packages/opencode/src/effect/runtime-flags.ts`, `packages/opencode/test/effect/runtime-flags.test.ts`.
