@@ -10,7 +10,8 @@
     "build": "bun run typecheck && vite build",
     "preview": "vite preview",
     "install:y700": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./install-y700-variant.ps1",
-    "tauri": "tauri"
+    "prepare:android": "bun run patch-android-manifest.ts",
+    "tauri": "bun run prepare:android && tauri"
   },
   "dependencies": {
     "@opencode-ai/app": "workspace:*",

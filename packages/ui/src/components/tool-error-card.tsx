@@ -35,8 +35,8 @@ export function ToolErrorCard(props: ToolErrorCardProps) {
       task: "ui.tool.task",
       webfetch: "ui.tool.webfetch",
       websearch: "ui.tool.websearch",
-      bash: "ui.tool.shell",
-      apply_patch: "ui.tool.patch",
+      bash: "Bash",
+      apply_patch: "apply_patch",
       question: "ui.tool.questions",
     }
     const key = map[split.tool]

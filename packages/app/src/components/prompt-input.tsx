@@ -28,6 +28,7 @@ import { Select } from "@opencode-ai/ui/select"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ModelSelectorPopover } from "@/components/dialog-select-model"
 import { useProviders } from "@/hooks/use-providers"
+import { getSessionContextMetrics } from "@/components/session/session-context-metrics"
 import { useCommand } from "@/context/command"
 import { Persist, persisted } from "@/utils/persist"
 import { usePermission } from "@/context/permission"
@@ -133,7 +134,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   let slashPopoverRef!: HTMLDivElement
 
   const mirror = { input: false }
-  const inset = 56
+  const inset = 44
   const space = `${inset}px`
 
   const scrollCursorIntoView = () => {
@@ -1102,6 +1103,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   })
 
   const variants = createMemo(() => ["default", ...local.model.variant.list()])
+  const sessionMessages = createMemo(() => (params.id ? (sync.data.message[params.id] ?? []) : []))
+  const contextTokens = createMemo(
+    () => getSessionContextMetrics(sessionMessages(), providers.all()).context?.total ?? 0,
+  )
+  const contextTokenLabel = createMemo(() => contextTokens().toLocaleString(language.intl()))
   const accepting = createMemo(() => {
     const id = params.id
     if (!id) return permission.isAutoAcceptingDirectory(sdk.directory)
@@ -1369,7 +1375,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           onMouseDown={(e) => {
             const target = e.target
             if (!(target instanceof HTMLElement)) return
-            if (target.closest('[data-action="prompt-attach"], [data-action="prompt-voice"], [data-action="prompt-submit"]')) {
+            if (
+              target.closest(
+                '[data-action="prompt-attach"], [data-action="prompt-voice"], [data-action="prompt-submit"]',
+              )
+            ) {
               return
             }
             editorRef?.focus()
@@ -1678,6 +1688,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                             variant="ghost"
                           />
                         </TooltipKeybind>
+                      </div>
+                    </Show>
+                    <Show when={params.id}>
+                      <div
+                        data-component="prompt-context-tokens"
+                        class="shrink-0 whitespace-nowrap text-13-regular text-text-weak"
+                      >
+                        <span>Context: </span>
+                        <span class="text-text-base">{contextTokenLabel()}</span>
+                        <span>t</span>
                       </div>
                     </Show>
                   </Show>

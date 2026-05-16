@@ -143,7 +143,10 @@ const App = () => {
     return {
       state,
       ready: (value as { ready?: unknown }).ready === true,
-      message: typeof (value as { message?: unknown }).message === "string" ? (value as { message: string }).message : undefined,
+      message:
+        typeof (value as { message?: unknown }).message === "string"
+          ? (value as { message: string }).message
+          : undefined,
     }
   }
 
@@ -246,7 +249,12 @@ const App = () => {
   const handleOnboardingComplete = async (server: ServerConfig) => {
     const normalized = normalizeServerUrl(server.url)
     if (!normalized) return
-    const config = { url: normalized, displayName: server.displayName, username: server.username, password: server.password }
+    const config = {
+      url: normalized,
+      displayName: server.displayName,
+      username: server.username,
+      password: server.password,
+    }
     await setDefaultServerConfig(config)
     setCompletedServer(config)
   }
@@ -254,6 +262,12 @@ const App = () => {
   onMount(() => {
     document.documentElement.dataset.platform = "android"
     void refreshVoice()
+
+    const syncViewport = () => {
+      const height = window.visualViewport?.height ?? window.innerHeight
+      document.documentElement.style.setProperty("--android-viewport-height", `${height}px`)
+    }
+    syncViewport()
 
     const handleClick = (event: MouseEvent) => {
       const link = (event.target as HTMLElement | null)?.closest("a.external-link") as HTMLAnchorElement | null
@@ -284,10 +298,16 @@ const App = () => {
 
     document.addEventListener("click", handleClick)
     window.addEventListener("focus", onFocus)
+    window.addEventListener("resize", syncViewport)
+    window.visualViewport?.addEventListener("resize", syncViewport)
+    window.visualViewport?.addEventListener("scroll", syncViewport)
     document.addEventListener("visibilitychange", onVisible)
     onCleanup(() => {
       document.removeEventListener("click", handleClick)
       window.removeEventListener("focus", onFocus)
+      window.removeEventListener("resize", syncViewport)
+      window.visualViewport?.removeEventListener("resize", syncViewport)
+      window.visualViewport?.removeEventListener("scroll", syncViewport)
       document.removeEventListener("visibilitychange", onVisible)
       stopListening()
       stopVoiceState()
@@ -306,7 +326,10 @@ const App = () => {
           onStop={() => void stopVoiceInput()}
         />
         <Show when={!defaultServer.loading}>
-          <Show when={defaultServer() ?? completedServer()} fallback={<Onboarding onComplete={handleOnboardingComplete} />}>
+          <Show
+            when={defaultServer() ?? completedServer()}
+            fallback={<Onboarding onComplete={handleOnboardingComplete} />}
+          >
             {(server) => {
               const conn = (): ServerConnection.Http => ({
                 type: "http",
