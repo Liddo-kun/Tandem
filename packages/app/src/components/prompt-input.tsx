@@ -134,8 +134,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   let slashPopoverRef!: HTMLDivElement
 
   const mirror = { input: false }
-  const inset = 44
-  const space = `${inset}px`
+  const actionSpace = createMemo(() => `${platform.platform === "ios" && platform.startVoiceInput ? 116 : 76}px`)
 
   const scrollCursorIntoView = () => {
     const container = scrollRef
@@ -165,8 +164,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       return
     }
 
-    if (bottom > container.scrollTop + container.clientHeight - inset) {
-      container.scrollTop = bottom - container.clientHeight + inset
+    if (bottom > container.scrollTop + container.clientHeight - padding) {
+      container.scrollTop = bottom - container.clientHeight + padding
     }
   }
 
@@ -282,7 +281,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   })
   const buttons = createMemo(() => motion(buttonsSpring()))
   const shell = createMemo(() => motion(1 - buttonsSpring()))
-  const control = createMemo(() => ({ height: "28px", ...buttons() }))
+  const control = createMemo(() => ({ height: "24px", ...buttons() }))
 
   const commentCount = createMemo(() => {
     if (store.mode === "shell") return 0
@@ -735,7 +734,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         const prev = node.previousSibling
         const next = node.nextSibling
         const prevIsBr = prev?.nodeType === Node.ELEMENT_NODE && (prev as HTMLElement).tagName === "BR"
-        return !!prevIsBr && !next
+        // A lone zero-width space is the normalized empty editor; after a trailing <br>, it preserves the caret line.
+        return (!prev || prevIsBr) && !next
       }
       if (node.nodeType !== Node.ELEMENT_NODE) return false
       const el = node as HTMLElement
@@ -758,6 +758,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
     const last = editorRef.lastChild
     if (last?.nodeType === Node.ELEMENT_NODE && (last as HTMLElement).tagName === "BR") {
+      editorRef.appendChild(document.createTextNode("\u200B"))
+    }
+    if (!last) {
+      // Android WebView draws a focused empty contenteditable caret outside our line box unless it has a text node.
       editorRef.appendChild(document.createTextNode("\u200B"))
     }
   }
@@ -1371,7 +1375,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           removeLabel={language.t("prompt.attachment.remove")}
         />
         <div
-          class="relative"
+          class="relative min-h-12"
           onMouseDown={(e) => {
             const target = e.target
             if (!(target instanceof HTMLElement)) return
@@ -1386,9 +1390,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           }}
         >
           <div
-            class="relative max-h-[240px] overflow-y-auto overscroll-contain no-scrollbar"
+            class="relative flex min-h-12 max-h-[240px] items-center overflow-y-auto overscroll-contain no-scrollbar"
             ref={(el) => (scrollRef = el)}
-            style={{ "scroll-padding-bottom": space }}
           >
             <div
               data-component="prompt-input"
@@ -1414,33 +1417,23 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               onKeyDown={handleKeyDown}
               classList={{
                 "select-text": true,
-                "w-full pl-3 pr-2 pt-2 text-14-regular text-text-strong focus:outline-none whitespace-pre-wrap": true,
+                "w-full min-h-8 pl-3 pt-0.5 max-[500px]:pt-1.5 text-14-regular leading-[30px] max-[500px]:leading-[26px] text-text-strong focus:outline-none whitespace-pre-wrap": true,
                 "[&_[data-type=file]]:text-syntax-property": true,
                 "[&_[data-type=agent]]:text-syntax-type": true,
                 "font-mono!": store.mode === "shell",
               }}
-              style={{ "padding-bottom": space }}
+              style={{ "padding-right": actionSpace() }}
             />
             <div
-              class="absolute top-0 inset-x-0 pl-3 pr-2 pt-2 text-14-regular text-text-weak pointer-events-none whitespace-nowrap truncate"
+              class="absolute top-1/2 inset-x-0 h-8 -translate-y-1/2 pl-3 pt-0.5 max-[500px]:pt-1.5 text-14-regular leading-[30px] max-[500px]:leading-[26px] text-text-weak pointer-events-none whitespace-nowrap truncate"
               classList={{ "font-mono!": store.mode === "shell" }}
-              style={{ "padding-bottom": space, display: prompt.dirty() ? "none" : undefined }}
+              style={{ "padding-right": actionSpace(), display: prompt.dirty() ? "none" : undefined }}
             >
               {placeholder()}
             </div>
           </div>
 
-          <div
-            aria-hidden="true"
-            class="pointer-events-none absolute inset-x-0 bottom-0"
-            style={{
-              height: space,
-              background:
-                "linear-gradient(to top, var(--surface-raised-stronger-non-alpha) calc(100% - 20px), transparent)",
-            }}
-          />
-
-          <div class="pointer-events-none absolute bottom-2 right-2 flex items-center gap-2">
+          <div class="pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -1455,10 +1448,29 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             />
 
             <div class="flex items-center gap-1 pointer-events-auto">
+              <TooltipKeybind
+                placement="top"
+                title={language.t("prompt.action.attachFile")}
+                keybind={command.keybind("file.attach")}
+              >
+                <Button
+                  data-action="prompt-attach"
+                  type="button"
+                  variant="ghost"
+                  class="size-8 p-0"
+                  style={buttons()}
+                  onClick={pick}
+                  disabled={store.mode !== "normal"}
+                  tabIndex={store.mode === "normal" ? undefined : -1}
+                  aria-label={language.t("prompt.action.attachFile")}
+                >
+                  <Icon name="plus" class="size-4.5" />
+                </Button>
+              </TooltipKeybind>
               <Show
                 when={
                   store.mode === "normal" &&
-                  (platform.platform === "ios" || platform.platform === "android") &&
+                  platform.platform === "ios" &&
                   platform.startVoiceInput
                 }
               >
@@ -1494,44 +1506,14 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               </Tooltip>
             </div>
           </div>
-
-          <div class="pointer-events-none absolute bottom-2 left-2">
-            <div
-              aria-hidden={store.mode !== "normal"}
-              class="pointer-events-auto flex h-8 items-center gap-1"
-              style={{
-                "pointer-events": buttonsSpring() > 0.5 ? "auto" : "none",
-              }}
-            >
-              <TooltipKeybind
-                placement="top"
-                title={language.t("prompt.action.attachFile")}
-                keybind={command.keybind("file.attach")}
-              >
-                <Button
-                  data-action="prompt-attach"
-                  type="button"
-                  variant="ghost"
-                  class="size-8 p-0"
-                  style={buttons()}
-                  onClick={pick}
-                  disabled={store.mode !== "normal"}
-                  tabIndex={store.mode === "normal" ? undefined : -1}
-                  aria-label={language.t("prompt.action.attachFile")}
-                >
-                  <Icon name="plus" class="size-4.5" />
-                </Button>
-              </TooltipKeybind>
-            </div>
-          </div>
         </div>
       </DockShellForm>
       <Show when={store.mode === "normal" || store.mode === "shell"}>
         <DockTray attach="top">
-          <div class="px-1.75 pt-5.5 pb-2 flex items-center gap-2 min-w-0">
+          <div class="px-1.75 pt-4 pb-[1px] flex items-center gap-2 min-w-0">
             <div class="flex items-center gap-1.5 min-w-0 flex-1 relative">
               <div
-                class="h-7 flex items-center gap-1.5 min-w-0 absolute inset-0"
+                class="h-6 flex items-center gap-1.5 min-w-0 absolute inset-0"
                 style={{
                   padding: "0 0px 0 8px",
                   ...shell(),
@@ -1550,7 +1532,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   {language.t("common.cancel")}
                 </Button>
               </div>
-              <div class="flex items-center gap-1.5 min-w-0 flex-1 h-7">
+              <div class="flex items-center gap-1.5 min-w-0 flex-1 h-6">
                 <Show when={!agentsLoading()}>
                   <div
                     data-component="prompt-agent-control"
@@ -1563,7 +1545,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       keybind={command.keybind("agent.cycle")}
                     >
                       <Select
-                        size="normal"
+                        size="small"
                         options={agentNames()}
                         current={local.agent.current()?.name ?? ""}
                         onSelect={(value) => {
@@ -1598,7 +1580,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                               data-action="prompt-model"
                               as="div"
                               variant="ghost"
-                              size="normal"
+                              size="small"
                               class="min-w-0 max-w-[320px] text-13-regular text-text-base group"
                               style={control()}
                               onClick={() => {
@@ -1636,7 +1618,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                             triggerAs={Button}
                             triggerProps={{
                               variant: "ghost",
-                              size: "normal",
+                              size: "small",
                               style: control(),
                               class: "min-w-0 max-w-[320px] text-13-regular text-text-base group",
                               "data-action": "prompt-model",
@@ -1673,7 +1655,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                           keybind={command.keybind("model.variant.cycle")}
                         >
                           <Select
-                            size="normal"
+                            size="small"
                             options={variants()}
                             current={local.model.variant.current() ?? "default"}
                             label={(x) => (x === "default" ? language.t("common.default") : x)}
