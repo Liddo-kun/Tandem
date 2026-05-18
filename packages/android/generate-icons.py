@@ -1,41 +1,26 @@
 #!/usr/bin/env python3
-"""Generate Android app icon PNGs from the iOS icon assets.
+"""Generate WhisperCode Android launcher icons."""
 
-Resizes the iOS AppIcon PNGs into all 5 mipmap densities for:
-  - ic_launcher_foreground.png (tinted icon on transparent bg, 108dp adaptive canvas)
-  - ic_launcher.png (dark icon, standard launcher)
-  - ic_launcher_round.png (dark icon, round launcher)
-
-Also generates adaptive icon XML files and outputs to:
-  1. packages/android/src-tauri/gen/android/app/src/main/res/
-  2. packages/desktop/src-tauri/icons/dev/android/
-  3. packages/desktop/src-tauri/icons/prod/android/
-"""
-
-from PIL import Image
+from PIL import Image, ImageDraw
 import os
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+RES_DIR = os.path.join(SCRIPT_DIR, "src-tauri", "gen", "android", "app", "src", "main", "res")
+SCALE = 2
 
-IOS_ICON_DIR = os.path.join(
-    SCRIPT_DIR, "..", "ios", "WhisperCode", "WhisperCode",
-    "Assets.xcassets", "AppIcon.appiconset",
-)
-
-# All output directories
-OUTPUT_DIRS = [
-    os.path.join(
-        SCRIPT_DIR, "src-tauri", "gen", "android", "app", "src", "main", "res",
-    ),
-    os.path.join(
-        SCRIPT_DIR, "..", "desktop", "src-tauri", "icons", "dev", "android",
-    ),
-    os.path.join(
-        SCRIPT_DIR, "..", "desktop", "src-tauri", "icons", "prod", "android",
-    ),
+W_RECTS = [
+    (128, 96, 160, 320),
+    (352, 96, 384, 320),
+    (224, 224, 288, 288),
+    (192, 256, 224, 288),
+    (288, 256, 320, 288),
+    (160, 288, 192, 352),
+    (320, 288, 352, 352),
+    (192, 320, 224, 416),
+    (288, 320, 320, 416),
 ]
+SHADOW_RECT = (224, 288, 288, 352)
 
-# Android adaptive icons: 108dp canvas, 72dp visible area, 66dp safe zone
 FOREGROUND_SIZES = {
     "mdpi": 108,
     "hdpi": 162,
@@ -44,7 +29,6 @@ FOREGROUND_SIZES = {
     "xxxhdpi": 432,
 }
 
-# Standard icon sizes per density (48dp)
 ICON_SIZES = {
     "mdpi": 48,
     "hdpi": 72,
@@ -63,16 +47,31 @@ ADAPTIVE_ICON_XML = """\
 IC_LAUNCHER_BACKGROUND_XML = """\
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <color name="ic_launcher_background">#fff</color>
+  <color name="ic_launcher_background">#131010</color>
 </resources>"""
 
 
-def make_foreground(src_img, size):
-    """Create adaptive icon foreground: place the icon art within the 108dp canvas.
+def scaled(rect):
+    return tuple(v * SCALE for v in rect)
 
-    The visible area is 72/108 of the canvas. We resize the source to fit
-    the visible area and paste it centered on a transparent canvas.
-    """
+
+def draw_icon(bg_color, letter_color, shadow_color=None, transparent_bg=False):
+    size = 512 * SCALE
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0) if transparent_bg else bg_color)
+    draw = ImageDraw.Draw(img)
+
+    if shadow_color:
+        x1, y1, x2, y2 = scaled(SHADOW_RECT)
+        draw.rectangle([x1, y1, x2 - 1, y2 - 1], fill=shadow_color)
+
+    for rect in W_RECTS:
+        x1, y1, x2, y2 = scaled(rect)
+        draw.rectangle([x1, y1, x2 - 1, y2 - 1], fill=letter_color)
+
+    return img
+
+
+def make_foreground(src_img, size):
     canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     visible = int(size * 72 / 108)
     resized = src_img.resize((visible, visible), Image.LANCZOS)
@@ -81,65 +80,38 @@ def make_foreground(src_img, size):
     return canvas
 
 
-def generate_icons(res_dir, dark, tinted, label):
-    """Generate all icon PNGs and XML files into a single res directory."""
-    print(f"\n--- {label} ---")
-    print(f"  Output: {res_dir}")
+def main():
+    if not os.path.isdir(RES_DIR):
+        print(f"Android resource directory missing; skipping launcher icon generation: {RES_DIR}")
+        return
+
+    dark = draw_icon(bg_color="#131010", letter_color="#FFFFFF", shadow_color="#5A5858")
+    tinted = draw_icon(bg_color=None, letter_color="#FFFFFF", transparent_bg=True)
 
     for density, size in FOREGROUND_SIZES.items():
-        out_dir = os.path.join(res_dir, f"mipmap-{density}")
+        out_dir = os.path.join(RES_DIR, f"mipmap-{density}")
         os.makedirs(out_dir, exist_ok=True)
-
-        fg = make_foreground(tinted, size)
-        fg.save(os.path.join(out_dir, "ic_launcher_foreground.png"))
-        print(f"  mipmap-{density}/ic_launcher_foreground.png ({size}x{size})")
+        make_foreground(tinted, size).save(os.path.join(out_dir, "ic_launcher_foreground.png"))
 
     for density, size in ICON_SIZES.items():
-        out_dir = os.path.join(res_dir, f"mipmap-{density}")
+        out_dir = os.path.join(RES_DIR, f"mipmap-{density}")
         os.makedirs(out_dir, exist_ok=True)
-
         icon = dark.resize((size, size), Image.LANCZOS)
         icon.save(os.path.join(out_dir, "ic_launcher.png"))
         icon.save(os.path.join(out_dir, "ic_launcher_round.png"))
-        print(f"  mipmap-{density}/ic_launcher.png + ic_launcher_round.png ({size}x{size})")
 
-    # Adaptive icon XML (API 26+)
-    anydpi_dir = os.path.join(res_dir, "mipmap-anydpi-v26")
+    anydpi_dir = os.path.join(RES_DIR, "mipmap-anydpi-v26")
     os.makedirs(anydpi_dir, exist_ok=True)
     for name in ("ic_launcher.xml", "ic_launcher_round.xml"):
         with open(os.path.join(anydpi_dir, name), "w") as f:
             f.write(ADAPTIVE_ICON_XML)
-        print(f"  mipmap-anydpi-v26/{name}")
 
-    # Background color resource
-    values_dir = os.path.join(res_dir, "values")
+    values_dir = os.path.join(RES_DIR, "values")
     os.makedirs(values_dir, exist_ok=True)
     with open(os.path.join(values_dir, "ic_launcher_background.xml"), "w") as f:
         f.write(IC_LAUNCHER_BACKGROUND_XML)
-    print(f"  values/ic_launcher_background.xml")
 
-
-def main():
-    dark_path = os.path.join(IOS_ICON_DIR, "AppIcon-dark.png")
-    tinted_path = os.path.join(IOS_ICON_DIR, "AppIcon-tinted.png")
-
-    dark = Image.open(dark_path).convert("RGBA")
-    tinted = Image.open(tinted_path).convert("RGBA")
-
-    print("Source icons:")
-    print(f"  Dark:   {dark_path} ({dark.size[0]}x{dark.size[1]})")
-    print(f"  Tinted: {tinted_path} ({tinted.size[0]}x{tinted.size[1]})")
-
-    labels = [
-        "Android gen/android (Tauri build)",
-        "Desktop dev/android icons",
-        "Desktop prod/android icons",
-    ]
-
-    for res_dir, label in zip(OUTPUT_DIRS, labels):
-        generate_icons(res_dir, dark, tinted, label)
-
-    print("\nDone! All Android icons generated.")
+    print(f"Generated WhisperCode Android launcher icons in {RES_DIR}")
 
 
 if __name__ == "__main__":

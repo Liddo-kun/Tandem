@@ -172,9 +172,11 @@ try {
     "Building $appName ($packageId); log: $buildLog"
     Push-Location $scriptDir
     try {
+      $env:OPENCODE_ANDROID_VARIANT = "1"
       Invoke-LoggedCommand -LogPath $buildLog -CommandText "bun run tauri android build --apk --debug --target $Target"
     }
     finally {
+      Remove-Item Env:\OPENCODE_ANDROID_VARIANT -ErrorAction SilentlyContinue
       Pop-Location
     }
 
@@ -200,6 +202,13 @@ try {
     if ((Test-Path -LiteralPath $backupBuildGradle) -and (Test-Path -LiteralPath $backupStringsXml)) {
       Copy-Item -LiteralPath $backupBuildGradle -Destination $buildGradle -Force
       Copy-Item -LiteralPath $backupStringsXml -Destination $stringsXml -Force
+      Push-Location $scriptDir
+      try {
+        Invoke-LoggedCommand -LogPath $buildLog -CommandText "bun run patch-android-generated.ts"
+      }
+      finally {
+        Pop-Location
+      }
       "Restored generated Android metadata files."
     }
   }
