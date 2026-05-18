@@ -134,7 +134,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   let slashPopoverRef!: HTMLDivElement
 
   const mirror = { input: false }
-  const actionSpace = createMemo(() => `${platform.platform === "ios" && platform.startVoiceInput ? 116 : 76}px`)
 
   const scrollCursorIntoView = () => {
     const container = scrollRef
@@ -1375,7 +1374,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           removeLabel={language.t("prompt.attachment.remove")}
         />
         <div
-          class="relative min-h-12"
+          class="relative flex min-h-12 items-center"
           onMouseDown={(e) => {
             const target = e.target
             if (!(target instanceof HTMLElement)) return
@@ -1390,7 +1389,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           }}
         >
           <div
-            class="relative flex min-h-12 max-h-[240px] items-center overflow-y-auto overscroll-contain no-scrollbar"
+            class="relative min-w-0 flex-1 max-h-[240px] overflow-y-auto overscroll-contain no-scrollbar"
             ref={(el) => (scrollRef = el)}
           >
             <div
@@ -1417,23 +1416,22 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               onKeyDown={handleKeyDown}
               classList={{
                 "select-text": true,
-                "w-full min-h-8 pl-3 pt-0.5 max-[500px]:pt-1.5 text-14-regular leading-[30px] max-[500px]:leading-[26px] text-text-strong focus:outline-none whitespace-pre-wrap": true,
+                "w-full min-h-12 pl-3 pr-2 py-3 text-14-regular text-text-strong focus:outline-none whitespace-pre-wrap": true,
                 "[&_[data-type=file]]:text-syntax-property": true,
                 "[&_[data-type=agent]]:text-syntax-type": true,
                 "font-mono!": store.mode === "shell",
               }}
-              style={{ "padding-right": actionSpace() }}
             />
             <div
-              class="absolute top-1/2 inset-x-0 h-8 -translate-y-1/2 pl-3 pt-0.5 max-[500px]:pt-1.5 text-14-regular leading-[30px] max-[500px]:leading-[26px] text-text-weak pointer-events-none whitespace-nowrap truncate"
+              class="absolute inset-x-0 top-0 min-h-12 pl-3 pr-2 py-3 text-14-regular text-text-weak pointer-events-none whitespace-nowrap truncate"
               classList={{ "font-mono!": store.mode === "shell" }}
-              style={{ "padding-right": actionSpace(), display: prompt.dirty() ? "none" : undefined }}
+              style={{ display: prompt.dirty() ? "none" : undefined }}
             >
               {placeholder()}
             </div>
           </div>
 
-          <div class="pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+          <div class="shrink-0 pr-2 flex items-center gap-2">
             <input
               ref={fileInputRef}
               type="file"

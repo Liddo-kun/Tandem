@@ -44,6 +44,7 @@ $apkSlug = $packageSegments -join "-"
 $renamedApk = Join-Path $apkDir "opencode-$apkSlug-y700-debug.apk"
 $workDir = Join-Path ([IO.Path]::GetTempPath()) "opencode-y700-$([guid]::NewGuid().ToString('N'))"
 $buildLog = Join-Path $workDir "android-build.log"
+$restoreLog = Join-Path $workDir "android-restore.log"
 $backupBuildGradle = Join-Path $workDir "build.gradle.kts"
 $backupStringsXml = Join-Path $workDir "strings.xml"
 
@@ -204,7 +205,13 @@ try {
       Copy-Item -LiteralPath $backupStringsXml -Destination $stringsXml -Force
       Push-Location $scriptDir
       try {
-        Invoke-LoggedCommand -LogPath $buildLog -CommandText "bun run patch-android-generated.ts"
+        try {
+          Invoke-LoggedCommand -LogPath $restoreLog -CommandText "bun run patch-android-generated.ts"
+        }
+        catch {
+          [Console]::Error.WriteLine("Warning: restored generated Android metadata backups, but post-restore patching failed: $($_.Exception.Message)")
+          [Console]::Error.WriteLine("Restore log: $restoreLog")
+        }
       }
       finally {
         Pop-Location
