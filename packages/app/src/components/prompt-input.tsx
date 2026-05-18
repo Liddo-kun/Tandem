@@ -134,6 +134,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   let slashPopoverRef!: HTMLDivElement
 
   const mirror = { input: false }
+  const mobile = () => platform.platform === "ios" || platform.platform === "android"
 
   const scrollCursorIntoView = () => {
     const container = scrollRef
@@ -1250,6 +1251,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         event.preventDefault()
         return
       }
+    }
+
+    if (event.key === "Enter" && !event.shiftKey && mobile() && store.mode === "normal") {
+      addPart({ type: "text", content: "\n", start: 0, end: 0 })
+      event.preventDefault()
+      return
     }
 
     if (ctrl && event.code === "KeyG") {

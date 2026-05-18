@@ -1,8 +1,10 @@
-import { Show, createEffect, createMemo, onCleanup } from "solid-js"
+import { Show, createEffect, createMemo, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useNavigate } from "@solidjs/router"
 import { useSpring } from "@opencode-ai/ui/motion-spring"
+import { makeEventListener } from "@solid-primitives/event-listener"
 import { useLayout } from "@/context/layout"
+import { usePlatform } from "@/context/platform"
 import { PromptInput } from "@/components/prompt-input"
 import { useLanguage } from "@/context/language"
 import { usePrompt } from "@/context/prompt"
@@ -48,6 +50,7 @@ export function SessionComposerRegion(props: {
 }) {
   const navigate = useNavigate()
   const layout = useLayout()
+  const platform = usePlatform()
   const prompt = usePrompt()
   const language = useLanguage()
   const route = useSessionKey()
@@ -84,6 +87,7 @@ export function SessionComposerRegion(props: {
   })
   let timer: number | undefined
   let frame: number | undefined
+  let dockRef: HTMLDivElement | undefined
 
   const clear = () => {
     if (timer !== undefined) {
@@ -116,6 +120,19 @@ export function SessionComposerRegion(props: {
 
   onCleanup(clear)
 
+  onMount(() => {
+    if (platform.platform !== "ios" && platform.platform !== "android") return
+    const stop = makeEventListener(
+      dockRef!,
+      "touchmove",
+      (event) => {
+        event.preventDefault()
+      },
+      { passive: false },
+    )
+    onCleanup(stop)
+  })
+
   const open = createMemo(() => store.ready && props.state.dock() && !props.state.closing())
   const progress = useSpring(() => (open() ? 1 : 0), { visualDuration: 0.3, bounce: 0 })
   const value = createMemo(() => Math.max(0, Math.min(1, progress())))
@@ -140,7 +157,10 @@ export function SessionComposerRegion(props: {
 
   return (
     <div
-      ref={props.setPromptDockRef}
+      ref={(el) => {
+        dockRef = el
+        props.setPromptDockRef(el)
+      }}
       data-component="session-prompt-dock"
       class="shrink-0 w-full pb-1 md:pb-3 flex flex-col justify-center items-center bg-background-stronger pointer-events-none"
     >
