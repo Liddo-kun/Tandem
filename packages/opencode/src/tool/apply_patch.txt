@@ -1,4 +1,4 @@
-Use the `apply_patch` tool to edit files. Your patch language is a stripped‑down, file‑oriented diff format designed to be easy to parse and safe to apply. You can think of it as a high‑level envelope:
+The `apply_patch` tool is your combined Write tool, Edit tool, Delete tool, and rename/move tool. Your patch language is a stripped‑down, file‑oriented diff format designed to be easy to parse and safe to apply. Using `apply_patch` allows better tracking of file changes in the harness backend. You can think of it as a high‑level envelope:
 
 *** Begin Patch
 [ one or more file sections ]

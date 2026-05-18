@@ -6,7 +6,12 @@ ${workdirSection}
 
 Use `${tmp}` for temporary work outside the workspace. This directory has already been created, already exists, and is pre-approved for external directory access.
 
-IMPORTANT: This tool is for terminal operations like git, npm, docker, etc. DO NOT use it for file operations (reading, writing, editing, searching, finding files) - use the specialized tools for this instead.
+IMPORTANT: This tool is for terminal operations like git, npm, docker, etc. Prefer dedicated tools for file and communication tasks. Use the bash tool for these operations only when explicitly requested, necessary, or more efficient for ungainly or repetitive work:
+- File search: use Glob instead of shell directory traversal
+- Content search: use Grep instead of shell search commands
+- Read files: use Read instead of shell commands that print file contents
+- Modify files: use the available file modification tool instead of shell redirects or content commands
+- Communication: respond directly instead of using shell commands to print messages
 
 ${commandSection}
 
