@@ -1837,20 +1837,6 @@ export default function Page() {
         >
           <div class="flex-1 min-h-0 overflow-hidden">
             <Switch>
-              <Match when={params.id && mobileChanges()}>
-                <div class="relative h-full overflow-hidden">
-                  {reviewContent({
-                    diffStyle: "unified",
-                    classes: {
-                      root: "pb-8",
-                      header: "px-4",
-                      container: "px-4",
-                    },
-                    loadingClass: "px-4 py-4 text-text-weak",
-                    emptyClass: "h-full pb-64 -mt-4 flex flex-col items-center justify-center text-center gap-6",
-                  })}
-                </div>
-              </Match>
               <Match when={params.id}>
                 <Show when={messagesReady()}>
                   <MessageTimeline

@@ -1040,7 +1040,7 @@ export function MessageTimeline(props: {
         )
       }
       case "BottomSpacer":
-        return <div data-timeline-row="bottom-spacer" aria-hidden="true" class="h-16" />
+        return <div data-timeline-row="bottom-spacer" aria-hidden="true" class="h-8" />
     }
   }
 
