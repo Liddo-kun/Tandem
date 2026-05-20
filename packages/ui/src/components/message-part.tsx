@@ -56,6 +56,30 @@ import { patchFiles, type ApplyPatchFile } from "./apply-patch-file"
 import { useLocation } from "@solidjs/router"
 import { attached, inline, kind } from "./message-file"
 
+async function writeClipboard(text: string): Promise<boolean> {
+  const body = typeof document === "undefined" ? undefined : document.body
+  if (body) {
+    const textarea = document.createElement("textarea")
+    textarea.value = text
+    textarea.setAttribute("readonly", "")
+    textarea.style.position = "fixed"
+    textarea.style.opacity = "0"
+    textarea.style.pointerEvents = "none"
+    body.appendChild(textarea)
+    textarea.select()
+    const copied = document.execCommand("copy")
+    body.removeChild(textarea)
+    if (copied) return true
+  }
+
+  const clipboard = typeof navigator === "undefined" ? undefined : navigator.clipboard
+  if (!clipboard?.writeText) return false
+  return clipboard.writeText(text).then(
+    () => true,
+    () => false,
+  )
+}
+
 interface Diagnostic {
   range: {
     start: { line: number; character: number }
@@ -1096,9 +1120,10 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
   const handleCopy = async () => {
     const content = text()
     if (!content) return
-    await navigator.clipboard.writeText(content)
-    setState("copied", true)
-    setTimeout(() => setState("copied", false), 2000)
+    if (await writeClipboard(content)) {
+      setState("copied", true)
+      setTimeout(() => setState("copied", false), 2000)
+    }
   }
 
   const revert = () => {
@@ -1522,9 +1547,10 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
   const handleCopy = async () => {
     const content = text()
     if (!content) return
-    await navigator.clipboard.writeText(content)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    if (await writeClipboard(content)) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
   }
 
   return (
@@ -1867,9 +1893,10 @@ ToolRegistry.register({
     const handleCopy = async () => {
       const content = text()
       if (!content) return
-      await navigator.clipboard.writeText(content)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (await writeClipboard(content)) {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }
     }
 
     return (
