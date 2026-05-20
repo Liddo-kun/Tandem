@@ -14,6 +14,8 @@ Build and maintain one personal repo, `Tandem`, based on current official OpenCo
 
 Use `log.md` as the exhaustive final-state inventory of Tandem changes relative to official OpenCode. `context.md` explains how to work in this repo; it should not become a skipped-commit ledger or merge-history log.
 
+Always read and update log.md when making a change to opencode, the web ui or the mobile apps.
+
 Before changing `packages/opencode` backend source, first check whether OpenCode config, a plugin, the opencode configuration skill, or documented extension points can solve the request without creating fork divergence.
 
 ## Source Priorities
