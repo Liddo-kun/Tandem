@@ -13,12 +13,15 @@ const generated = (...parts: string[]) =>
   path.join(import.meta.dir, "src-tauri", "gen", "android", "app", "src", "main", ...parts)
 
 const manifestPath = generated("AndroidManifest.xml")
+const gradlePropertiesPath = path.join(import.meta.dir, "src-tauri", "gen", "android", "gradle.properties")
 const buildGradlePath = path.join(import.meta.dir, "src-tauri", "gen", "android", "app", "build.gradle.kts")
 const stringsPath = generated("res", "values", "strings.xml")
 const mainActivityTemplatePath = path.join(import.meta.dir, "src-tauri", "templates", "MainActivity.kt")
 const config = (await Bun.file(path.join(import.meta.dir, "src-tauri", "tauri.conf.json")).json()) as TauriConfig
 const manifest = Bun.file(manifestPath)
 const mainActivity = await findMainActivity()
+
+await patchGradleProperties()
 
 if (process.env.OPENCODE_ANDROID_VARIANT !== "1") {
   await patchBuildGradle()
@@ -62,6 +65,20 @@ async function patchBuildGradle() {
   )
 }
 
+async function patchGradleProperties() {
+  const gradleProperties = Bun.file(gradlePropertiesPath)
+  if (!(await gradleProperties.exists())) return
+
+  await Bun.write(
+    gradlePropertiesPath,
+    setProperties(await gradleProperties.text(), {
+      // CI-style local builds should exit cleanly instead of leaving Gradle/Kotlin daemons alive.
+      "org.gradle.daemon": "false",
+      "kotlin.compiler.execution.strategy": "in-process",
+    }),
+  )
+}
+
 async function patchStrings() {
   const strings = Bun.file(stringsPath)
   if (!(await strings.exists())) return
@@ -93,4 +110,27 @@ function escapeXml(value: string) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;")
+}
+
+function setProperties(text: string, properties: Record<string, string>) {
+  const lines = text.split(/\r?\n/)
+  const seen = new Set<string>()
+
+  const updated = lines.map((line) => {
+    const match = line.match(/^([^#!\s][^=]*)=(.*)$/)
+    if (!match) return line
+
+    const key = match[1]!.trim()
+    const value = properties[key]
+    if (value === undefined) return line
+
+    seen.add(key)
+    return `${key}=${value}`
+  })
+
+  for (const [key, value] of Object.entries(properties)) {
+    if (!seen.has(key)) updated.push(`${key}=${value}`)
+  }
+
+  return updated.join("\n")
 }

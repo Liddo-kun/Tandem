@@ -57,11 +57,20 @@ function Invoke-LoggedCommand {
     [string]$CommandText
   )
 
-  & $env:ComSpec /d /c "$CommandText >> `"$LogPath`" 2>&1"
-  $exitCode = $LASTEXITCODE
+  $started = Get-Date
+  $process = Start-Process `
+    -FilePath $env:ComSpec `
+    -ArgumentList @("/d", "/c", "$CommandText > `"$LogPath`" 2>&1") `
+    -NoNewWindow `
+    -PassThru `
+    -Wait
+  $exitCode = $process.ExitCode
   if ($exitCode -ne 0) {
     throw "Command failed with exit code $exitCode. See log: $LogPath"
   }
+
+  $elapsed = (Get-Date) - $started
+  [Console]::WriteLine("Command finished in $([math]::Round($elapsed.TotalSeconds, 1))s. Full log: $LogPath")
 }
 
 function Get-ConnectedDevices {
