@@ -69,7 +69,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 
 ## Shared Chat And Tool Display
 
-- Compacts chat feed spacing by reducing user bubble padding, assistant text spacing, copy-row reserve height, assistant content gap, and turn-list gap. Files: `packages/ui/src/components/message-part.css`, `packages/ui/src/components/session-turn.css`.
+- Compacts chat feed spacing by reducing user bubble padding, user and assistant copy/meta row height, assistant text spacing, inter-turn padding, assistant content gap, and turn-list gap. Files: `packages/app/src/pages/session/message-timeline.tsx`, `packages/ui/src/components/message-part.css`, `packages/ui/src/components/session-turn.css`.
 - Adds compact multiline tool summary triggers for Bash and `apply_patch`, including status dots, command/file subjects, and first-line output/change previews while preserving existing expanded details. Files: `packages/ui/src/components/basic-tool.tsx`, `packages/ui/src/components/basic-tool.css`, `packages/ui/src/components/collapsible.css`, `packages/ui/src/components/message-part.tsx`, `packages/ui/src/components/tool-error-card.tsx`.
 
 ## Backend Tool Defaults

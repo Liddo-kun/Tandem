@@ -147,8 +147,8 @@
   }
 
   [data-slot="user-message-copy-wrapper"] {
-    min-height: 20px;
-    margin-top: 2px;
+    min-height: 18px;
+    margin-top: 0;
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -216,8 +216,8 @@
   }
 
   [data-slot="text-part-copy-wrapper"] {
-    min-height: 20px;
-    margin-top: 2px;
+    min-height: 18px;
+    margin-top: 0;
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -230,6 +230,11 @@
     [data-component="tooltip-trigger"] {
       display: inline-flex;
       width: fit-content;
+    }
+
+    [data-component="icon-button"][data-size="normal"] {
+      width: 20px;
+      height: 20px;
     }
   }
 
