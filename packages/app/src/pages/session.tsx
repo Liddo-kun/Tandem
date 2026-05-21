@@ -1332,7 +1332,6 @@ export default function Page() {
   const autoScroll = createAutoScroll({
     working: () => true,
     overflowAnchor: "dynamic",
-    reverseScrollTop: platform.platform !== "ios" && platform.platform !== "android",
   })
 
   let scrollStateFrame: number | undefined
@@ -1340,10 +1339,8 @@ export default function Page() {
   let fillFrame: number | undefined
 
   const jumpThreshold = (el: HTMLDivElement) => Math.max(400, el.clientHeight)
-  const reverseScrollTop = () => platform.platform !== "ios" && platform.platform !== "android"
   const distanceFromBottom = (el: HTMLDivElement) => {
     const max = Math.max(0, el.scrollHeight - el.clientHeight)
-    if (reverseScrollTop()) return Math.abs(el.scrollTop)
     return Math.max(0, max - el.scrollTop)
   }
 
@@ -1920,7 +1917,6 @@ export default function Page() {
                       emptyClass: "h-full pb-64 -mt-4 flex flex-col items-center justify-center text-center gap-6",
                     })}
                     actions={actions}
-                    reverseScroll
                     scroll={ui.scroll}
                     onResumeScroll={resumeScroll}
                     setScrollRef={setScrollRef}
