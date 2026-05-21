@@ -9,6 +9,8 @@ type OpenDirectoryPickerOptions = { title?: string; multiple?: boolean }
 type OpenFilePickerOptions = { title?: string; multiple?: boolean; accept?: string[]; extensions?: string[] }
 type SaveFilePickerOptions = { title?: string; defaultPath?: string }
 type UpdateInfo = { updateAvailable: boolean; version?: string }
+type PlatformName = "web" | "desktop" | "ios" | "android"
+type PlatformOS = "macos" | "windows" | "linux" | "ios" | "android"
 export type VoiceState = "prewarming" | "ready" | "recording" | "processing" | "error"
 export type VoiceStatus = {
   state: VoiceState
@@ -26,12 +28,20 @@ export type VoiceStopResult = {
   message?: string
 }
 
+export type FatalRendererErrorLog = {
+  error: string
+  url: string
+  version?: string
+  platform: PlatformName
+  os?: PlatformOS
+}
+
 export type Platform = {
   /** Platform discriminator */
-  platform: "web" | "desktop" | "ios" | "android"
+  platform: PlatformName
 
   /** Desktop OS (Tauri only) */
-  os?: "macos" | "windows" | "linux" | "ios" | "android"
+  os?: PlatformOS
 
   /** App version */
   version?: string
@@ -131,6 +141,12 @@ export type Platform = {
 
   /** Share content (mobile only) */
   share?(data: { text?: string; url?: string }): Promise<boolean>
+
+  /** Export collected diagnostic logs (desktop only) */
+  exportDebugLogs?(): Promise<string>
+
+  /** Record a fatal renderer error in platform logs (desktop only) */
+  recordFatalRendererError?(error: FatalRendererErrorLog): Promise<void>
 }
 
 export type DisplayBackend = "auto" | "wayland"

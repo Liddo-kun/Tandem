@@ -4,6 +4,7 @@ export { useCommand } from "./context/command"
 export { loadLocaleDict, normalizeLocale, useLanguage, type Locale } from "./context/language"
 export {
   type DisplayBackend,
+  type FatalRendererErrorLog,
   type Platform,
   PlatformProvider,
   type VoiceStartResult,
