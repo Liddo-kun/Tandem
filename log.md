@@ -54,6 +54,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 - Truncates long prompt model names while preserving full-value tooltips. Files: `packages/app/src/components/prompt-input.tsx`.
 - Adds prompt footer context-token display and a compact centered prompt row for mobile-safe composer layout. Files: `packages/app/src/components/prompt-input.tsx`.
 - Adds mobile-visible session header search and mobile refresh button behavior. Files: `packages/app/src/components/session/session-header.tsx`.
+- Adds the mobile hamburger/session-list button to the non-production titlebar so native iOS/Android keep the new project/tab controls while preserving session-list access. Files: `packages/app/src/components/titlebar.tsx`.
 - Adds mobile connection and platform help in shared app surfaces. Files: `packages/app/src/components/dialog-select-server.tsx`, `packages/app/src/pages/home.tsx`.
 - Adds mobile resume recovery for browser focus, visibility restore, online, page show, native foreground events, and SSE reconnect. Files: `packages/app/src/pages/session.tsx`, `packages/app/src/context/global-sdk.tsx`, `packages/app/src/context/global-sync.tsx`, `packages/app/src/context/sync.tsx`, `packages/ios/src/entry-ios.tsx`, `packages/android/src/entry-android.tsx`.
 - Adds session/todo/status refresh on active-session resume and copy-safe todo cache updates. Files: `packages/app/src/pages/session.tsx`, `packages/app/src/context/global-sync.tsx`, `packages/app/src/context/global-sync/event-reducer.ts`, `packages/app/src/context/todo-store.ts`.
