@@ -38,6 +38,7 @@ import { createRefreshQueue } from "./global-sync/queue"
 import { directoryKey } from "./global-sync/utils"
 import { PathKey } from "@/utils/path-key"
 import { copyTodos } from "./todo-store"
+import { createDirSyncContext } from "./directory-sync"
 
 type GlobalStore = {
   ready: boolean
@@ -476,6 +477,9 @@ function createGlobalSync() {
     },
   }))
 
+  const dirSyncContexts = new Map<string, ReturnType<typeof createDirSyncContext>>()
+  const dirSyncContextRefCounts = new Map<string, number>()
+
   return {
     data: globalStore,
     set,
@@ -493,6 +497,26 @@ function createGlobalSync() {
     project: projectApi,
     todo: {
       set: setSessionTodo,
+    },
+    createDirSyncContext: (directory: string) => {
+      onCleanup(() => {
+        dirSyncContextRefCounts.set(directory, (dirSyncContextRefCounts.get(directory) ?? 0) - 1)
+        if (dirSyncContextRefCounts.get(directory) === 0) {
+          dirSyncContexts.delete(directory)
+          dirSyncContextRefCounts.delete(directory)
+        }
+      })
+
+      const cached = dirSyncContexts.get(directory)
+      if (cached) {
+        dirSyncContextRefCounts.set(directory, (dirSyncContextRefCounts.get(directory) ?? 0) + 1)
+        return cached
+      }
+      const ctx = createDirSyncContext(globalSDK.createClient({ directory, throwOnError: true }), directory)
+      dirSyncContexts.set(directory, ctx)
+      dirSyncContextRefCounts.set(directory, 1)
+
+      return ctx
     },
   }
 }
