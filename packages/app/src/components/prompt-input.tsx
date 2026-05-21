@@ -751,8 +751,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         const prev = node.previousSibling
         const next = node.nextSibling
         const prevIsBr = prev?.nodeType === Node.ELEMENT_NODE && (prev as HTMLElement).tagName === "BR"
-        // A lone zero-width space is the normalized empty editor; after a trailing <br>, it preserves the caret line.
-        return (!prev || prevIsBr) && !next
+        // After a trailing <br>, a zero-width space preserves the caret line.
+        return !!prev && prevIsBr && !next
       }
       if (node.nodeType !== Node.ELEMENT_NODE) return false
       const el = node as HTMLElement
@@ -775,10 +775,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
     const last = editorRef.lastChild
     if (last?.nodeType === Node.ELEMENT_NODE && (last as HTMLElement).tagName === "BR") {
-      editorRef.appendChild(document.createTextNode("\u200B"))
-    }
-    if (!last) {
-      // Android WebView draws a focused empty contenteditable caret outside our line box unless it has a text node.
       editorRef.appendChild(document.createTextNode("\u200B"))
     }
   }

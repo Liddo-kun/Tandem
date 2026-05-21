@@ -50,6 +50,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 ## Shared Mobile UI And Session Behavior
 
 - Adds mobile prompt voice controls, `opencode:transcription` handling, mobile-specific prompt voice placement, and protection against editor refocus when tapping mobile prompt controls. Files: `packages/app/src/components/prompt-input.tsx`, `packages/ios/src/entry-ios.tsx`, `packages/android/src/entry-android.tsx`.
+- Removes the empty-prompt zero-width-space caret placeholder so Android IME/autocorrect does not treat it as part of the first composed word. Files: `packages/app/src/components/prompt-input.tsx`.
 - Adds prompt keyboard delete-word behavior for native mobile toolbar events. Files: `packages/app/src/components/prompt-input.tsx`, `packages/app/src/components/prompt-input/editor-dom.ts`, `packages/ios/src/entry-ios.tsx`.
 - Truncates long prompt model names while preserving full-value tooltips. Files: `packages/app/src/components/prompt-input.tsx`.
 - Adds prompt footer context-token display, agent/build-plan selection and thinking-effort selection in the v2 prompt row, and a compact centered prompt row for mobile-safe composer layout. The v2 agent selector is expected to be temporary: if upstream adds an equivalent selector, match upstream and remove the Tandem-only implementation. Files: `packages/app/src/components/prompt-input.tsx`.
