@@ -74,7 +74,6 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
   const electronWindows = createMemo(() => windows() && !tauriApi())
   const linux = createMemo(() => platform.platform === "desktop" && platform.os === "linux")
   const web = createMemo(() => platform.platform === "web")
-  const nativeMobile = createMemo(() => platform.platform === "ios" || platform.platform === "android")
   const zoom = () => platform.webviewZoom?.() ?? 1
   const titlebarZoom = () => (windows() ? Math.max(zoom(), minTitlebarZoom) : zoom())
   const counterZoom = () => (windows() && titlebarZoom() < 1 ? 1 / titlebarZoom() : 1)
@@ -323,16 +322,6 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
                 <ChannelIndicator />
                 <Show when={windows() || linux()}>
                   <WindowsAppMenu command={command} platform={platform} variant="v2" />
-                </Show>
-                <Show when={nativeMobile()}>
-                  <IconButton
-                    icon="menu"
-                    variant="ghost"
-                    class="titlebar-icon rounded-md"
-                    onClick={layout.mobileSidebar.toggle}
-                    aria-label={language.t("sidebar.menu.toggle")}
-                    aria-expanded={layout.mobileSidebar.opened()}
-                  />
                 </Show>
                 <IconButtonV2
                   variant="ghost-muted"
