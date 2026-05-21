@@ -1438,6 +1438,33 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     </Show>
   )
 
+  const modelVariantControl = () => (
+    <Show when={!providersLoading() && variants().length > 2}>
+      <TooltipKeybind
+        placement="top"
+        gutter={4}
+        title={language.t("command.model.variant.cycle")}
+        keybind={command.keybind("model.variant.cycle")}
+      >
+        <Select
+          size="normal"
+          options={variants()}
+          current={local.model.variant.current() ?? "default"}
+          label={(x) => (x === "default" ? language.t("common.default") : x)}
+          onSelect={(value) => {
+            local.model.variant.set(value === "default" ? undefined : value)
+            restoreFocus()
+          }}
+          class="capitalize max-w-[150px] justify-start text-v2-text-text-faint"
+          valueClass="truncate text-[13px] font-[440] leading-4 text-v2-text-text-faint"
+          triggerStyle={control()}
+          triggerProps={{ "data-action": "prompt-model-variant" }}
+          variant="ghost"
+        />
+      </TooltipKeybind>
+    </Show>
+  )
+
   const newSession = () => props.variant === "new-session"
   const worktrees = createMemo(() => [MAIN_WORKTREE, ...(sync.project?.sandboxes ?? []), CREATE_WORKTREE])
   const currentWorktree = createMemo(() => {
@@ -1627,6 +1654,17 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   </div>
                 </Show>
                 {modelControl()}
+                {modelVariantControl()}
+                <Show when={params.id}>
+                  <div
+                    data-component="prompt-context-tokens"
+                    class="shrink-0 whitespace-nowrap text-[13px] font-[440] leading-4 text-v2-text-text-muted"
+                  >
+                    <span>Context: </span>
+                    <span class="text-v2-text-text-faint">{contextTokenLabel()}</span>
+                    <span>t</span>
+                  </div>
+                </Show>
               </div>
               <Tooltip placement="top" inactive={!working() && blank()} value={tip()}>
                 <IconButton
