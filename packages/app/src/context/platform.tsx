@@ -112,6 +112,12 @@ export type Platform = {
   /** Set the webview zoom level (platform-specific) */
   setWebviewZoom?(scale: number): Promise<void> | void
 
+  /** Get whether native pinch/Ctrl-scroll zoom gestures are enabled (desktop only) */
+  getPinchZoomEnabled?(): Promise<boolean> | boolean
+
+  /** Allow native pinch/Ctrl-scroll zoom gestures (desktop only) */
+  setPinchZoomEnabled?(enabled: boolean): Promise<void> | void
+
   /** Run a desktop-only menu action from the app chrome */
   runDesktopMenuAction?(action: DesktopMenuAction): Promise<void> | void
 
