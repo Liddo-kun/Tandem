@@ -1465,6 +1465,32 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     </Show>
   )
 
+  const agentControl = () => (
+    <Show when={!agentsLoading()}>
+      <TooltipKeybind
+        placement="top"
+        gutter={4}
+        title={language.t("command.agent.cycle")}
+        keybind={command.keybind("agent.cycle")}
+      >
+        <Select
+          size="normal"
+          options={agentNames()}
+          current={local.agent.current()?.name ?? ""}
+          onSelect={(value) => {
+            local.agent.set(value)
+            restoreFocus()
+          }}
+          class="capitalize max-w-[150px] justify-start text-v2-text-text-faint"
+          valueClass="truncate text-[13px] font-[440] leading-4 text-v2-text-text-faint"
+          triggerStyle={control()}
+          triggerProps={{ "data-action": "prompt-agent" }}
+          variant="ghost"
+        />
+      </TooltipKeybind>
+    </Show>
+  )
+
   const newSession = () => props.variant === "new-session"
   const worktrees = createMemo(() => [MAIN_WORKTREE, ...(sync.project?.sandboxes ?? []), CREATE_WORKTREE])
   const currentWorktree = createMemo(() => {
@@ -1565,7 +1591,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               onMouseDown={(e) => {
                 const target = e.target
                 if (!(target instanceof HTMLElement)) return
-                if (target.closest('[data-action="prompt-attach"], [data-action="prompt-voice"], [data-action="prompt-submit"]')) return
+                if (
+                  target.closest(
+                    '[data-action="prompt-attach"], [data-action="prompt-voice"], [data-action="prompt-agent"], [data-action="prompt-workspace"], [data-action="prompt-model"], [data-action="prompt-model-variant"], [data-action="prompt-submit"]',
+                  )
+                ) {
+                  return
+                }
                 editorRef?.focus()
               }}
             >
@@ -1631,6 +1663,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   />
                 </TooltipKeybind>
                 {voiceInputButton("v2")}
+                {agentControl()}
                 <Show when={newSession()}>
                   <div class="relative">
                     <div class="pointer-events-none absolute left-2 top-1/2 z-10 flex size-4 -translate-y-1/2 items-center justify-center">
