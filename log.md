@@ -16,7 +16,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 - Extends the shared app-to-native interface for mobile storage, default server persistence, structured voice state/start/stop, speech locale selection, haptics, and sharing. Files: `packages/app/src/context/platform.tsx`, `packages/app/src/index.ts`.
 - Adds platform-backed async persistence for non-web apps while preserving legacy localStorage migration and workspace/session key normalization. Files: `packages/app/src/utils/persist.ts`.
 - Adds mobile default-server handling through current OpenCode `ServerConnection.Key` and `AppInterface` server entries. Files: `packages/app/src/context/platform.tsx`, `packages/ios/src/entry-ios.tsx`, `packages/android/src/entry-android.tsx`.
-- Adds mobile connection helper text for server setup. Files: `packages/app/src/components/dialog-select-server.tsx`, `packages/app/src/pages/home.tsx`.
+- Adds mobile connection helper text for server setup, including a mobile-only home hint when the legacy home layout is active. Files: `packages/app/src/components/dialog-select-server.tsx`, `packages/app/src/pages/home.tsx`.
 - Adds speech locale settings persisted under `settings.v3`, platform pushdown of selected locale, and a mobile-only General settings selector. Files: `packages/app/src/context/settings.tsx`, `packages/app/src/components/settings-general.tsx`, `packages/app/src/context/platform.tsx`.
 - Adds English fallback text for mobile, voice, speech-locale, refresh, delete-word, review-limit, and onboarding strings across locale dictionaries. Files: `packages/app/src/i18n/*.ts`.
 
