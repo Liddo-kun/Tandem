@@ -1790,14 +1790,12 @@ export default function Page() {
       if (document.visibilityState !== "visible") return
       onResume()
     }
-    const stopFocus = makeEventListener(window, "focus", onResume)
     const stopPageShow = makeEventListener(window, "pageshow", onResume)
     const stopOnline = makeEventListener(window, "online", onResume)
     const stopResume = makeEventListener(window, "opencode:resume", onResume)
     const stopVisibility = makeEventListener(document, "visibilitychange", onVisibility)
 
     onCleanup(() => {
-      stopFocus()
       stopPageShow()
       stopOnline()
       stopResume()

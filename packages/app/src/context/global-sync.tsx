@@ -434,14 +434,12 @@ function createGlobalSync() {
       if (document.visibilityState !== "visible") return
       onResume()
     }
-    window.addEventListener("focus", onResume)
     window.addEventListener("pageshow", onResume)
     window.addEventListener("online", onResume)
     window.addEventListener("opencode:resume", onResume)
     if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisibility)
 
     onCleanup(() => {
-      window.removeEventListener("focus", onResume)
       window.removeEventListener("pageshow", onResume)
       window.removeEventListener("online", onResume)
       window.removeEventListener("opencode:resume", onResume)

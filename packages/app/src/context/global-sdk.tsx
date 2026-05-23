@@ -107,7 +107,9 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
     let run: Promise<void> | undefined
     let started = false
     const HEARTBEAT_TIMEOUT_MS = 15_000
+    const RESUME_ABORT_INTERVAL_MS = 1_000
     let lastEventAt = Date.now()
+    let lastResumeAbort = 0
     let heartbeat: ReturnType<typeof setTimeout> | undefined
     const resetHeartbeat = () => {
       lastEventAt = Date.now()
@@ -220,7 +222,11 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
       })
       makeEventListener(window, "opencode:resume", () => {
         if (!started) return
-        attempt?.abort()
+        if (!attempt) return
+        const now = Date.now()
+        if (now - lastResumeAbort < RESUME_ABORT_INTERVAL_MS) return
+        lastResumeAbort = now
+        attempt.abort()
       })
     })
 

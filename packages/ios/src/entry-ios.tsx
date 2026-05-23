@@ -241,7 +241,6 @@ const App = () => {
       platform.openLink(link.href)
     }
 
-    const onFocus = () => emitResume()
     const onVisible = () => {
       if (document.visibilityState !== "visible") return
       emitResume()
@@ -299,11 +298,9 @@ const App = () => {
     })
 
     document.addEventListener("click", handleClick)
-    window.addEventListener("focus", onFocus)
     document.addEventListener("visibilitychange", onVisible)
     onCleanup(() => {
       document.removeEventListener("click", handleClick)
-      window.removeEventListener("focus", onFocus)
       document.removeEventListener("visibilitychange", onVisible)
       stopListening()
       stopVoiceState()

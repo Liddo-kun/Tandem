@@ -111,7 +111,7 @@ Enhanced-only features should be additive or feature-detected where possible.
 
 ## Mobile Session Behavior
 
-- Mobile session pages must recover after native/background suspension by refreshing session/todos/status on focus, pageshow, online, visibility, and `opencode:resume`.
+- Mobile session pages must recover after native/background suspension by refreshing session/todos/status on pageshow, online, visibility restore, and `opencode:resume`. Do not treat plain window focus as a heavy resume signal without device evidence; mobile wrappers already emit native resume events from visibility/native lifecycle changes.
 - On phones, keep session title, context usage, and overflow actions accessible from the Session tab; do not reintroduce a duplicate title/action bar except during inline rename.
 - Native mobile session overflow/delete flows must remain WebView-safe: non-modal menus and deferred confirmations avoid suppressed popups or swallowed dialogs.
 - Keep mobile review/diff handling guarded by fallback diff generation and the mobile review limit so large reviews do not freeze iOS/Android WebViews.
