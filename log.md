@@ -76,3 +76,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 ## Backend Tool Defaults
 
 - Enables Exa-backed websearch by default by making `OPENCODE_ENABLE_EXA` default to true while keeping the explicit env override path. Files: `packages/opencode/src/effect/runtime-flags.ts`, `packages/opencode/test/effect/runtime-flags.test.ts`.
+
+## Test-Only Compatibility
+
+- Keeps the OpenTUI diff file tree snapshot test stable on Windows by waiting for a non-empty settled frame before reading rendered rows. Files: `packages/opencode/test/cli/tui/diff-viewer-file-tree.test.tsx`.

@@ -50,7 +50,7 @@ describe("DiffViewerFileTree", () => {
 
     try {
       await renderOnceSettled(app)
-      const lines = visibleLines(app.captureCharFrame())
+      const lines = visibleLines(await captureSettledFrame(app))
 
       expect(lines).toEqual([
         "▾ a",
