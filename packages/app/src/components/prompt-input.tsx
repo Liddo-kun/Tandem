@@ -1139,7 +1139,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const variants = createMemo(() => ["default", ...local.model.variant.list()])
   const sessionMessages = createMemo(() => (params.id ? (sync.data.message[params.id] ?? []) : []))
   const contextTokens = createMemo(
-    () => getSessionContextMetrics(sessionMessages(), providers.all()).context?.total ?? 0,
+    () => getSessionContextMetrics(sessionMessages(), [...providers.all().values()]).context?.total ?? 0,
   )
   const contextTokenLabel = createMemo(() => contextTokens().toLocaleString(language.intl()))
   const accepting = createMemo(() => {
