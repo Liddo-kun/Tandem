@@ -11,7 +11,7 @@ import { Popover as KobaltePopover } from "@kobalte/core/popover"
 import { showToast } from "@opencode-ai/ui/toast"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { SessionContextUsage } from "@/components/session-context-usage"
-import { useGlobalSDK } from "@/context/global-sdk"
+import { useServerSDK } from "@/context/server-sdk"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useSDK } from "@/context/sdk"
@@ -21,7 +21,7 @@ import { sessionTitle } from "@/utils/session-title"
 
 export function SessionTitleActions(props: { sessionID?: string; parentID?: string; onRename: () => void }) {
   const navigate = useNavigate()
-  const globalSDK = useGlobalSDK()
+  const serverSDK = useServerSDK()
   const sdk = useSDK()
   const sync = useSync()
   const dialog = useDialog()
@@ -70,14 +70,14 @@ export function SessionTitleActions(props: { sessionID?: string; parentID?: stri
   }
 
   const shareMutation = useMutation(() => ({
-    mutationFn: (id: string) => globalSDK.client.session.share({ sessionID: id, directory: sdk.directory }),
+    mutationFn: (id: string) => serverSDK.client.session.share({ sessionID: id, directory: sdk.directory }),
     onError: (err) => {
       console.error("Failed to share session", err)
     },
   }))
 
   const unshareMutation = useMutation(() => ({
-    mutationFn: (id: string) => globalSDK.client.session.unshare({ sessionID: id, directory: sdk.directory }),
+    mutationFn: (id: string) => serverSDK.client.session.unshare({ sessionID: id, directory: sdk.directory }),
     onError: (err) => {
       console.error("Failed to unshare session", err)
     },

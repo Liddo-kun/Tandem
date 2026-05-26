@@ -1,11 +1,11 @@
-import { useGlobalSync } from "./global-sync"
+import { useServerSync } from "./server-sync"
 import { useSDK } from "./sdk"
 
 export { applyOptimisticAdd, applyOptimisticRemove, mergeOptimisticPage } from "./directory-sync"
 
 export const useSync = () => {
-  const globalSync = useGlobalSync()
+  const serverSync = useServerSync()
   const sdk = useSDK()
 
-  return globalSync.createDirSyncContext(sdk.directory)
+  return serverSync.createDirSyncContext(sdk.directory)
 }
