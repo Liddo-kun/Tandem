@@ -34,6 +34,12 @@ const keyFor = (directory: string, id: string) => `${directory}\n${id}`
 
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
+const isNotFound = (error: unknown) =>
+  error instanceof Error &&
+  typeof error.cause === "object" &&
+  error.cause !== null &&
+  (error.cause as { status?: unknown }).status === 404
+
 function merge<T extends { id: string }>(a: readonly T[], b: readonly T[]) {
   const map = new Map(a.map((item) => [item.id, item] as const))
   for (const item of b) map.set(item.id, item)
@@ -347,6 +353,10 @@ export const createDirSyncContext = (directory: string, serverSync: ReturnType<t
           })
         })
       })
+      .catch((error) => {
+        if (isNotFound(error) && !tracked(input.directory, input.sessionID)) return
+        throw error
+      })
       .finally(() => {
         setMeta(
           produce((draft) => {
@@ -458,22 +468,27 @@ export const createDirSyncContext = (directory: string, serverSync: ReturnType<t
           const sessionReq =
             hasSession && !opts?.force
               ? Promise.resolve()
-              : retry(() => client.session.get({ sessionID })).then((session) => {
-                  if (!tracked(directory, sessionID)) return
-                  const data = session.data
-                  if (!data) return
-                  setStore(
-                    "session",
-                    produce((draft) => {
-                      const match = Binary.search(draft, sessionID, (s) => s.id)
-                      if (match.found) {
-                        draft[match.index] = data
-                        return
-                      }
-                      draft.splice(match.index, 0, data)
-                    }),
-                  )
-                })
+              : retry(() => client.session.get({ sessionID }))
+                  .then((session) => {
+                    if (!tracked(directory, sessionID)) return
+                    const data = session.data
+                    if (!data) return
+                    setStore(
+                      "session",
+                      produce((draft) => {
+                        const match = Binary.search(draft, sessionID, (s) => s.id)
+                        if (match.found) {
+                          draft[match.index] = data
+                          return
+                        }
+                        draft.splice(match.index, 0, data)
+                      }),
+                    )
+                  })
+                  .catch((error) => {
+                    if (isNotFound(error) && !tracked(directory, sessionID)) return
+                    throw error
+                  })
 
           const messagesReq =
             cached && !opts?.force

@@ -1829,7 +1829,6 @@ export default function Page() {
         inputRef = el
       }}
       newSessionWorktree={newSessionWorktree()}
-      onNewSessionWorktreeChange={(value) => setStore("newSessionWorktree", value)}
       onNewSessionWorktreeReset={() => setStore("newSessionWorktree", "main")}
       onSubmit={() => {
         comments.clear()
@@ -1952,9 +1951,7 @@ export default function Page() {
               </Match>
               <Match when={true}>
                 <Show when={USE_NEW_SESSION_DESIGN} fallback={<NewSessionView worktree={newSessionWorktree()} />}>
-                  <NewSessionDesignView worktree={newSessionWorktree()}>
-                    {composerRegion("inline")}
-                  </NewSessionDesignView>
+                  <NewSessionDesignView>{composerRegion("inline")}</NewSessionDesignView>
                 </Show>
               </Match>
             </Switch>

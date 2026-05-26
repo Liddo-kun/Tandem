@@ -11,6 +11,7 @@ import { Popover as KobaltePopover } from "@kobalte/core/popover"
 import { showToast } from "@opencode-ai/ui/toast"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { SessionContextUsage } from "@/components/session-context-usage"
+import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
 import { useServerSDK } from "@/context/server-sdk"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
@@ -120,7 +121,9 @@ export function SessionTitleActions(props: { sessionID?: string; parentID?: stri
             if (index !== -1) draft.session.splice(index, 1)
           }),
         )
+        sync.session.evict(sessionID)
         navigateAfterSessionRemoval(sessionID, session.parentID, nextSession?.id)
+        notifySessionTabsRemoved({ directory: sdk.directory, sessionIDs: [sessionID] })
       })
       .catch((err) => {
         showToast({
@@ -151,42 +154,46 @@ export function SessionTitleActions(props: { sessionID?: string; parentID?: stri
 
     if (!result) return false
 
+    const removed = new Set<string>([sessionID])
+    const byParent = new Map<string, string[]>()
+    for (const item of sync.data.session) {
+      const parentID = item.parentID
+      if (!parentID) continue
+      const existing = byParent.get(parentID)
+      if (existing) {
+        existing.push(item.id)
+        continue
+      }
+      byParent.set(parentID, [item.id])
+    }
+
+    const stack = [sessionID]
+    while (stack.length) {
+      const parentID = stack.pop()
+      if (!parentID) continue
+
+      const children = byParent.get(parentID)
+      if (!children) continue
+
+      for (const child of children) {
+        if (removed.has(child)) continue
+        removed.add(child)
+        stack.push(child)
+      }
+    }
+
+    navigateAfterSessionRemoval(sessionID, session.parentID, nextSession?.id)
+
     sync.set(
       produce((draft) => {
-        const removed = new Set<string>([sessionID])
-
-        const byParent = new Map<string, string[]>()
-        for (const item of draft.session) {
-          const parentID = item.parentID
-          if (!parentID) continue
-          const existing = byParent.get(parentID)
-          if (existing) {
-            existing.push(item.id)
-            continue
-          }
-          byParent.set(parentID, [item.id])
-        }
-
-        const stack = [sessionID]
-        while (stack.length) {
-          const parentID = stack.pop()
-          if (!parentID) continue
-
-          const children = byParent.get(parentID)
-          if (!children) continue
-
-          for (const child of children) {
-            if (removed.has(child)) continue
-            removed.add(child)
-            stack.push(child)
-          }
-        }
-
         draft.session = draft.session.filter((s) => !removed.has(s.id))
       }),
     )
 
-    navigateAfterSessionRemoval(sessionID, session.parentID, nextSession?.id)
+    for (const id of removed) {
+      sync.session.evict(id)
+    }
+    notifySessionTabsRemoved({ directory: sdk.directory, sessionIDs: [...removed] })
     return true
   }
 
