@@ -4,6 +4,9 @@ import appPlugin from "@opencode-ai/app/vite"
 export default defineConfig({
   plugins: [appPlugin],
   publicDir: "../app/public",
+  define: {
+    "import.meta.env.VITE_TANDEM_ANDROID_V2_ONLY": JSON.stringify("true"),
+  },
   server: {
     host: "0.0.0.0",
     port: 1422,

@@ -396,5 +396,6 @@ catch {
   exit 1
 }
 
-"Installed $appName as $packageId"
-"Build log: $buildLog"
+[Console]::WriteLine("Installed $appName as $packageId")
+[Console]::WriteLine("Build log: $buildLog")
+exit 0

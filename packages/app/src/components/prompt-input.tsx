@@ -11,8 +11,6 @@ import {
   createMemo,
   createSignal,
   createResource,
-  Switch,
-  Match,
   type ComponentProps,
   type JSX,
 } from "solid-js"
@@ -89,7 +87,8 @@ import { pathKey } from "@/utils/path-key"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { displayName } from "@/pages/layout/helpers"
 
-const USE_V2_INPUT = import.meta.env.VITE_OPENCODE_CHANNEL !== "prod"
+const USE_V2_INPUT =
+  import.meta.env.VITE_TANDEM_ANDROID_V2_ONLY === "true" || import.meta.env.VITE_OPENCODE_CHANNEL !== "prod"
 
 interface PromptInputProps {
   class?: string
@@ -1540,8 +1539,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         commandKeybind={command.keybind}
         t={(key) => language.t(key as Parameters<typeof language.t>[0])}
       />
-      <Switch>
-        <Match when={USE_V2_INPUT}>
+      {USE_V2_INPUT ? (
           <div class="flex flex-col gap-3">
             <DockShellForm
               data-component={newSession() ? "session-new-composer" : "session-composer"}
@@ -1657,6 +1655,35 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     <ComposerPickerTrigger state={newProjectTriggerState()} />
                   </Show>
                   <ComposerModelControl state={modelControlState()} />
+                  <Show when={variants().length > 2}>
+                    <div
+                      data-component="prompt-thinking-effort-control"
+                      style={providersShouldFadeIn() ? { animation: "fade-in 0.3s" } : undefined}
+                    >
+                      <TooltipKeybind
+                        placement="top"
+                        gutter={4}
+                        title={language.t("command.model.variant.cycle")}
+                        keybind={command.keybind("model.variant.cycle")}
+                      >
+                        <Select
+                          size="normal"
+                          options={variants()}
+                          current={local.model.variant.current() ?? "default"}
+                          label={(value) => (value === "default" ? language.t("common.default") : value)}
+                          onSelect={(value) => {
+                            local.model.variant.set(value === "default" ? undefined : value)
+                            restoreFocus()
+                          }}
+                          class="max-w-[150px] justify-start capitalize text-v2-text-text-faint"
+                          valueClass="truncate text-[13px] font-[440] leading-5 text-v2-text-text-faint"
+                          triggerStyle={control()}
+                          triggerProps={{ "data-action": "prompt-thinking-effort" }}
+                          variant="ghost"
+                        />
+                      </TooltipKeybind>
+                    </div>
+                  </Show>
                   <Show when={params.id}>
                     <div
                       data-component="prompt-context-tokens"
@@ -1692,8 +1719,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               </div>
             </Show>
           </div>
-        </Match>
-        <Match when>
+      ) : (
+        <>
           <DockShellForm
             onSubmit={handleSubmit}
             classList={{
@@ -2043,8 +2070,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               </div>
             </DockTray>
           </Show>
-        </Match>
-      </Switch>
+        </>
+      )}
     </div>
   )
 }
