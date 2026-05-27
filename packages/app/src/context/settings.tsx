@@ -34,6 +34,7 @@ export interface Settings {
     editToolPartsExpanded: boolean
     showSessionProgressBar: boolean
     showCustomAgents: boolean
+    newLayoutDesigns?: boolean
   }
   updates: {
     startup: boolean
@@ -65,6 +66,7 @@ export const displayScaleStep = 0.02
 export type DisplayScale = number
 
 const displayScaleDefault: DisplayScale = 1
+export const newLayoutDesignsDefault = import.meta.env.VITE_OPENCODE_CHANNEL !== "prod"
 
 const monoFallback =
   'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
@@ -296,6 +298,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         showCustomAgents: withFallback(() => store.general?.showCustomAgents, defaultSettings.general.showCustomAgents),
         setShowCustomAgents(value: boolean) {
           setStore("general", "showCustomAgents", value)
+        },
+        newLayoutDesigns: withFallback(() => store.general?.newLayoutDesigns, newLayoutDesignsDefault),
+        setNewLayoutDesigns(value: boolean) {
+          setStore("general", "newLayoutDesigns", value)
         },
       },
       updates: {
