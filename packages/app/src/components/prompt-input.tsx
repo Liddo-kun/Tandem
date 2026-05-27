@@ -52,7 +52,7 @@ import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useSettings } from "@/context/settings"
 import { useSessionLayout } from "@/pages/session/session-layout"
-import { createSessionTabs } from "@/pages/session/helpers"
+import { createSessionTabs, openSessionContext } from "@/pages/session/helpers"
 import {
   createTextFragment,
   getCursorPosition,
@@ -202,11 +202,21 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     })
   }
 
-  const activeFileTab = createSessionTabs({
+  const sessionTabs = createSessionTabs({
     tabs,
     pathFromTab: files.pathFromTab,
     normalizeTab: (tab) => (tab.startsWith("file://") ? files.tab(tab) : tab),
-  }).activeFileTab
+  })
+  const activeFileTab = sessionTabs.activeFileTab
+
+  const openContext = () => {
+    if (!params.id) return
+    if (sessionTabs.activeTab() === "context") {
+      tabs().close("context")
+      return
+    }
+    openSessionContext({ view: view(), layout, tabs: tabs() })
+  }
 
   const commentInReview = (path: string) => {
     const sessionID = params.id
@@ -1684,14 +1694,18 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     </div>
                   </Show>
                   <Show when={params.id}>
-                    <div
+                    <button
+                      type="button"
+                      data-action="prompt-context-tokens"
                       data-component="prompt-context-tokens"
-                      class="shrink-0 whitespace-nowrap text-[13px] font-[440] leading-4 text-v2-text-text-muted"
+                      class="shrink-0 whitespace-nowrap border-0 bg-transparent p-0 text-[13px] font-[440] leading-4 text-v2-text-text-muted transition-colors hover:text-v2-text-text-base"
+                      onClick={openContext}
+                      aria-label={language.t("context.usage.view")}
                     >
                       <span>Context: </span>
                       <span class="text-v2-text-text-faint">{contextTokenLabel()}</span>
                       <span>t</span>
-                    </div>
+                    </button>
                   </Show>
                 </div>
                 <Tooltip placement="top" inactive={!working() && blank()} value={tip()}>
@@ -2053,14 +2067,18 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                           </div>
                         </Show>
                         <Show when={params.id}>
-                          <div
+                          <button
+                            type="button"
+                            data-action="prompt-context-tokens"
                             data-component="prompt-context-tokens"
-                            class="shrink-0 whitespace-nowrap text-13-regular text-text-weak"
+                            class="shrink-0 whitespace-nowrap border-0 bg-transparent p-0 text-13-regular text-text-weak transition-colors hover:text-text-base"
+                            onClick={openContext}
+                            aria-label={language.t("context.usage.view")}
                           >
                             <span>Context: </span>
                             <span class="text-text-base">{contextTokenLabel()}</span>
                             <span>t</span>
-                          </div>
+                          </button>
                         </Show>
                       </Show>
                     </Show>

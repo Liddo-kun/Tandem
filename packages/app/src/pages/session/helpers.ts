@@ -18,7 +18,34 @@ type TabsInput = {
   hasReview?: Accessor<boolean>
 }
 
+type OpenSessionContextInput = {
+  view: {
+    reviewPanel: {
+      opened: () => boolean
+      open: () => void
+    }
+  }
+  layout: {
+    fileTree: {
+      opened: () => boolean
+      tab: () => "changes" | "all"
+      setTab: (tab: "changes" | "all") => void
+    }
+  }
+  tabs: {
+    open: (tab: string) => unknown
+    setActive: (tab: string | undefined) => void
+  }
+}
+
 export const getSessionKey = (dir: string | undefined, id: string | undefined) => `${dir ?? ""}${id ? `/${id}` : ""}`
+
+export function openSessionContext(input: OpenSessionContextInput) {
+  if (!input.view.reviewPanel.opened()) input.view.reviewPanel.open()
+  if (input.layout.fileTree.opened() && input.layout.fileTree.tab() !== "all") input.layout.fileTree.setTab("all")
+  void input.tabs.open("context")
+  input.tabs.setActive("context")
+}
 
 export const createSessionTabs = (input: TabsInput) => {
   const review = input.review ?? (() => false)

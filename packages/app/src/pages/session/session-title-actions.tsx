@@ -10,7 +10,6 @@ import { TextField } from "@opencode-ai/ui/text-field"
 import { Popover as KobaltePopover } from "@kobalte/core/popover"
 import { showToast } from "@opencode-ai/ui/toast"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { SessionContextUsage } from "@/components/session-context-usage"
 import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
 import { useServerSDK } from "@/context/server-sdk"
 import { useLanguage } from "@/context/language"
@@ -201,7 +200,19 @@ export function SessionTitleActions(props: { sessionID?: string; parentID?: stri
     <Show when={props.sessionID} keyed>
       {(id) => (
         <div class="shrink-0 flex items-center gap-3">
-          <SessionContextUsage placement="bottom" />
+          <Show when={nativeMobile}>
+            <IconButton
+              icon="refresh"
+              variant="ghost"
+              class="size-6 rounded-md"
+              onClick={() => {
+                platform.haptic?.("light")
+                void platform.restart()
+              }}
+              aria-label={language.t("session.header.refresh")}
+              data-action="session-refresh"
+            />
+          </Show>
           <Show when={!props.parentID}>
             <DropdownMenu
               gutter={4}
