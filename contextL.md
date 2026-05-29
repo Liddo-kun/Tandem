@@ -1,10 +1,10 @@
 # Tandem Project Context
 
-Use this as the recurring startup context when working in `Tandem`. The root `AGENTS.md` should stay as a thin pointer to this file so the project rules do not drift across two documents.
+Use this as the recurring startup context when working in `Tandem` from Ubuntu/Linux/proot. The root `AGENTS.md` should stay as a thin pointer to the environment-specific context file so the project rules do not drift across documents.
 
 ## Agent Working Habits
 
-- At the start of a session, read this file.
+- At the start of a session, read this file when running from Ubuntu/Linux/proot.
 - When editing package-specific code, also check the nearest nested `AGENTS.md` for that package.
 - Use parallel tool calls when independent reads/searches can run at the same time.
 
@@ -12,7 +12,7 @@ Use this as the recurring startup context when working in `Tandem`. The root `AG
 
 Build and maintain one personal repo, `Tandem`, based on current official OpenCode, with selected Whispercode mobile/iOS/Android features and personal enhancements, while staying easy to update from OpenCode.
 
-Use `log.md` as the exhaustive final-state inventory of Tandem changes relative to official OpenCode. `context.md` explains how to work in this repo; it should not become a skipped-commit ledger or merge-history log.
+Use `log.md` as the exhaustive final-state inventory of Tandem changes relative to official OpenCode. This file explains how to work in this repo from Ubuntu/Linux/proot; it should not become a skipped-commit ledger or merge-history log.
 
 Always read and update log.md when making a change to opencode, the web ui or the mobile apps.
 
@@ -152,12 +152,12 @@ Enhanced-only features should be additive or feature-detected where possible.
 
 ## Local Development
 
-- Bun path on this machine: `C:\Program_Files\Bun\bin\bun.exe`.
+- Bun path on this machine: `bun` on PATH.
 - `oc web` or `opencode dev web` may show the remote `https://app.opencode.ai` UI, so it is not proof that local `packages/app` changes are visible.
 - For local shared-app work, run the backend from `packages/opencode` with `bun run --conditions=browser ./src/index.ts serve --port 4096`, run the frontend from `packages/app` with `bun dev -- --port 4444`, then open `http://localhost:4444`.
 - LAN web test command: `oc web --hostname 0.0.0.0 --port 4096` or `opencode web --hostname 0.0.0.0 --port 4096`.
-- Local app UI test backend: `C:\Program_Files\Bun\bin\bun.exe run --cwd packages/opencode --conditions=browser ./src/index.ts serve --port 4096`.
-- Local app UI test frontend: `C:\Program_Files\Bun\bin\bun.exe run --cwd packages/app dev -- --port 4444`.
+- Local app UI test backend: `bun run --cwd packages/opencode --conditions=browser ./src/index.ts serve --port 4096`.
+- Local app UI test frontend: `bun run --cwd packages/app dev -- --port 4444`.
 - Open `http://localhost:4444` for local app UI changes; it targets the backend at `http://localhost:4096`.
 - Running `bun dev` from the root or `packages/opencode` starts the interactive TUI. Do not use it as a blocking foreground verification command.
 - Official release comparison command: `npx --yes -p opencode-ai@<version> opencode web --hostname 0.0.0.0 --port 4096`. The npm package name is `opencode-ai`.
@@ -174,31 +174,31 @@ Enhanced-only features should be additive or feature-detected where possible.
 - Focused `packages/ui` test: `bun test src/path/to/file.test.ts`.
 - HTTP API gates: from `packages/opencode`, run `bun run test:httpapi`.
 - App e2e: from repo root, run `bun --cwd packages/app test:e2e:local`; install Chromium first with `bunx playwright install chromium` from `packages/app` if the browser is missing.
-- Build opencode with filtered logs: `C:\Program_Files\Bun\bin\bun.exe run --cwd packages/opencode build 2>&1 | Tee-Object -FilePath "C:\Temp\opencode\opencode-build.log" | rg -i "error|fail|exception|warning|building|smoke test|passed"`.
-- Build a single Windows x64 opencode exe from `packages/opencode`: `bun run build --single 2>&1 | Tee-Object -FilePath "C:\Temp\opencode\opencode-build.log" | rg -i "error|fail|exception|warning|building|smoke test|passed"`.
+- Build opencode with filtered logs: `bun run --cwd packages/opencode build 2>&1 | tee /tmp/opencode/opencode-build.log | rg -i "error|fail|exception|warning|building|smoke test|passed"`.
+- Build a single Linux ARM64 opencode binary from `packages/opencode`: `bun run build --single 2>&1 | tee /tmp/opencode/opencode-build.log | rg -i "error|fail|exception|warning|building|smoke test|passed"`.
 - Build current-platform CLI from `packages/opencode`: `bun run build --single`; output is under `packages/opencode/dist/opencode-<platform>/bin/opencode`.
 - Build desktop from `packages/desktop`: `bun run build`; this first builds `packages/opencode/dist/node`.
 - Build Android debug APK from `packages/android`: `bun run tauri android build --apk --debug --target aarch64`; output is `packages/android/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`.
-- Build Android debug APK with filtered logs: `C:\Program_Files\Bun\bin\bun.exe run --cwd packages/android tauri android build --apk --debug --target aarch64 2>&1 | Tee-Object -FilePath "C:\Temp\opencode\android-build.log" | rg -i "error|fail|exception|warning|building|built|assemble|apk|passed"`.
-- Opencode build recreates `packages/opencode/dist`; main Windows exe is `packages/opencode/dist/opencode-windows-x64/bin/opencode.exe`.
+- Build Android debug APK with filtered logs: `bun run --cwd packages/android tauri android build --apk --debug --target aarch64 2>&1 | tee /tmp/opencode/android-build.log | rg -i "error|fail|exception|warning|building|built|assemble|apk|passed"`.
+- Opencode build recreates `packages/opencode/dist`; main Linux ARM64 binary is `packages/opencode/dist/opencode-linux-arm64/bin/opencode`.
 
 ## Tablet Ubuntu Tandem CLI Install
 
 - The Y700/Android Ubuntu environment uses the Linux ARM64 binary, not `opencode.exe`. The installed command lives at `/home/jon/.opencode/bin/opencode` inside Ubuntu.
-- Build Tandem from Windows with the full `packages/opencode` build so the Linux ARM64 target is produced: `C:\Program_Files\Bun\bin\bun.exe run --cwd packages/opencode build`.
+- Build Tandem from Ubuntu with the full `packages/opencode` build so the Linux ARM64 target is produced: `bun run --cwd packages/opencode build`.
 - The tablet binary to install is `packages/opencode/dist/opencode-linux-arm64/bin/opencode`. Do not copy the Windows binary from `opencode-windows-x64` to the tablet.
-- Copy the built binary to Termux: `scp -i C:\Temp\opencode\tablet_setup_key -P 8022 C:\Users\Jon\Tandem\packages\opencode\dist\opencode-linux-arm64\bin\opencode u0_a253@192.168.1.85:/data/data/com.termux/files/home/opencode-tandem`.
-- Replace the Ubuntu-installed opencode with the Tandem build: `ssh -i C:\Temp\opencode\tablet_setup_key -p 8022 u0_a253@192.168.1.85 "proot-distro login ubuntu -- bash -lc 'install -m 755 /data/data/com.termux/files/home/opencode-tandem /home/jon/.opencode/bin/opencode && chown jon:jon /home/jon/.opencode/bin/opencode'"`.
-- Verify from Ubuntu: `proot-distro login ubuntu --user jon -- bash -lc 'export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$PATH"; opencode --version'`.
+- Replace the Ubuntu-installed opencode directly: `install -m 755 packages/opencode/dist/opencode-linux-arm64/bin/opencode /home/jon/.opencode/bin/opencode`.
+- Verify from Ubuntu: `export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$PATH"; opencode --version`.
 
 ## Android Testing And Build
 
 - Normal Android builds should package as `WhisperCode` with Android package id `com.devgriffin.whispercode`.
 - `bun run prepare:android` regenerates launcher icons and restores generated Android metadata/MainActivity patches from `packages/android/src-tauri/tauri.conf.json`.
 - Use `bun run install:y700 -- -Name <name>` from `packages/android` for a side-by-side Y700 APK build. This builds a temporary parallel-installable debug APK, installs it on the Y700, and restores generated Android metadata afterward.
-- Run the Y700 installer directly, without wrapping it in `Tee-Object`, `rg`, or another output-filtering pipeline. `install-y700-variant.ts` already writes full logs and prints progress; an outer pipeline can leave the shell/tool call waiting even after the build and install have completed.
-- Y700 was previously seen on ADB as `192.168.1.85:42979` and `adb-HA28HF30-cGyG7x._adb-tls-connect._tcp`.
-- If ADB shows no devices even when the Y700 is connected, restart the adb server.
+- Run the Y700 installer directly, without wrapping it in `tee`, `rg`, or another output-filtering pipeline. `install-y700-variant.ts` already writes full logs and prints progress; an outer pipeline can leave the shell/tool call waiting even after the build and install have completed.
+- The side-by-side installer requires the local Android/Tauri toolchain: `adb`, `cargo`, Java, Android SDK/NDK, and Python. Pass the current wireless debugging endpoint when needed, for example `bun run install:y700 -- -Name test20 -Device 192.168.1.85:<port>`.
+- Y700 was previously seen on ADB as `192.168.1.85:42979` and `adb-HA28HF30-cGyG7x._adb-tls-connect._tcp`; the Linux installer defaults to `192.168.1.85:5555` and falls back to the single connected ADB device.
+- If ADB shows no devices from Ubuntu/proot, run `adb-reconnect`; if it cannot reach the Y700, enable Wireless debugging/pairing again on Android.
 
 ## Branch And Commit Habits
 

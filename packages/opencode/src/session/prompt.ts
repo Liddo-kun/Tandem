@@ -1432,13 +1432,27 @@ export const layer = Layer.effect(
 
             yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
-            const [skills, env, instructions, modelMsgs] = yield* Effect.all([
+            const [skills, env, instructions] = yield* Effect.all([
               sys.skills(agent),
               sys.environment(model),
               instruction.system().pipe(Effect.orDie),
-              MessageV2.toModelMessagesEffect(msgs, model),
             ])
-            const system = [...env, ...instructions, ...(skills ? [skills] : [])]
+            const useInstructionReminder = model.api.id.includes("claude")
+            if (useInstructionReminder && instructions.length > 0) {
+              const firstUserMsg = msgs.find((m) => m.info.role === "user")
+              if (firstUserMsg) {
+                firstUserMsg.parts.unshift({
+                  id: PartID.ascending(),
+                  messageID: firstUserMsg.info.id,
+                  sessionID: firstUserMsg.info.sessionID,
+                  type: "text",
+                  text: `<system-reminder>\n${instructions.join("\n\n")}\n</system-reminder>`,
+                  synthetic: true,
+                })
+              }
+            }
+            const modelMsgs = yield* MessageV2.toModelMessagesEffect(msgs, model)
+            const system = [...env, ...(useInstructionReminder ? [] : instructions), ...(skills ? [skills] : [])]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
             const result = yield* handle.process({

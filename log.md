@@ -45,7 +45,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 - Adds persisted mobile page zoom in shared appearance settings, Android CSS-root zoom with viewport-height and safe-area compensation, iOS `WKWebView.pageZoom`, and Android hardware volume-key zoom stepping. Files: `packages/app/src/context/settings.tsx`, `packages/app/src/context/platform.tsx`, `packages/app/src/components/settings-general.tsx`, `packages/android/index.html`, `packages/android/src/entry-android.tsx`, `packages/android/src-tauri/templates/MainActivity.kt`, `packages/ios/src/entry-ios.tsx`, `packages/ios/OpenCode/Bridge/PlatformBridge.swift`.
 - Adds Android first-run onboarding with setup instructions, manual URL entry, optional display name/Basic auth credentials, and `/global/health` then `/health` checks. Files: `packages/android/src/onboarding.tsx`, `packages/android/src/entry-android.tsx`.
 - Adds Android voice input bridge integration and overlay. Files: `packages/android/src/entry-android.tsx`, `packages/android/src/voice-input.tsx`, `packages/android/src-tauri/mobile-bridge/src/commands.rs`, `packages/android/src-tauri/mobile-bridge/android/src/main/java/MobileBridgePlugin.kt`.
-- Adds Android debug build/install helpers, including side-by-side Y700 variant builds that restore generated metadata, save full logs, and explicitly return after a successful install. Files: `packages/android/build-and-install.sh`, `packages/android/install-y700-variant.ps1`, `packages/android/generate-icons.py`.
+- Adds Android debug build/install helpers, including dependency-free launcher icon generation and side-by-side Y700 variant builds that restore generated metadata, save full logs, and explicitly return after a successful install. Files: `packages/android/build-and-install.sh`, `packages/android/install-y700-variant.ts`, `packages/android/generate-icons.py`.
 
 ## Shared Mobile UI And Session Behavior
 
@@ -76,6 +76,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 ## Backend Tool Defaults
 
 - Enables Exa-backed websearch by default by making `OPENCODE_ENABLE_EXA` default to true while keeping the explicit env override path. Files: `packages/opencode/src/effect/runtime-flags.ts`, `packages/opencode/test/effect/runtime-flags.test.ts`.
+- Makes Claude/Anthropic prompt assembly more Claude Code-shaped by moving resolved instruction files into a first-user `<system-reminder>` and replacing the older Anthropic prompt body with a near-literal live Opus 4.8 `# Harness` structure while leaving memory and environment injection to runtime, omitting the captured security-testing paragraph, and rewriting Claude Code-only session guidance to opencode's actual Skill behavior. Files: `packages/opencode/src/session/prompt.ts`, `packages/opencode/src/session/prompt/anthropic.txt`.
 
 ## Test-Only Compatibility
 

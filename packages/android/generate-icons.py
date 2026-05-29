@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Generate WhisperCode Android launcher icons."""
 
-from PIL import Image, ImageDraw
+import struct
+import zlib
 import os
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 RES_DIR = os.path.join(SCRIPT_DIR, "src-tauri", "gen", "android", "app", "src", "main", "res")
-SCALE = 2
-
 W_RECTS = [
     (128, 96, 160, 320),
     (352, 96, 384, 320),
@@ -51,33 +50,64 @@ IC_LAUNCHER_BACKGROUND_XML = """\
 </resources>"""
 
 
-def scaled(rect):
-    return tuple(v * SCALE for v in rect)
+def color(value):
+    value = value.lstrip("#")
+    return tuple(int(value[index : index + 2], 16) for index in (0, 2, 4)) + (255,)
 
 
-def draw_icon(bg_color, letter_color, shadow_color=None, transparent_bg=False):
-    size = 512 * SCALE
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0) if transparent_bg else bg_color)
-    draw = ImageDraw.Draw(img)
+def empty_image(size, fill=(0, 0, 0, 0)):
+    return [[fill for _ in range(size)] for _ in range(size)]
 
+
+def fill_rect(image, rect, fill, base_size=512, offset=0, target_size=None):
+    target_size = target_size or len(image)
+    x1, y1, x2, y2 = rect
+    left = offset + round(x1 * target_size / base_size)
+    top = offset + round(y1 * target_size / base_size)
+    right = offset + round(x2 * target_size / base_size)
+    bottom = offset + round(y2 * target_size / base_size)
+
+    for y in range(max(0, top), min(len(image), bottom)):
+        row = image[y]
+        for x in range(max(0, left), min(len(row), right)):
+            row[x] = fill
+
+
+def draw_icon(size, bg_color, letter_color, shadow_color=None, transparent_bg=False):
+    image = empty_image(size, (0, 0, 0, 0) if transparent_bg else color(bg_color))
     if shadow_color:
-        x1, y1, x2, y2 = scaled(SHADOW_RECT)
-        draw.rectangle([x1, y1, x2 - 1, y2 - 1], fill=shadow_color)
+        fill_rect(image, SHADOW_RECT, color(shadow_color))
 
     for rect in W_RECTS:
-        x1, y1, x2, y2 = scaled(rect)
-        draw.rectangle([x1, y1, x2 - 1, y2 - 1], fill=letter_color)
+        fill_rect(image, rect, color(letter_color))
 
-    return img
+    return image
 
 
-def make_foreground(src_img, size):
-    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+def draw_foreground(size):
+    image = empty_image(size)
     visible = int(size * 72 / 108)
-    resized = src_img.resize((visible, visible), Image.LANCZOS)
     offset = (size - visible) // 2
-    canvas.paste(resized, (offset, offset), resized)
-    return canvas
+
+    for rect in W_RECTS:
+        fill_rect(image, rect, color("#FFFFFF"), offset=offset, target_size=visible)
+
+    return image
+
+
+def write_png(path, image):
+    height = len(image)
+    width = len(image[0]) if height else 0
+    raw = b"".join(b"\x00" + b"".join(bytes(pixel) for pixel in row) for row in image)
+
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    with open(path, "wb") as file:
+        file.write(b"\x89PNG\r\n\x1a\n")
+        file.write(chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)))
+        file.write(chunk(b"IDAT", zlib.compress(raw, 9)))
+        file.write(chunk(b"IEND", b""))
 
 
 def main():
@@ -85,20 +115,17 @@ def main():
         print(f"Android resource directory missing; skipping launcher icon generation: {RES_DIR}")
         return
 
-    dark = draw_icon(bg_color="#131010", letter_color="#FFFFFF", shadow_color="#5A5858")
-    tinted = draw_icon(bg_color=None, letter_color="#FFFFFF", transparent_bg=True)
-
     for density, size in FOREGROUND_SIZES.items():
         out_dir = os.path.join(RES_DIR, f"mipmap-{density}")
         os.makedirs(out_dir, exist_ok=True)
-        make_foreground(tinted, size).save(os.path.join(out_dir, "ic_launcher_foreground.png"))
+        write_png(os.path.join(out_dir, "ic_launcher_foreground.png"), draw_foreground(size))
 
     for density, size in ICON_SIZES.items():
         out_dir = os.path.join(RES_DIR, f"mipmap-{density}")
         os.makedirs(out_dir, exist_ok=True)
-        icon = dark.resize((size, size), Image.LANCZOS)
-        icon.save(os.path.join(out_dir, "ic_launcher.png"))
-        icon.save(os.path.join(out_dir, "ic_launcher_round.png"))
+        icon = draw_icon(size, bg_color="#131010", letter_color="#FFFFFF", shadow_color="#5A5858")
+        write_png(os.path.join(out_dir, "ic_launcher.png"), icon)
+        write_png(os.path.join(out_dir, "ic_launcher_round.png"), icon)
 
     anydpi_dir = os.path.join(RES_DIR, "mipmap-anydpi-v26")
     os.makedirs(anydpi_dir, exist_ok=True)

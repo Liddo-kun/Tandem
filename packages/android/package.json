@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "bun run typecheck && vite build",
     "preview": "vite preview",
-    "install:y700": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./install-y700-variant.ps1",
+    "install:y700": "bun ./install-y700-variant.ts",
     "prepare:android": "python generate-icons.py && bun run patch-android-generated.ts",
     "tauri": "bun run prepare:android && tauri"
   },

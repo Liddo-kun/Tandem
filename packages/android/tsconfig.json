@@ -18,5 +18,5 @@
     "types": ["vite/client", "bun"]
   },
   "references": [{ "path": "../app" }],
-  "include": ["src", "package.json", "patch-android-generated.ts"]
+  "include": ["src", "package.json", "patch-android-generated.ts", "install-y700-variant.ts"]
 }
