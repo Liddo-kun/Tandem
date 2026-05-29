@@ -182,6 +182,15 @@ Enhanced-only features should be additive or feature-detected where possible.
 - Build Android debug APK with filtered logs: `C:\Program_Files\Bun\bin\bun.exe run --cwd packages/android tauri android build --apk --debug --target aarch64 2>&1 | Tee-Object -FilePath "C:\Temp\opencode\android-build.log" | rg -i "error|fail|exception|warning|building|built|assemble|apk|passed"`.
 - Opencode build recreates `packages/opencode/dist`; main Windows exe is `packages/opencode/dist/opencode-windows-x64/bin/opencode.exe`.
 
+## Tablet Ubuntu Tandem CLI Install
+
+- The Y700/Android Ubuntu environment uses the Linux ARM64 binary, not `opencode.exe`. The installed command lives at `/home/jon/.opencode/bin/opencode` inside Ubuntu.
+- Build Tandem from Windows with the full `packages/opencode` build so the Linux ARM64 target is produced: `C:\Program_Files\Bun\bin\bun.exe run --cwd packages/opencode build`.
+- The tablet binary to install is `packages/opencode/dist/opencode-linux-arm64/bin/opencode`. Do not copy the Windows binary from `opencode-windows-x64` to the tablet.
+- Copy the built binary to Termux: `scp -i C:\Temp\opencode\tablet_setup_key -P 8022 C:\Users\Jon\Tandem\packages\opencode\dist\opencode-linux-arm64\bin\opencode u0_a253@192.168.1.85:/data/data/com.termux/files/home/opencode-tandem`.
+- Replace the Ubuntu-installed opencode with the Tandem build: `ssh -i C:\Temp\opencode\tablet_setup_key -p 8022 u0_a253@192.168.1.85 "proot-distro login ubuntu -- bash -lc 'install -m 755 /data/data/com.termux/files/home/opencode-tandem /home/jon/.opencode/bin/opencode && chown jon:jon /home/jon/.opencode/bin/opencode'"`.
+- Verify from Ubuntu: `proot-distro login ubuntu --user jon -- bash -lc 'export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$PATH"; opencode --version'`.
+
 ## Android Testing And Build
 
 - Normal Android builds should package as `WhisperCode` with Android package id `com.devgriffin.whispercode`.
