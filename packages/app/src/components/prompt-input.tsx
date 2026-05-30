@@ -321,7 +321,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   })
   const buttons = createMemo(() => motion(buttonsSpring()))
   const shell = createMemo(() => motion(1 - buttonsSpring()))
-  const control = createMemo(() => ({ height: "24px", ...buttons() }))
+  // Tighten the composer trigger buttons (model, agent, effort, project): the shared Button
+  // CSS uses gap: 8px, which pushed each label's chevron too far right and widened the bar.
+  const control = createMemo(() => ({ height: "24px", gap: "0px", ...buttons() }))
 
   const commentCount = createMemo(() => {
     if (store.mode === "shell") return 0
@@ -1386,6 +1388,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     return "Ask anything, / for commands, @ for context..."
   }
 
+  const composerModelName = createMemo(() =>
+    promptComposerModelName(local.model.current()?.name ?? language.t("dialog.model.select.title")),
+  )
+
   const modelControlState = createMemo<ComposerModelControlState>(() => ({
     loading: providersLoading(),
     paid: providers.paid().length > 0,
@@ -1393,7 +1399,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     keybind: command.keybind("model.choose"),
     model: local.model,
     providerID: local.model.current()?.provider?.id,
-    modelName: local.model.current()?.name ?? language.t("dialog.model.select.title"),
+    modelName: composerModelName(),
     style: control(),
     onClose: restoreFocus,
     onUnpaidClick: () => {
@@ -1994,7 +2000,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                                     class="block min-w-0 max-w-[8ch] truncate"
                                     title={local.model.current()?.name ?? language.t("dialog.model.select.title")}
                                   >
-                                    {local.model.current()?.name ?? language.t("dialog.model.select.title")}
+                                    {composerModelName()}
                                   </span>
                                   <Icon name="chevron-down" size="small" class="shrink-0" />
                                 </Button>
@@ -2030,7 +2036,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                                     class="block min-w-0 max-w-[8ch] truncate"
                                     title={local.model.current()?.name ?? language.t("dialog.model.select.title")}
                                   >
-                                    {local.model.current()?.name ?? language.t("dialog.model.select.title")}
+                                    {composerModelName()}
                                   </span>
                                 <Icon name="chevron-down" size="small" class="shrink-0" />
                               </ModelSelectorPopover>
@@ -2098,6 +2104,10 @@ type ComposerPickerItemState = {
   label: string
   selected?: boolean
   onSelect: () => void
+}
+
+function promptComposerModelName(name: string) {
+  return name.replace(/^Claude\s+/, "")
 }
 
 type ComposerPickerTriggerState = {
