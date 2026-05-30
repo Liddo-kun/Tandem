@@ -108,6 +108,7 @@ describe("warmSessions", () => {
 
 describe("bootstrapDirectory", () => {
   test("marks a loading directory partial during bootstrap and complete after success", async () => {
+    const mcpReads: string[] = []
     const [store, setStore] = createStore<State>({
       status: "loading",
       agent: [],
@@ -142,6 +143,7 @@ describe("bootstrapDirectory", () => {
 
     await bootstrapDirectory({
       directory: "/project",
+      mcp: false,
       global: {
         config: {} satisfies Config,
         path: { state: "", config: "", worktree: "/project", directory: "/project", home: "/home" },
@@ -153,10 +155,20 @@ describe("bootstrapDirectory", () => {
         config: { get: async () => ({ data: {} }) },
         session: { status: async () => ({ data: {} }) },
         vcs: { get: async () => ({ data: undefined }) },
-        command: { list: async () => ({ data: [] }) },
+        command: {
+          list: async () => {
+            mcpReads.push("command")
+            return { data: [] }
+          },
+        },
         permission: { list: async () => ({ data: [] }) },
         question: { list: async () => ({ data: [] }) },
-        mcp: { status: async () => ({ data: {} }) },
+        mcp: {
+          status: async () => {
+            mcpReads.push("status")
+            return { data: {} }
+          },
+        },
         provider: { list: async () => ({ data: { all: [], connected: [], default: {} } }) },
       } as unknown as OpencodeClient,
       store,
@@ -172,5 +184,6 @@ describe("bootstrapDirectory", () => {
     await new Promise((resolve) => setTimeout(resolve, 80))
 
     expect(store.status).toBe("complete")
+    expect(mcpReads).toEqual([])
   })
 })
