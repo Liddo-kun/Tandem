@@ -282,19 +282,19 @@ export const layer: Layer.Layer<
     const describeSkill = Effect.fn("ToolRegistry.describeSkill")(function* (agent: Agent.Info) {
       const list = yield* skill.available(agent)
       if (list.length === 0) return "No skills are currently available."
+      // UPSTREAM-DIVERGENCE: match real Claude Code — the tool description explains how to invoke
+      // a skill and points at the list in the system prompt rather than embedding (and duplicating)
+      // the skill names + descriptions here. See Skill.fmt for the rationale.
       return [
         "Load a specialized skill that provides domain-specific instructions and workflows.",
         "",
-        "When you recognize that a task matches one of the available skills listed below, use this tool to load the full skill instructions.",
+        "When you recognize that a task matches one of the available skills, use this tool to load the full skill instructions.",
         "",
         "The skill will inject detailed instructions, workflows, and access to bundled resources (scripts, references, templates) into the conversation context.",
         "",
         'Tool output includes a `<skill_content name="...">` block with the loaded content.',
         "",
-        "The following skills provide specialized sets of instructions for particular tasks",
-        "Invoke this tool to load a skill when a task matches one of the available skills listed below:",
-        "",
-        Skill.fmt(list, { verbose: false }),
+        "Available skills are listed in the system prompt. Only invoke a skill that appears in that list — don't guess.",
       ].join("\n")
     })
 

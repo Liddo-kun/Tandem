@@ -1,5 +1,4 @@
 import path from "path"
-import { pathToFileURL } from "url"
 import { Effect, Layer, Context, Schema } from "effect"
 import { NamedError } from "@opencode-ai/core/util/error"
 import type { Agent } from "@/agent/agent"
@@ -323,30 +322,20 @@ export const defaultLayer = layer.pipe(
   Layer.provide(RuntimeFlags.defaultLayer),
 )
 
-export function fmt(list: Info[], opts: { verbose: boolean }) {
+// UPSTREAM-DIVERGENCE: Tandem presents skills the way real Claude Code does — a single
+// markdown list ("The following skills are available..." + `- name: description`) emitted
+// once in the system prompt, with no <available_skills> XML, no <location> tags, and no
+// duplicate list embedded in the Skill tool description. Opus is trained on the Claude Code
+// format, so matching it improves skill recognition and avoids duplicated description tokens.
+export function fmt(list: Info[]) {
   const described = list.filter((skill) => skill.description !== undefined)
   if (described.length === 0) return "No skills are currently available."
-  if (opts.verbose) {
-    return [
-      "<available_skills>",
-      ...described
-        .toSorted((a, b) => a.name.localeCompare(b.name))
-        .flatMap((skill) => [
-          "  <skill>",
-          `    <name>${skill.name}</name>`,
-          `    <description>${skill.description}</description>`,
-          `    <location>${pathToFileURL(skill.location).href}</location>`,
-          "  </skill>",
-        ]),
-      "</available_skills>",
-    ].join("\n")
-  }
-
   return [
-    "## Available Skills",
+    "The following skills are available for use with the Skill tool:",
+    "",
     ...described
       .toSorted((a, b) => a.name.localeCompare(b.name))
-      .map((skill) => `- **${skill.name}**: ${skill.description}`),
+      .map((skill) => `- ${skill.name}: ${skill.description}`),
   ].join("\n")
 }
 

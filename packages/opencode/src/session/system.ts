@@ -66,14 +66,12 @@ export const layer = Layer.effect(
         if (Permission.disabled(["skill"], agent.permission).has("skill")) return
 
         const list = yield* skill.available(agent)
+        if (list.length === 0) return
 
-        return [
-          "Skills provide specialized instructions and workflows for specific tasks.",
-          "Use the skill tool to load a skill when a task matches its description.",
-          // the agents seem to ingest the information about skills a bit better if we present a more verbose
-          // version of them here and a less verbose version in tool description, rather than vice versa.
-          Skill.fmt(list, { verbose: true }),
-        ].join("\n")
+        // UPSTREAM-DIVERGENCE: match real Claude Code — the skill list lives here in the system
+        // prompt only, as a single markdown list. The Skill tool description points back to this
+        // list instead of repeating it. See Skill.fmt for the rationale.
+        return Skill.fmt(list)
       }),
     })
   }),

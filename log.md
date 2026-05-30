@@ -79,6 +79,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 
 - Enables Exa-backed websearch by default by making `OPENCODE_ENABLE_EXA` default to true while keeping the explicit env override path. Files: `packages/opencode/src/effect/runtime-flags.ts`, `packages/opencode/test/effect/runtime-flags.test.ts`.
 - Makes Claude/Anthropic prompt assembly more Claude Code-shaped by moving resolved instruction files into a first-user `<system-reminder>` and replacing the older Anthropic prompt body with a near-literal live Opus 4.8 `# Harness` structure while leaving memory and environment injection to runtime, omitting the captured security-testing paragraph, and rewriting Claude Code-only session guidance to opencode's actual Skill behavior. Files: `packages/opencode/src/session/prompt.ts`, `packages/opencode/src/session/prompt/anthropic.txt`.
+- Matches real Claude Code skill presentation: lists skills once in the system prompt as a single markdown list (`The following skills are available...` + `- name: description`, no `<available_skills>` XML or `<location>` tags), and makes the Skill tool description generic by pointing at that list instead of embedding a duplicate copy of every skill name + description. `Skill.fmt` loses its `verbose` option. Files: `packages/opencode/src/skill/index.ts`, `packages/opencode/src/session/system.ts`, `packages/opencode/src/tool/registry.ts`, `packages/opencode/test/skill/skill.test.ts`.
 
 ## Test-Only Compatibility
 
