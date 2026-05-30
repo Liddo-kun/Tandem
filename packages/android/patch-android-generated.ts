@@ -83,8 +83,9 @@ async function patchStrings() {
   const strings = Bun.file(stringsPath)
   if (!(await strings.exists())) return
 
-  const appName = escapeXml(config.productName ?? "WhisperCode")
-  const title = escapeXml(config.app?.windows?.[0]?.title ?? config.productName ?? "WhisperCode")
+  // UPSTREAM-DIVERGENCE: Generated Android labels should fall back to Tandem if config is missing.
+  const appName = escapeXml(config.productName ?? "Tandem")
+  const title = escapeXml(config.app?.windows?.[0]?.title ?? config.productName ?? "Tandem")
   const text = await strings.text()
   await Bun.write(
     stringsPath,

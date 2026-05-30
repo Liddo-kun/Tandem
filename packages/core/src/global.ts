@@ -5,8 +5,10 @@ import os from "os"
 import { Context, Effect, Layer } from "effect"
 import { Flock } from "./util/flock"
 import { Flag } from "./flag/flag"
+import { Brand } from "./brand"
 
-const app = "opencode"
+// UPSTREAM-DIVERGENCE: see brand.ts; separates Tandem dirs from opencode for parallel install.
+const app = Brand.dir
 const data = path.join(xdgData!, app)
 const cache = path.join(xdgCache!, app)
 const config = path.join(xdgConfig!, app)

@@ -36,7 +36,8 @@ const packageSegments = variantName
 
 if (packageSegments.length === 0) throw new Error("-Name must contain at least one ASCII letter or digit.")
 
-const appName = `OpenCode ${variantName}`
+// UPSTREAM-DIVERGENCE: Side-by-side debug variants should show Tandem while package IDs stay compatible.
+const appName = `Tandem ${variantName}`
 const packageId = `ai.opencode.android.${packageSegments.join(".")}`
 const renamedApk = path.join(apkDir, `opencode-${packageSegments.join("-")}-y700-debug.apk`)
 const workDir = path.join(os.tmpdir(), `opencode-y700-${crypto.randomUUID().replaceAll("-", "")}`)

@@ -1,6 +1,9 @@
 import Foundation
 import Network
 
+// UPSTREAM-DIVERGENCE: Prefer Tandem's parallel-install port while keeping opencode scan compatibility.
+private let tandemScanPorts: [UInt16] = [4097, 4096]
+
 final class NetworkScanBridge: @unchecked Sendable {
   var onFound: (([String: Any]) -> Void)?
   var onComplete: (() -> Void)?
@@ -62,18 +65,35 @@ final class NetworkScanBridge: @unchecked Sendable {
   }
 
   private func probe(host: String, gen: Int, done: @escaping () -> Void) {
-    let port: UInt16 = 4096
+    probe(host: host, ports: tandemScanPorts[...], gen: gen, done: done)
+  }
+
+  private func probe(host: String, ports: ArraySlice<UInt16>, gen: Int, done: @escaping () -> Void) {
+    guard !isStale(gen: gen), let port = ports.first else {
+      done()
+      return
+    }
     let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: NWEndpoint.Port(rawValue: port)!)
     let connection = NWConnection(to: endpoint, using: .tcp)
     let completed = LockedFlag()
     let finish = { [weak self] (found: Bool) in
       guard completed.setIfFalse() else { return }
       connection.cancel()
-      if found {
-        self?.verifyHealth(host: host, port: port, gen: gen, done: done)
+      guard let self else {
+        done()
         return
       }
-      done()
+      if found {
+        self.verifyHealth(host: host, port: port, gen: gen) { healthy in
+          if healthy {
+            done()
+            return
+          }
+          self.probe(host: host, ports: ports.dropFirst(), gen: gen, done: done)
+        }
+        return
+      }
+      self.probe(host: host, ports: ports.dropFirst(), gen: gen, done: done)
     }
     let timeout = DispatchWorkItem { finish(false) }
     queue.asyncAfter(deadline: .now() + .milliseconds(500), execute: timeout)
@@ -93,10 +113,10 @@ final class NetworkScanBridge: @unchecked Sendable {
     connection.start(queue: queue)
   }
 
-  private func verifyHealth(host: String, port: UInt16, gen: Int, done: @escaping () -> Void) {
+  private func verifyHealth(host: String, port: UInt16, gen: Int, done: @escaping (Bool) -> Void) {
     let urlString = "http://\(host):\(port)"
     guard let url = URL(string: "\(urlString)/global/health") else {
-      done()
+      done(false)
       return
     }
 
@@ -106,16 +126,17 @@ final class NetworkScanBridge: @unchecked Sendable {
 
     URLSession.shared.dataTask(with: request) { [weak self] _, response, _ in
       guard let self, !self.isStale(gen: gen) else {
-        done()
+        done(false)
         return
       }
       let http = response as? HTTPURLResponse
-      if http?.statusCode == 200 {
+      let healthy = http?.statusCode == 200
+      if healthy {
         DispatchQueue.main.async {
           self.fireFound(gen: gen, result: ["host": host, "port": port, "url": urlString])
         }
       }
-      done()
+      done(healthy)
     }.resume()
   }
 

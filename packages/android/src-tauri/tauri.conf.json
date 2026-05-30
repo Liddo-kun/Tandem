@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "WhisperCode",
+  "productName": "Tandem",
   "identifier": "com.devgriffin.whispercode",
   "version": "../package.json",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "WhisperCode"
+        "title": "Tandem"
       }
     ],
     "withGlobalTauri": true,

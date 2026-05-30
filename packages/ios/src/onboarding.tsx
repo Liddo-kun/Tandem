@@ -5,6 +5,11 @@ import { Icon } from "@opencode-ai/ui/icon"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { bridge } from "./bridge"
 
+// UPSTREAM-DIVERGENCE: Tandem-branded mobile onboarding prefers the parallel-install web port.
+const BRAND_NAME = "Tandem"
+const SERVER_COMMAND = "tandem web --hostname 0.0.0.0 --port 4097"
+const SERVER_URL_PLACEHOLDER = "http://192.168.1.100:4097"
+
 type ScanResult = { host: string; port: number; url: string }
 type ServerConfig = { url: string; displayName?: string; username?: string; password?: string }
 
@@ -129,12 +134,12 @@ export function Onboarding(props: { onComplete: (server: ServerConfig) => void }
       <Show when={store.step === 0}>
         <div class="flex flex-col items-center text-center max-w-sm w-full gap-6">
           <div class="flex size-20 items-center justify-center rounded-2xl bg-surface-raised-base text-text-strong text-2xl font-semibold">
-            OC
+            T
           </div>
           <div class="flex flex-col gap-2">
-            <h1 class="text-2xl font-semibold text-text-strong">Welcome to OpenCode</h1>
+            <h1 class="text-2xl font-semibold text-text-strong">Welcome to {BRAND_NAME}</h1>
             <p class="text-text-weak text-14-regular leading-relaxed">
-              Connect this iOS app to an OpenCode server running on your development machine.
+              Connect this iOS app to a {BRAND_NAME} server running on your development machine.
             </p>
           </div>
           <Button variant="primary" size="large" class="w-full mt-4" onClick={() => setStore("step", 1)}>
@@ -147,13 +152,13 @@ export function Onboarding(props: { onComplete: (server: ServerConfig) => void }
         <div class="flex flex-col items-center max-w-sm w-full gap-6">
           <StepIndicator current={1} total={3} />
           <div class="flex flex-col gap-2 text-center">
-            <h2 class="text-xl font-semibold text-text-strong">Install OpenCode</h2>
+            <h2 class="text-xl font-semibold text-text-strong">Install {BRAND_NAME}</h2>
             <p class="text-text-weak text-14-regular leading-relaxed">
-              Install the OpenCode CLI on your development machine.
+              Install the {BRAND_NAME} CLI on your development machine. {BRAND_NAME} follows the OpenCode CLI setup.
             </p>
           </div>
           <a href="https://opencode.ai/" class="external-link flex items-center justify-center gap-2 w-full px-4 py-3 rounded-md bg-surface-raised-base text-text-strong text-14-regular hover:bg-surface-base-hover transition-colors">
-            <span>opencode.ai</span>
+            <span>OpenCode docs</span>
             <Icon name="square-arrow-top-right" size="small" />
           </a>
           <div class="flex gap-3 w-full mt-2">
@@ -173,10 +178,10 @@ export function Onboarding(props: { onComplete: (server: ServerConfig) => void }
           <div class="flex flex-col gap-2 text-center">
             <h2 class="text-xl font-semibold text-text-strong">Start the Server</h2>
             <p class="text-text-weak text-14-regular leading-relaxed">
-              Run this command in a project directory on your development machine.
+              Run this command in a project directory on your development machine to start the {BRAND_NAME} server.
             </p>
           </div>
-          <CopyBlock code="opencode web --hostname 0.0.0.0" />
+          <CopyBlock code={SERVER_COMMAND} />
           <div class="flex gap-3 w-full mt-2">
             <Button variant="secondary" size="large" class="flex-1" onClick={() => setStore("step", 1)}>
               Back
@@ -259,7 +264,7 @@ export function Onboarding(props: { onComplete: (server: ServerConfig) => void }
               <TextField
                 hideLabel
                 label="Server URL"
-                placeholder="http://192.168.1.100:4096"
+                placeholder={SERVER_URL_PLACEHOLDER}
                 value={store.manualUrl}
                 onChange={(value) => setStore("manualUrl", value)}
               />

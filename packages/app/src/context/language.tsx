@@ -2,6 +2,7 @@ import * as i18n from "@solid-primitives/i18n"
 import { createEffect, createMemo, createResource } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createSimpleContext } from "@opencode-ai/ui/context"
+import { Brand } from "@opencode-ai/core/brand"
 import { Persist, persisted } from "@/utils/persist"
 import { dict as en } from "@/i18n/en"
 import { dict as uiEn } from "@opencode-ai/ui/i18n/en"
@@ -97,11 +98,29 @@ const LABEL_KEY: Record<Locale, keyof Dictionary> = {
   tr: "language.tr",
 }
 
-const base = i18n.flatten({ ...en, ...uiEn })
+// UPSTREAM-DIVERGENCE: Apply Tandem product copy centrally so locale files stay close to upstream.
+const brandOverrides = {
+  "dialog.server.description": `Switch which ${Brand.name} server this app connects to.`,
+  "toast.update.description": `A new version of ${Brand.name} ({{version}}) is now available to install.`,
+  "error.page.report.prefix": `Please report this error to the ${Brand.name} project`,
+  "error.chain.mcpFailed": `MCP server "{{name}}" failed. Note, ${Brand.name} does not support MCP authentication yet.`,
+  "sidebar.gettingStarted.line1": `${Brand.name} includes free models so you can start immediately.`,
+  "app.name.desktop": `${Brand.name} Desktop`,
+  "settings.desktop.wsl.description": `Run the ${Brand.name} server inside WSL on Windows.`,
+  "settings.general.row.language.description": `Change the display language for ${Brand.name}`,
+  "settings.general.row.appearance.description": `Customize how ${Brand.name} looks on your device`,
+  "settings.general.row.colorScheme.description": `Choose whether ${Brand.name} follows the system, light, or dark theme`,
+  "settings.general.row.theme.description": `Customize ${Brand.name}'s theme.`,
+  "settings.updates.row.startup.description": `Automatically check for updates when ${Brand.name} starts`,
+  "settings.updates.toast.latest.description": `You are using the latest version of ${Brand.name}.`,
+} satisfies Partial<Record<keyof Dictionary, string>>
+
+const withBrandOverrides = (dict: Dictionary) => ({ ...dict, ...brandOverrides }) as Dictionary
+const base = withBrandOverrides(i18n.flatten({ ...en, ...uiEn }) as Dictionary)
 const dicts = new Map<Locale, Dictionary>([["en", base]])
 
 const merge = (app: Promise<Source>, ui: Promise<Source>) =>
-  Promise.all([app, ui]).then(([a, b]) => ({ ...base, ...i18n.flatten({ ...a.dict, ...b.dict }) }) as Dictionary)
+  Promise.all([app, ui]).then(([a, b]) => withBrandOverrides({ ...base, ...i18n.flatten({ ...a.dict, ...b.dict }) } as Dictionary))
 
 const loaders: Record<Exclude<Locale, "en">, () => Promise<Dictionary>> = {
   zh: () => merge(import("@/i18n/zh"), import("@opencode-ai/ui/i18n/zh")),

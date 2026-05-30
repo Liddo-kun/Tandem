@@ -41,6 +41,8 @@ class ShareArgs {
 
 private data class ScanEntry(val host: String, val port: Int, val url: String)
 private data class WifiAddressInfo(val address: String, val prefixLength: Int)
+// UPSTREAM-DIVERGENCE: Prefer Tandem's parallel-install port while keeping opencode scan compatibility.
+private val tandemScanPorts = listOf(4097, 4096)
 
 @TauriPlugin(
     permissions = [
@@ -270,23 +272,26 @@ class MobileBridgePlugin(private val activity: Activity) : Plugin(activity), Rec
     private fun probeHost(host: String, gen: Int): ScanEntry? {
         if (isScanStale(gen)) return null
 
-        val port = 4096
-        val socket = Socket()
-        return try {
-            socket.connect(InetSocketAddress(host, port), 500)
-            socket.close()
-
-            val base = "http://$host:$port"
-            if (!checkHealth("$base/global/health", gen) && !checkHealth("$base/health", gen)) return null
-            ScanEntry(host = host, port = port, url = base)
-        } catch (_: Throwable) {
-            null
-        } finally {
+        for (port in tandemScanPorts) {
+            if (isScanStale(gen)) return null
+            val socket = Socket()
             try {
+                socket.connect(InetSocketAddress(host, port), 500)
                 socket.close()
+
+                val base = "http://$host:$port"
+                if (checkHealth("$base/global/health", gen) || checkHealth("$base/health", gen)) {
+                    return ScanEntry(host = host, port = port, url = base)
+                }
             } catch (_: Throwable) {
+            } finally {
+                try {
+                    socket.close()
+                } catch (_: Throwable) {
+                }
             }
         }
+        return null
     }
 
     private fun checkHealth(url: String, gen: Int): Boolean {

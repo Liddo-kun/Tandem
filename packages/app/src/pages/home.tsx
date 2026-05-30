@@ -3,7 +3,6 @@ import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useQuery } from "@tanstack/solid-query"
 import { Button } from "@opencode-ai/ui/button"
-import { Logo } from "@opencode-ai/ui/logo"
 import { Spinner } from "@opencode-ai/ui/spinner"
 import { Avatar as AvatarV2 } from "@opencode-ai/ui/v2/components/avatar-v2.jsx"
 import { ButtonV2 } from "@opencode-ai/ui/v2/components/button-v2.jsx"
@@ -12,6 +11,7 @@ import { IconButtonV2 } from "@opencode-ai/ui/v2/components/icon-button-v2.jsx"
 import { MenuV2 } from "@opencode-ai/ui/v2/components/menu-v2.jsx"
 import { getAvatarColors, useLayout, type LocalProject } from "@/context/layout"
 import { useNavigate } from "@solidjs/router"
+import { Brand } from "@opencode-ai/core/brand"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { Icon } from "@opencode-ai/ui/icon"
 import { usePlatform } from "@/context/platform"
@@ -32,12 +32,15 @@ import { sessionPermissionRequest } from "@/pages/session/composer/session-reque
 import { ServerHealthIndicator } from "@/components/server/server-row"
 import { useServers } from "@/context/servers"
 import { useSettings } from "@/context/settings"
+import { BrandWordmark } from "@/components/brand-wordmark"
 
 const HOME_SESSION_LIMIT = 15
 const HOME_ROW =
   "flex min-w-0 w-full shrink-0 cursor-default items-center rounded-[6px] border-0 bg-transparent text-left text-v2-text-text-muted transition-colors duration-[120ms] ease-in-out hover:bg-v2-overlay-simple-overlay-hover focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
 const HOME_PROJECT_NAV_ROW = `${HOME_ROW} h-7 gap-2 px-1.5 [&>span]:min-w-0 [&>span]:overflow-hidden [&>span]:text-ellipsis [&>span]:whitespace-nowrap`
 const HOME_SECTION_LABEL = "text-v2-text-text-muted [font-weight:440]"
+// UPSTREAM-DIVERGENCE: Tandem mobile setup prefers port 4097 so opencode can keep 4096.
+const MOBILE_SETUP_COMMAND = `${Brand.command} web --hostname 0.0.0.0 --port 4097`
 
 type HomeSessionRecord = {
   session: Session
@@ -735,7 +738,7 @@ function LegacyHome() {
 
   return (
     <div class="mx-auto mt-55 w-full md:w-auto px-4">
-      <Logo class="md:w-xl opacity-12" />
+      <BrandWordmark class="text-center text-6xl md:text-8xl font-semibold tracking-[-0.04em] text-text-strong opacity-20" />
       <Button
         size="large"
         variant="ghost"
@@ -754,7 +757,7 @@ function LegacyHome() {
         <p class="mt-3 block max-w-md text-center text-12-regular text-text-dimmed">
           Need help connecting? Run{" "}
           <code class="bg-surface-raised-base text-text-secondary-base px-1.5 py-0.5 rounded-sm break-all">
-            opencode web --hostname 0.0.0.0
+            {MOBILE_SETUP_COMMAND}
           </code>{" "}
           on your server.
         </p>
