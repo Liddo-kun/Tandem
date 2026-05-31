@@ -47,7 +47,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 - Adds Android first-run onboarding with setup instructions, manual URL entry, optional display name/Basic auth credentials, and `/global/health` then `/health` checks. Files: `packages/android/src/onboarding.tsx`, `packages/android/src/entry-android.tsx`.
 - Adds Android voice input bridge integration and overlay. Files: `packages/android/src/entry-android.tsx`, `packages/android/src/voice-input.tsx`, `packages/android/src-tauri/mobile-bridge/src/commands.rs`, `packages/android/src-tauri/mobile-bridge/android/src/main/java/MobileBridgePlugin.kt`.
 - Adds Android debug build/install helpers, including dependency-free launcher icon generation and side-by-side Y700 variant builds that restore generated metadata, save full logs, and explicitly return after a successful install. Files: `packages/android/build-and-install.sh`, `packages/android/install-y700-variant.ts`, `packages/android/generate-icons.py`.
-- Adds generated Android release-signing patching so release builds use ignored local `release.keystore`/`keystore.properties` files when present. Files: `packages/android/patch-android-generated.ts`, `ANDROID_BUILD.md`.
+- Adds generated Android release-signing patching so release builds use ignored local `release.keystore`/`keystore.properties` files when present, and preserves LAN HTTP access for release APKs by keeping generated `usesCleartextTraffic` enabled. Files: `packages/android/patch-android-generated.ts`, `ANDROID_BUILD.md`.
 
 ## Shared Mobile UI And Session Behavior
 

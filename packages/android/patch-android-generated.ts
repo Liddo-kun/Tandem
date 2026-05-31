@@ -61,7 +61,10 @@ async function patchBuildGradle() {
   const text = patchReleaseSigning(await buildGradle.text())
   await Bun.write(
     buildGradlePath,
-    text.replace(/applicationId\s*=\s*"[^"]+"/, `applicationId = "${config.identifier ?? "com.devgriffin.whispercode"}"`),
+    text
+      .replace(/applicationId\s*=\s*"[^"]+"/, `applicationId = "${config.identifier ?? "com.devgriffin.whispercode"}"`)
+      // UPSTREAM-DIVERGENCE: Android release APKs must connect to LAN HTTP Tandem/opencode servers.
+      .replace(/manifestPlaceholders\["usesCleartextTraffic"\]\s*=\s*"[^"]+"/, `manifestPlaceholders["usesCleartextTraffic"] = "true"`),
   )
 }
 
