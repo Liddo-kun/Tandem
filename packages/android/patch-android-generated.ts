@@ -62,7 +62,7 @@ async function patchBuildGradle() {
   await Bun.write(
     buildGradlePath,
     text
-      .replace(/applicationId\s*=\s*"[^"]+"/, `applicationId = "${config.identifier ?? "com.devgriffin.whispercode"}"`)
+      .replace(/applicationId\s*=\s*"[^"]+"/, `applicationId = "${config.identifier ?? "app.liddokun.tandem"}"`)
       // UPSTREAM-DIVERGENCE: Android release APKs must connect to LAN HTTP Tandem/opencode servers.
       .replace(/manifestPlaceholders\["usesCleartextTraffic"\]\s*=\s*"[^"]+"/, `manifestPlaceholders["usesCleartextTraffic"] = "true"`),
   )

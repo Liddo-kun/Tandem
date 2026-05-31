@@ -2,7 +2,8 @@ import { BoxRenderable, MouseButton, MouseEvent, RGBA, TextAttributes } from "@o
 import { useRenderer } from "@opentui/solid"
 import { For, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { useTheme, tint } from "@tui/context/theme"
-import { go, logo } from "@/cli/logo"
+import { go } from "@/cli/logo"
+import { gradientColor, tuiShape } from "@/cli/brand-logo"
 
 export type LogoShape = {
   left: string[]
@@ -302,7 +303,8 @@ function build(shape: LogoShape): LogoContext {
   return { LEFT, FULL, SPAN, MAP: mapGlyphs(FULL), shape }
 }
 
-const DEFAULT = build(logo)
+// UPSTREAM-DIVERGENCE: Tandem uses a fork-owned brand logo shape for the interactive TUI home screen.
+const DEFAULT = build(tuiShape)
 const GO = build(go)
 
 function shimmer(x: number, y: number, frame: Frame, ctx: LogoContext) {
@@ -687,13 +689,19 @@ export function Logo(props: { shape?: LogoShape; ink?: RGBA; idle?: boolean } = 
     dusk: Frame,
     state: IdleState | undefined,
   ): JSX.Element[] => {
-    const shadow = tint(theme.background, ink, 0.25)
     const attrs = bold ? TextAttributes.BOLD : undefined
+    const useBrandGradient = !props.shape && !props.ink
+    const brandInk = (x: number) => {
+      const [r, g, b] = gradientColor((x + 0.5) / Math.max(1, (ctx.FULL[0]?.length ?? 1) - 1))
+      return RGBA.fromInts(r, g, b)
+    }
 
     return Array.from(line).map((char, i) => {
+      const baseInk = useBrandGradient ? brandInk(off + i) : ink
+      const shadow = tint(theme.background, baseInk, 0.25)
       if (char === " ") {
         return (
-          <text fg={ink} attributes={attrs} selectable={false}>
+          <text fg={baseInk} attributes={attrs} selectable={false}>
             {char}
           </text>
         )
@@ -710,8 +718,8 @@ export function Logo(props: { shape?: LogoShape; ink?: RGBA; idle?: boolean } = 
       const primaryMixBot = charLit ? Math.min(1, pulseBot.primary) : 0
       // Layer primary tint first, then white peak on top — so the halo/tail pulls toward primary,
       // while the bright core stays pure white
-      const inkTopTint = primaryMixTop > 0 ? tint(ink, theme.primary, primaryMixTop) : ink
-      const inkBotTint = primaryMixBot > 0 ? tint(ink, theme.primary, primaryMixBot) : ink
+      const inkTopTint = primaryMixTop > 0 ? tint(baseInk, theme.primary, primaryMixTop) : baseInk
+      const inkBotTint = primaryMixBot > 0 ? tint(baseInk, theme.primary, primaryMixBot) : baseInk
       const inkTop = peakMixTop > 0 ? tint(inkTopTint, PEAK, peakMixTop) : inkTopTint
       const inkBot = peakMixBot > 0 ? tint(inkBotTint, PEAK, peakMixBot) : inkBotTint
       // For the non-peak-aware brightness channels, use the average of top/bot
@@ -722,7 +730,7 @@ export function Logo(props: { shape?: LogoShape; ink?: RGBA; idle?: boolean } = 
       }
       const peakMix = charLit ? Math.min(1, pulse.peak) : 0
       const primaryMix = charLit ? Math.min(1, pulse.primary) : 0
-      const inkPrimary = primaryMix > 0 ? tint(ink, theme.primary, primaryMix) : ink
+      const inkPrimary = primaryMix > 0 ? tint(baseInk, theme.primary, primaryMix) : baseInk
       const inkTinted = peakMix > 0 ? tint(inkPrimary, PEAK, peakMix) : inkPrimary
       const shadowMixCfg = state?.cfg.shadowMix ?? shimmerConfig.shadowMix
       const shadowMixTop = Math.min(1, pulseTop.peak * shadowMixCfg)

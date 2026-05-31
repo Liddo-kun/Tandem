@@ -198,7 +198,7 @@ Enhanced-only features should be additive or feature-detected where possible.
 
 ## Android Testing And Build
 
-- Normal Android builds should package as `WhisperCode` with Android package id `com.devgriffin.whispercode`.
+- Normal Android builds should package as `Tandem` with Android package id `app.liddokun.tandem`.
 - `bun run prepare:android` regenerates launcher icons and restores generated Android metadata/MainActivity patches from `packages/android/src-tauri/tauri.conf.json`.
 - Use `bun run install:y700 -- -Name <name>` from `packages/android` for a side-by-side Y700 APK build. This builds a temporary parallel-installable debug APK, installs it on the Y700, and restores generated Android metadata afterward.
 - Run the Y700 installer directly, without wrapping it in `Tee-Object`, `rg`, or another output-filtering pipeline. `install-y700-variant.ts` already writes full logs and prints progress; an outer pipeline can leave the shell/tool call waiting even after the build and install have completed.
