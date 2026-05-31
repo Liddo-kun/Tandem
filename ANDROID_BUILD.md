@@ -9,12 +9,12 @@ This records the imported Whisper Android release-build notes for Tandem.
 - Android NDK `27.0.12077973` installed.
 - JDK 21 installed.
 - Release keystore at `packages/android/release.keystore`.
-- Keystore config at `packages/android/src-tauri/gen/android/keystore.properties`.
+- Keystore config at `packages/android/keystore.properties`.
 
 Example `keystore.properties`:
 
 ```properties
-storeFile=../../../../release.keystore
+storeFile=release.keystore
 storePassword=your_password
 keyAlias=your_alias
 keyPassword=your_password
@@ -46,7 +46,7 @@ packages/android/src-tauri/gen/android/app/build/outputs/apk/universal/release/a
 
 ## Notes
 
-- `packages/android/release.keystore` is intentionally ignored.
+- `packages/android/release.keystore` and `packages/android/keystore.properties` are intentionally ignored.
 - `packages/android/src-tauri/gen/` is intentionally ignored as generated Tauri Android output.
-- Android release signing is wired through `packages/android/patch-android-generated.ts`, which patches the generated Gradle project to read `src-tauri/gen/android/keystore.properties` when present.
+- Android release signing is wired through `packages/android/patch-android-generated.ts`, which patches the generated Gradle project to read `packages/android/keystore.properties` when present.
 - Android release signing was verified locally with `apksigner verify` for the APK and `jarsigner -verify` for the AAB.

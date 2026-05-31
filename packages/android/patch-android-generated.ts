@@ -69,16 +69,19 @@ async function patchBuildGradle() {
 }
 
 function patchReleaseSigning(text: string) {
-  const propertiesMarker = `val releaseKeystorePropertiesFile = file("../keystore.properties")`
+  const propertiesMarker = `val releaseKeystorePropertiesFile = file("../../../../keystore.properties")`
   const signingMarker = `signingConfigs {`
 
-  let updated = text
+  let updated = text.replace(
+    `val releaseKeystorePropertiesFile = file("../keystore.properties")`,
+    propertiesMarker,
+  )
   if (!updated.includes(propertiesMarker)) {
     updated = updated.replace(
       /(val tauriProperties = Properties\(\)\.apply \{[\s\S]*?\n\})/,
       `$1
 
-val releaseKeystorePropertiesFile = file("../keystore.properties")
+val releaseKeystorePropertiesFile = file("../../../../keystore.properties")
 val releaseKeystoreProperties = Properties().apply {
     if (releaseKeystorePropertiesFile.exists()) {
         releaseKeystorePropertiesFile.inputStream().use { load(it) }
@@ -92,8 +95,9 @@ val releaseKeystoreProperties = Properties().apply {
       /    buildTypes \{/,
       `    signingConfigs {
         create("release") {
-            if (releaseKeystorePropertiesFile.exists()) {
-                storeFile = file(releaseKeystoreProperties.getProperty("storeFile"))
+            val releaseStoreFile = releaseKeystoreProperties.getProperty("storeFile")
+            if (releaseKeystorePropertiesFile.exists() && !releaseStoreFile.isNullOrBlank()) {
+                storeFile = releaseKeystorePropertiesFile.parentFile.resolve(releaseStoreFile)
                 storePassword = releaseKeystoreProperties.getProperty("storePassword")
                 keyAlias = releaseKeystoreProperties.getProperty("keyAlias")
                 keyPassword = releaseKeystoreProperties.getProperty("keyPassword")
@@ -103,6 +107,14 @@ val releaseKeystoreProperties = Properties().apply {
     buildTypes {`,
     )
   }
+
+  updated = updated.replace(
+    `            if (releaseKeystorePropertiesFile.exists()) {
+                storeFile = file(releaseKeystoreProperties.getProperty("storeFile"))`,
+    `            val releaseStoreFile = releaseKeystoreProperties.getProperty("storeFile")
+            if (releaseKeystorePropertiesFile.exists() && !releaseStoreFile.isNullOrBlank()) {
+                storeFile = releaseKeystorePropertiesFile.parentFile.resolve(releaseStoreFile)`,
+  )
 
   if (!updated.includes(`signingConfig = signingConfigs.getByName("release")`)) {
     updated = updated.replace(

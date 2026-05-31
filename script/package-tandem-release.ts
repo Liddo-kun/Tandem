@@ -136,12 +136,14 @@ async function stageAndroidArtifacts() {
     return
   }
 
-  const files = (await globFiles(outputs, ["**/*.apk", "**/*.aab"])).filter((file) => includeDebugAndroid || !isDebugAndroidArtifact(file))
+  const files = (await globFiles(outputs, ["**/*.apk", "**/*.aab"])).filter(
+    (file) => includeDebugAndroid || (!isDebugAndroidArtifact(file) && !isUnsignedAndroidArtifact(file)),
+  )
   if (files.length === 0) {
     missing.push(
       includeDebugAndroid
         ? "Android: no APK or AAB files were found under packages/android/src-tauri/gen/android/app/build/outputs."
-        : "Android: no release APK or AAB files were found under packages/android/src-tauri/gen/android/app/build/outputs. Use --include-debug-android only for local debug packaging.",
+        : "Android: no signed release APK or AAB files were found under packages/android/src-tauri/gen/android/app/build/outputs. Use --include-debug-android only for local debug packaging.",
     )
     return
   }
@@ -215,6 +217,10 @@ function mobileName(prefix: string, file: string) {
 
 function isDebugAndroidArtifact(file: string) {
   return file.replaceAll("\\", "/").toLowerCase().includes("/debug/") || path.basename(file).toLowerCase().includes("debug")
+}
+
+function isUnsignedAndroidArtifact(file: string) {
+  return path.basename(file).toLowerCase().includes("unsigned")
 }
 
 function assertRequiredCommonArtifacts() {

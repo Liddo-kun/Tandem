@@ -95,6 +95,7 @@ if (!releaseVersion && !allowDevVersion) {
 }
 if (!allowPartial && !packageArgs.includes("--required-common")) packageArgs.push("--required-common")
 if (!allowPartial && !packageArgs.includes("--strict")) packageArgs.push("--strict")
+if (!packageOnly && !skipAndroid && !debugAndroid) await preflightAndroidSigning()
 if (!packageOnly && !allowPartial) await preflightReleaseInputs()
 
 const steps: RunStep[] = []
@@ -180,17 +181,20 @@ Examples:
 
 async function preflightReleaseInputs() {
   const missing: string[] = []
-  if (!debugAndroid) {
-    if (!(await exists(path.join(root, "packages/android/release.keystore")))) missing.push("packages/android/release.keystore")
-    if (!(await exists(path.join(root, "packages/android/src-tauri/gen/android/keystore.properties")))) {
-      missing.push("packages/android/src-tauri/gen/android/keystore.properties")
-    }
-  }
   if (!hasForwarded("--ios-ipa") && !(await hasStandardIosIpa())) {
     missing.push("signed iOS .ipa under packages/ios/build, packages/ios/dist, packages/ios/export, or --ios-ipa <path>")
   }
   if (missing.length > 0) {
     throw new Error(`Missing release input(s):\n- ${missing.join("\n- ")}\nUse --allow-partial only for local/test builds.`)
+  }
+}
+
+async function preflightAndroidSigning() {
+  const missing = []
+  if (!(await exists(path.join(root, "packages/android/release.keystore")))) missing.push("packages/android/release.keystore")
+  if (!(await exists(path.join(root, "packages/android/keystore.properties")))) missing.push("packages/android/keystore.properties")
+  if (missing.length > 0) {
+    throw new Error(`Missing Android release signing input(s):\n- ${missing.join("\n- ")}\nUse --debug-android only for local debug APKs.`)
   }
 }
 

@@ -34,6 +34,7 @@ tsconfig.tsbuildinfo
 packages/android/src-tauri/**/build/
 packages/android/src-tauri/gen/
 packages/android/saved-icons/
+packages/android/keystore.properties
 packages/android/release.keystore
 script/deploy-relay
 packages/opencode/system-prompts/
