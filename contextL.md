@@ -2,12 +2,6 @@
 
 Use this as the recurring startup context when working in `Tandem` from Ubuntu/Linux/proot. The root `AGENTS.md` should stay as a thin pointer to the environment-specific context file so the project rules do not drift across documents.
 
-## Agent Working Habits
-
-- At the start of a session, read this file when running from Ubuntu/Linux/proot.
-- When editing package-specific code, also check the nearest nested `AGENTS.md` for that package.
-- Use parallel tool calls when independent reads/searches can run at the same time.
-
 ## Goal
 
 Build and maintain one personal repo, `Tandem`, based on current official OpenCode, with selected Whispercode mobile/iOS/Android features and personal enhancements, while staying easy to update from OpenCode.
@@ -48,7 +42,6 @@ whisper  = Whispercode
 - Core OpenCode/server files: default to current OpenCode; keep fork behavior only when an explicit mobile compatibility reason exists.
 - iOS/Android/mobile-specific files: prefer the Tandem mobile behavior already documented in `log.md`.
 - Shared web UI mobile changes: inspect manually and keep the smallest useful behavior. Preserve Tandem-added features that still serve the mobile/product contract, and import compatible OpenCode improvements.
-- Keep APK/server compatibility explicit.
 - Preserve `UPSTREAM-DIVERGENCE` comments. They mark Tandem-specific code that should survive upstream merges.
 - Do not treat `PUSH_NOTIFICATIONS.md` notes as implemented source unless the referenced files exist in Tandem.
 - If conflicts arise, optimize for a working current OpenCode build with the documented iOS/Android/mobile behavior intact.
@@ -102,12 +95,10 @@ Enhanced-only features should be additive or feature-detected where possible.
 
 ## Shared App And Platform Contract
 
-- `packages/app` is the shared Solid web UI used by standalone web, embedded CLI web UI, desktop renderer, Android, and iOS.
 - `packages/app/src/context/platform.tsx` is the app-to-native contract. Preserve optional mobile methods/types for push state, push pairing, relay preferences, voice input, speech locale, haptics, share, default server storage, and native async storage when merging upstream.
 - Android/iOS wrappers dispatch `opencode:transcription`; `PromptInput` consumes it. Preserve native voice input compatibility when refactoring prompt input or platform code.
 - Preserve platform-backed persistence for non-web apps. Do not replace native iOS/Android storage with browser-only `localStorage`.
 - Preserve existing Tandem/Whispercode mobile i18n keys during upstream merges.
-- Keep mobile review/diff work bounded through `packages/app/src/utils/mobile-review-limit.ts`; large reviews can freeze iOS/Android WebViews.
 
 ## Mobile Session Behavior
 
@@ -154,7 +145,6 @@ Enhanced-only features should be additive or feature-detected where possible.
 
 - Bun path on this machine: `bun` on PATH.
 - `oc web` or `opencode dev web` may show the remote `https://app.opencode.ai` UI, so it is not proof that local `packages/app` changes are visible.
-- For local shared-app work, run the backend from `packages/opencode` with `bun run --conditions=browser ./src/index.ts serve --port 4096`, run the frontend from `packages/app` with `bun dev -- --port 4444`, then open `http://localhost:4444`.
 - LAN web test command: `oc web --hostname 0.0.0.0 --port 4096` or `opencode web --hostname 0.0.0.0 --port 4096`.
 - Local app UI test backend: `bun run --cwd packages/opencode --conditions=browser ./src/index.ts serve --port 4096`.
 - Local app UI test frontend: `bun run --cwd packages/app dev -- --port 4444`.
@@ -227,11 +217,8 @@ Keep commits focused so they can be cherry-picked later if needed.
 
 - Make the smallest correct change that satisfies the documented Tandem/mobile contract.
 - Keep simple logic inline; extract helpers only when they are reused, name a real concept, or hide genuinely complex validation.
-- Reduce variable count by inlining values that are only used once, when doing so stays readable.
 - Prefer deletion over accommodation for stale fork code outside the selected Tandem/mobile contract.
-- Prefer Bun APIs such as `Bun.file()` when they fit, precise types over `any`, `const` over `let`, early returns over `else`, and dot access over unnecessary destructuring.
-- Rely on type inference when possible; add explicit type annotations or interfaces when needed for exports or clarity.
-- Prefer functional array methods such as `flatMap`, `filter`, and `map` over loops when they remain readable; use type guards on `filter` to keep useful inference downstream.
+- Prefer repo conventions: Bun APIs where they fit, precise types, type inference when clear, early returns, readable array methods, and type guards on filters.
 - When a function has several validation branches or supporting details, make the main function read as the happy path and move supporting details into small helpers below it.
 - Keep helpers close to the code they support when that improves readability.
 - Do not return `Effect` from helpers unless they actually perform effectful work. Synchronous parsing, validation, and option building should stay synchronous.
