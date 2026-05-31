@@ -19,7 +19,9 @@ import {
   type ScrollbackWriter,
 } from "@opentui/core"
 import * as Locale from "@/util/locale"
-import { go, logo } from "@/cli/logo"
+import { go } from "@/cli/logo"
+import { wordmark } from "@/cli/brand-logo"
+import { Brand } from "@opencode-ai/core/brand"
 import type { RunSplashTheme } from "./theme"
 
 export const SPLASH_TITLE_LIMIT = 50
@@ -206,30 +208,21 @@ function build(input: SplashWriterInput, kind: "entry" | "exit", ctx: Scrollback
   let height = 1
 
   if (kind === "entry") {
-    const rightShadow = color(input.theme.rightShadow, fallback(240, "#475569"))
-
-    for (let i = 0; i < logo.left.length; i += 1) {
-      const leftText = logo.left[i] ?? ""
-      const rightText = logo.right[i] ?? ""
-
-      draw(lines, leftText, {
-        left: 0,
-        top: i,
-        fg: left,
-        shadow: leftShadow,
-      })
-      draw(lines, rightText, {
-        left: leftText.length + 1,
-        top: i,
-        fg: right,
-        shadow: rightShadow,
-      })
+    // UPSTREAM-DIVERGENCE: Tandem ANSI Shadow wordmark. Solid fill (█) uses the brand color,
+    // the box-drawing shadow glyphs use the dimmer shadow color for depth.
+    for (let i = 0; i < wordmark.length; i += 1) {
+      const row = wordmark[i] ?? ""
+      let x = 0
+      for (const char of row) {
+        if (char !== " ") push(lines, x, i, char, char === "█" ? left : leftShadow)
+        x += 1
+      }
     }
 
-    height = logo.left.length
+    height = wordmark.length
 
     if (input.showSession !== false) {
-      const top = logo.left.length + 1
+      const top = wordmark.length + 1
       const label = "Session".padEnd(10, " ")
       push(lines, 0, top, label, left, undefined, TextAttributes.DIM)
       push(lines, label.length, top, meta.title, right, undefined, TextAttributes.BOLD)
@@ -263,7 +256,7 @@ function build(input: SplashWriterInput, kind: "entry" | "exit", ctx: Scrollback
       lines,
       body_left + label.length,
       top + 1,
-      `opencode run -i -s ${meta.session_id}`,
+      `${Brand.command} run -i -s ${meta.session_id}`, // UPSTREAM-DIVERGENCE: Tandem command name
       right,
       undefined,
       TextAttributes.BOLD,

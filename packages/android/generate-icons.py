@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Generate WhisperCode Android launcher icons."""
+"""Generate Tandem Android launcher icons: a bold "T" monogram on the brand
+teal->sky->violet gradient, matching the CLI wordmark and the in-app logo mark."""
 
 import struct
 import zlib
@@ -7,18 +8,18 @@ import os
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 RES_DIR = os.path.join(SCRIPT_DIR, "src-tauri", "gen", "android", "app", "src", "main", "res")
-W_RECTS = [
-    (128, 96, 160, 320),
-    (352, 96, 384, 320),
-    (224, 224, 288, 288),
-    (192, 256, 224, 288),
-    (288, 256, 320, 288),
-    (160, 288, 192, 352),
-    (320, 288, 352, 352),
-    (192, 320, 224, 416),
-    (288, 320, 320, 416),
+
+# Tandem "T" monogram, designed on a 512x512 grid (top bar + centered stem).
+T_RECTS = [
+    (116, 128, 396, 188),  # top bar
+    (226, 128, 286, 388),  # stem
 ]
-SHADOW_RECT = (224, 288, 288, 352)
+SHADOW_OFFSET = 16
+SHADOW_COLOR = (7, 10, 18, 120)
+LETTER_COLOR = (255, 255, 255, 255)
+
+# Brand gradient stops (teal -> sky -> violet); identical to the CLI logo gradient.
+GRADIENT = [(45, 212, 191), (56, 189, 248), (139, 92, 246)]
 
 FOREGROUND_SIZES = {
     "mdpi": 108,
@@ -40,23 +41,53 @@ ADAPTIVE_ICON_XML = """\
 <?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
   <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
-  <background android:drawable="@color/ic_launcher_background"/>
+  <background android:drawable="@drawable/ic_launcher_background"/>
 </adaptive-icon>"""
 
+# Gradient background drawable for adaptive icons (angle 315 = top-left -> bottom-right).
+IC_LAUNCHER_BACKGROUND_DRAWABLE_XML = """\
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <gradient
+      android:type="linear"
+      android:angle="315"
+      android:startColor="#2DD4BF"
+      android:centerColor="#38BDF8"
+      android:endColor="#8B5CF6"/>
+</shape>"""
+
+# Solid fallback color kept for any legacy reference; adaptive icons use the gradient drawable.
 IC_LAUNCHER_BACKGROUND_XML = """\
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <color name="ic_launcher_background">#131010</color>
+  <color name="ic_launcher_background">#38BDF8</color>
 </resources>"""
 
 
-def color(value):
-    value = value.lstrip("#")
-    return tuple(int(value[index : index + 2], 16) for index in (0, 2, 4)) + (255,)
+def lerp(a, b, f):
+    return tuple(round(a[index] + (b[index] - a[index]) * f) for index in range(3))
+
+
+def gradient_color(t):
+    clamped = max(0.0, min(1.0, t))
+    scaled = clamped * (len(GRADIENT) - 1)
+    index = min(len(GRADIENT) - 2, int(scaled))
+    r, g, b = lerp(GRADIENT[index], GRADIENT[index + 1], scaled - index)
+    return (r, g, b, 255)
 
 
 def empty_image(size, fill=(0, 0, 0, 0)):
     return [[fill for _ in range(size)] for _ in range(size)]
+
+
+def fill_gradient(image):
+    height = len(image)
+    width = len(image[0]) if height else 0
+    denom = (width - 1) + (height - 1)
+    for y in range(height):
+        row = image[y]
+        for x in range(width):
+            row[x] = gradient_color((x + y) / denom if denom else 0)
 
 
 def fill_rect(image, rect, fill, base_size=512, offset=0, target_size=None):
@@ -73,14 +104,18 @@ def fill_rect(image, rect, fill, base_size=512, offset=0, target_size=None):
             row[x] = fill
 
 
-def draw_icon(size, bg_color, letter_color, shadow_color=None, transparent_bg=False):
-    image = empty_image(size, (0, 0, 0, 0) if transparent_bg else color(bg_color))
-    if shadow_color:
-        fill_rect(image, SHADOW_RECT, color(shadow_color))
+def draw_letter(image, offset=0, target_size=None):
+    for x1, y1, x2, y2 in T_RECTS:
+        shadow = (x1 + SHADOW_OFFSET, y1 + SHADOW_OFFSET, x2 + SHADOW_OFFSET, y2 + SHADOW_OFFSET)
+        fill_rect(image, shadow, SHADOW_COLOR, offset=offset, target_size=target_size)
+    for rect in T_RECTS:
+        fill_rect(image, rect, LETTER_COLOR, offset=offset, target_size=target_size)
 
-    for rect in W_RECTS:
-        fill_rect(image, rect, color(letter_color))
 
+def draw_icon(size):
+    image = empty_image(size)
+    fill_gradient(image)
+    draw_letter(image)
     return image
 
 
@@ -88,10 +123,7 @@ def draw_foreground(size):
     image = empty_image(size)
     visible = int(size * 72 / 108)
     offset = (size - visible) // 2
-
-    for rect in W_RECTS:
-        fill_rect(image, rect, color("#FFFFFF"), offset=offset, target_size=visible)
-
+    draw_letter(image, offset=offset, target_size=visible)
     return image
 
 
@@ -123,7 +155,7 @@ def main():
     for density, size in ICON_SIZES.items():
         out_dir = os.path.join(RES_DIR, f"mipmap-{density}")
         os.makedirs(out_dir, exist_ok=True)
-        icon = draw_icon(size, bg_color="#131010", letter_color="#FFFFFF", shadow_color="#5A5858")
+        icon = draw_icon(size)
         write_png(os.path.join(out_dir, "ic_launcher.png"), icon)
         write_png(os.path.join(out_dir, "ic_launcher_round.png"), icon)
 
@@ -133,12 +165,17 @@ def main():
         with open(os.path.join(anydpi_dir, name), "w") as f:
             f.write(ADAPTIVE_ICON_XML)
 
+    drawable_dir = os.path.join(RES_DIR, "drawable")
+    os.makedirs(drawable_dir, exist_ok=True)
+    with open(os.path.join(drawable_dir, "ic_launcher_background.xml"), "w") as f:
+        f.write(IC_LAUNCHER_BACKGROUND_DRAWABLE_XML)
+
     values_dir = os.path.join(RES_DIR, "values")
     os.makedirs(values_dir, exist_ok=True)
     with open(os.path.join(values_dir, "ic_launcher_background.xml"), "w") as f:
         f.write(IC_LAUNCHER_BACKGROUND_XML)
 
-    print(f"Generated WhisperCode Android launcher icons in {RES_DIR}")
+    print(f"Generated Tandem Android launcher icons in {RES_DIR}")
 
 
 if __name__ == "__main__":

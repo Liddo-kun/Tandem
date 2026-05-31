@@ -61,7 +61,7 @@ async function patchBuildGradle() {
   const text = await buildGradle.text()
   await Bun.write(
     buildGradlePath,
-    text.replace(/applicationId\s*=\s*"[^"]+"/, `applicationId = "${config.identifier ?? "com.devgriffin.whispercode"}"`),
+    text.replace(/applicationId\s*=\s*"[^"]+"/, `applicationId = "${config.identifier ?? "app.liddokun.tandem"}"`),
   )
 }
 
