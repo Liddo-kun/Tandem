@@ -8,8 +8,8 @@ This records the imported Whisper Android release-build notes for Tandem.
 - Android SDK installed.
 - Android NDK `27.0.12077973` installed.
 - JDK 21 installed.
-- Release keystore at `packages/android/release.keystore`.
-- Keystore config at `packages/android/keystore.properties`.
+- Release keystore at `packages/android/release.keystore`. The release script creates this local ignored file on first run if both signing files are absent.
+- Keystore config at `packages/android/keystore.properties`. The release script creates this local ignored file on first run if both signing files are absent.
 
 Example `keystore.properties`:
 
@@ -47,6 +47,7 @@ packages/android/src-tauri/gen/android/app/build/outputs/apk/universal/release/a
 ## Notes
 
 - `packages/android/release.keystore` and `packages/android/keystore.properties` are intentionally ignored.
+- If only one Android signing file exists, restore the missing file or delete both files so `bun run tandem:release -- --version <version>` can create a fresh local signing pair.
 - `packages/android/src-tauri/gen/` is intentionally ignored as generated Tauri Android output.
 - Android release signing is wired through `packages/android/patch-android-generated.ts`, which patches the generated Gradle project to read `packages/android/keystore.properties` when present.
 - Android release signing was verified locally with `apksigner verify` for the APK and `jarsigner -verify` for the AAB.

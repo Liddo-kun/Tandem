@@ -2,6 +2,7 @@
 
 import { createWriteStream } from "fs"
 import fs from "fs/promises"
+import { randomBytes } from "crypto"
 import os from "os"
 import path from "path"
 import { fileURLToPath } from "url"
@@ -95,7 +96,7 @@ if (!releaseVersion && !allowDevVersion) {
 }
 if (!allowPartial && !packageArgs.includes("--required-common")) packageArgs.push("--required-common")
 if (!allowPartial && !packageArgs.includes("--strict")) packageArgs.push("--strict")
-if (!packageOnly && !skipAndroid && !debugAndroid) await preflightAndroidSigning()
+if (!packageOnly && !skipAndroid && !debugAndroid) await ensureAndroidSigning()
 if (!packageOnly && !allowPartial) await preflightReleaseInputs()
 
 const steps: RunStep[] = []
@@ -152,6 +153,11 @@ Linux x64/arm64, Android APK/AAB, and iOS IPA. The repo currently has iOS web
 source but no checked-in Xcode project, so put a signed .ipa under packages/ios/build
 or pass --ios-ipa <path> before a full strict release.
 
+Android release signing uses ignored local files at packages/android/release.keystore
+and packages/android/keystore.properties. If neither exists, this script creates
+both on first run. If only one exists, restore the missing file or delete both to
+create a fresh local signing pair.
+
 Options:
   --version <version>   Version to embed in CLI builds. Can also use OPENCODE_VERSION
   --single-cli          Build only the current-platform CLI instead of all CLI targets
@@ -189,13 +195,56 @@ async function preflightReleaseInputs() {
   }
 }
 
-async function preflightAndroidSigning() {
-  const missing = []
-  if (!(await exists(path.join(root, "packages/android/release.keystore")))) missing.push("packages/android/release.keystore")
-  if (!(await exists(path.join(root, "packages/android/keystore.properties")))) missing.push("packages/android/keystore.properties")
-  if (missing.length > 0) {
-    throw new Error(`Missing Android release signing input(s):\n- ${missing.join("\n- ")}\nUse --debug-android only for local debug APKs.`)
+async function ensureAndroidSigning() {
+  const keystore = path.join(root, "packages/android/release.keystore")
+  const properties = path.join(root, "packages/android/keystore.properties")
+  const hasKeystore = await exists(keystore)
+  const hasProperties = await exists(properties)
+  if (hasKeystore && hasProperties) return
+
+  if (hasKeystore || hasProperties) {
+    throw new Error(
+      `Android release signing is incomplete. Restore the missing file, or delete both files so the release script can create a fresh local signing key:\n- packages/android/release.keystore\n- packages/android/keystore.properties`,
+    )
   }
+
+  await fs.mkdir(path.dirname(keystore), { recursive: true })
+  const password = randomBytes(48).toString("base64url")
+  const command = [
+    "keytool",
+    "-genkeypair",
+    "-v",
+    "-keystore",
+    keystore,
+    "-storetype",
+    "PKCS12",
+    "-alias",
+    "tandem-release",
+    "-keyalg",
+    "RSA",
+    "-keysize",
+    "4096",
+    "-validity",
+    "10000",
+    "-storepass",
+    password,
+    "-keypass",
+    password,
+    "-dname",
+    "CN=Tandem, O=Tandem, C=US",
+  ]
+  const proc = Bun.spawn(command, { cwd: root, stdout: "pipe", stderr: "pipe" })
+  const [code, stdout, stderr] = await Promise.all([proc.exited, streamText(proc.stdout), streamText(proc.stderr)])
+  if (code !== 0) {
+    await fs.rm(keystore, { force: true })
+    throw new Error(`Failed to create Android release keystore with keytool.\n${stdout}${stderr}`)
+  }
+
+  await fs.writeFile(
+    properties,
+    [`storeFile=release.keystore`, `storePassword=${password}`, `keyAlias=tandem-release`, `keyPassword=${password}`, ""].join("\n"),
+  )
+  console.log("Created local Android release signing files under packages/android")
 }
 
 async function run(step: RunStep) {
@@ -241,6 +290,19 @@ async function pipe(stream: ReadableStream<Uint8Array> | null, log: NodeJS.Writa
     buffer = printCompleteLines(buffer + tail, filter)
   }
   if (buffer) printLine(buffer, filter)
+}
+
+async function streamText(stream: ReadableStream<Uint8Array> | null) {
+  if (!stream) return ""
+  const reader = stream.getReader()
+  const decoder = new TextDecoder()
+  let text = ""
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    text += decoder.decode(value, { stream: true })
+  }
+  return text + decoder.decode()
 }
 
 function printCompleteLines(text: string, filter: RegExp | undefined) {
