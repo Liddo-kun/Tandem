@@ -28,6 +28,8 @@ Normal Windows Tandem release builds run from repo root and install both the Win
 bun run tandem:release -- --install-windows --install-android
 ```
 
+`--install-android` checks ADB before building and requires exactly one connected device unless `ANDROID_SERIAL` is set.
+
 Strict public release packaging with an iOS IPA uses:
 
 ```bash

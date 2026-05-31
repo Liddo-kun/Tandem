@@ -102,7 +102,7 @@ if (uploadTag) await uploadReleaseFiles(uploadTag, uploadRepo)
 console.log(`\nStaged ${artifacts.length} Tandem release artifact${artifacts.length === 1 ? "" : "s"} in ${outDir}`)
 for (const artifact of artifacts) console.log(`- ${artifact.kind}: ${path.basename(artifact.output)}`)
 if (missing.length > 0) {
-  console.log("\nMissing targets:")
+  console.log(strict || requiredCommon ? "\nMissing targets:" : "\nNot packaged:")
   for (const item of missing) console.log(`- ${item}`)
 }
 

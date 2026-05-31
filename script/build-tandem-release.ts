@@ -91,6 +91,7 @@ for (let i = 0; i < args.length; i++) {
 await fs.mkdir(logDir, { recursive: true })
 if (!releaseVersion && !allowDevVersion) releaseVersion = await defaultReleaseVersion()
 if (releaseVersion) process.env["OPENCODE_VERSION"] = releaseVersion
+if (hasForwarded("--install-android")) await preflightAndroidInstall()
 if (!packageOnly && !skipAndroid && !debugAndroid) await ensureAndroidSigning()
 if (!packageOnly && !skipAndroid) await ensureAndroidGeneratedProject()
 if (!packageOnly && (hasForwarded("--strict") || hasForwarded("--required-common"))) await preflightReleaseInputs()
@@ -177,7 +178,7 @@ Options:
   --strict              Forwarded to tandem:package; require CLI, Android, and iOS artifacts
   --required-common     Forwarded to tandem:package; require the common full release set
   --install-windows     Forwarded to tandem:package; install C:\\Program_Files\\tandem.exe
-  --install-android     Forwarded to tandem:package; install the signed release APK with adb install -r
+  --install-android     Forwarded to tandem:package; install the signed release APK with adb install -r. Requires exactly one connected ADB device unless ANDROID_SERIAL is set
   --upload <tag>        Forwarded to tandem:package; upload to existing GitHub release
   --repo <owner/name>   Forwarded to tandem:package; repo for --upload
   --no-clean            Forwarded to tandem:package
@@ -196,6 +197,29 @@ async function preflightReleaseInputs() {
   }
   if (missing.length > 0) {
     throw new Error(`Missing release input(s):\n- ${missing.join("\n- ")}\nUse --allow-partial only for local/test builds.`)
+  }
+}
+
+async function preflightAndroidInstall() {
+  const serial = process.env["ANDROID_SERIAL"]
+  if (serial) {
+    const { code, stdout, stderr } = await captureCommand(["adb", "-s", serial, "get-state"], root)
+    if (code !== 0 || stdout.trim() !== "device") {
+      throw new Error(`--install-android could not reach ANDROID_SERIAL=${serial}.\n${stdout}${stderr}`)
+    }
+    return
+  }
+
+  const { code, stdout, stderr } = await captureCommand(["adb", "devices"], root)
+  if (code !== 0) throw new Error(`--install-android could not run adb devices.\n${stdout}${stderr}`)
+
+  const devices = stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim().split(/\s+/))
+    .filter(([serial, state]) => serial && state === "device")
+
+  if (devices.length !== 1) {
+    throw new Error(`--install-android requires exactly one connected ADB device, or set ANDROID_SERIAL.\nadb devices output:\n${stdout.trim()}`)
   }
 }
 
@@ -329,11 +353,16 @@ async function streamText(stream: ReadableStream<Uint8Array> | null) {
 }
 
 async function runCommand(command: string[], cwd: string, failure: string) {
-  const proc = Bun.spawn(command, { cwd, env: { ...process.env }, stdout: "pipe", stderr: "pipe" })
-  const [code, stdout, stderr] = await Promise.all([proc.exited, streamText(proc.stdout), streamText(proc.stderr)])
+  const { code, stdout, stderr } = await captureCommand(command, cwd)
   if (stdout) console.log(stdout.trimEnd())
   if (stderr) console.error(stderr.trimEnd())
   if (code !== 0) throw new Error(`${failure} with exit code ${code}.`)
+}
+
+async function captureCommand(command: string[], cwd: string) {
+  const proc = Bun.spawn(command, { cwd, env: { ...process.env }, stdout: "pipe", stderr: "pipe" })
+  const [code, stdout, stderr] = await Promise.all([proc.exited, streamText(proc.stdout), streamText(proc.stderr)])
+  return { code, stdout, stderr }
 }
 
 function printCompleteLines(text: string, filter: RegExp | undefined) {
