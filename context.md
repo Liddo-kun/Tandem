@@ -175,12 +175,17 @@ Enhanced-only features should be additive or feature-detected where possible.
 - HTTP API gates: from `packages/opencode`, run `bun run test:httpapi`.
 - App e2e: from repo root, run `bun --cwd packages/app test:e2e:local`; install Chromium first with `bunx playwright install chromium` from `packages/app` if the browser is missing.
 - Build opencode with filtered logs: `C:\Program_Files\Bun\bin\bun.exe run --cwd packages/opencode build 2>&1 | Tee-Object -FilePath "C:\Temp\opencode\opencode-build.log" | rg -i "error|fail|exception|warning|building|smoke test|passed"`.
-- Build a single Windows x64 opencode exe from `packages/opencode`: `bun run build --single 2>&1 | Tee-Object -FilePath "C:\Temp\opencode\opencode-build.log" | rg -i "error|fail|exception|warning|building|smoke test|passed"`.
-- Build current-platform CLI from `packages/opencode`: `bun run build --single`; output is under `packages/opencode/dist/opencode-<platform>/bin/opencode`.
+- Build a single Windows x64/current-platform CLI with filtered logs from repo root: `C:\Program_Files\Bun\bin\bun.exe run --cwd packages/opencode build --single 2>&1 | Tee-Object -FilePath "C:\Temp\opencode\opencode-build.log" | rg -i "error|fail|exception|warning|building|smoke test|passed"`.
+- CLI build output folders remain OpenCode-shaped for upstream compatibility; package or install them as Tandem with `bun run tandem:package` instead of changing `packages/opencode/script/build.ts` just to rename artifacts.
 - Build desktop from `packages/desktop`: `bun run build`; this first builds `packages/opencode/dist/node`.
-- Build Android debug APK from `packages/android`: `bun run tauri android build --apk --debug --target aarch64`; output is `packages/android/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`.
-- Build Android debug APK with filtered logs: `C:\Program_Files\Bun\bin\bun.exe run --cwd packages/android tauri android build --apk --debug --target aarch64 2>&1 | Tee-Object -FilePath "C:\Temp\opencode\android-build.log" | rg -i "error|fail|exception|warning|building|built|assemble|apk|passed"`.
+- Build Android debug APK with filtered logs from repo root: `C:\Program_Files\Bun\bin\bun.exe run --cwd packages/android tauri android build --apk --debug --target aarch64 2>&1 | Tee-Object -FilePath "C:\Temp\opencode\android-build.log" | rg -i "error|fail|exception|warning|building|built|assemble|apk|passed"`. Output APK: `packages/android/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`.
 - Opencode build recreates `packages/opencode/dist`; main Windows exe is `packages/opencode/dist/opencode-windows-x64/bin/opencode.exe`.
+
+## Tandem Release Packaging
+
+- Normal full release build: `bun run tandem:release -- --version <version>` from repo root.
+- If the signed iOS IPA is not already under `packages/ios/build`, `packages/ios/dist`, or `packages/ios/export`, pass it with `bun run tandem:release -- --ios-ipa <path>`.
+- Local partial Windows/Y700 test build: `bun run tandem:release -- --single-cli --allow-partial --allow-dev-version --debug-android --install-windows`. More options: `bun run tandem:release -- --help`.
 
 ## Tablet Ubuntu Tandem CLI Install
 

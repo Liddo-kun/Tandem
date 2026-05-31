@@ -58,11 +58,61 @@ async function patchBuildGradle() {
   const buildGradle = Bun.file(buildGradlePath)
   if (!(await buildGradle.exists())) return
 
-  const text = await buildGradle.text()
+  const text = patchReleaseSigning(await buildGradle.text())
   await Bun.write(
     buildGradlePath,
     text.replace(/applicationId\s*=\s*"[^"]+"/, `applicationId = "${config.identifier ?? "com.devgriffin.whispercode"}"`),
   )
+}
+
+function patchReleaseSigning(text: string) {
+  const propertiesMarker = `val releaseKeystorePropertiesFile = file("../keystore.properties")`
+  const signingMarker = `signingConfigs {`
+
+  let updated = text
+  if (!updated.includes(propertiesMarker)) {
+    updated = updated.replace(
+      /(val tauriProperties = Properties\(\)\.apply \{[\s\S]*?\n\})/,
+      `$1
+
+val releaseKeystorePropertiesFile = file("../keystore.properties")
+val releaseKeystoreProperties = Properties().apply {
+    if (releaseKeystorePropertiesFile.exists()) {
+        releaseKeystorePropertiesFile.inputStream().use { load(it) }
+    }
+}`,
+    )
+  }
+
+  if (!updated.includes(signingMarker)) {
+    updated = updated.replace(
+      /    buildTypes \{/,
+      `    signingConfigs {
+        create("release") {
+            if (releaseKeystorePropertiesFile.exists()) {
+                storeFile = file(releaseKeystoreProperties.getProperty("storeFile"))
+                storePassword = releaseKeystoreProperties.getProperty("storePassword")
+                keyAlias = releaseKeystoreProperties.getProperty("keyAlias")
+                keyPassword = releaseKeystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+    buildTypes {`,
+    )
+  }
+
+  if (!updated.includes(`signingConfig = signingConfigs.getByName("release")`)) {
+    updated = updated.replace(
+      /        getByName\("release"\) \{\r?\n/,
+      `        getByName("release") {
+            if (releaseKeystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+`,
+    )
+  }
+
+  return updated
 }
 
 async function patchGradleProperties() {

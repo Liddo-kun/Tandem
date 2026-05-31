@@ -14,6 +14,8 @@
     "dev:storybook": "bun --cwd packages/storybook storybook",
     "lint": "oxlint",
     "typecheck": "bun turbo typecheck",
+    "tandem:package": "bun run script/package-tandem-release.ts",
+    "tandem:release": "bun run script/build-tandem-release.ts",
     "upgrade-opentui": "bun run script/upgrade-opentui.ts",
     "postinstall": "bun run --cwd packages/opencode fix-node-pty",
     "prepare": "husky",

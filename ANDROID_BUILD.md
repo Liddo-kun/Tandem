@@ -22,10 +22,16 @@ keyPassword=your_password
 
 ## Build
 
-Run from `packages/android` after setting local Android environment variables:
+Normal Tandem release builds run from repo root:
 
 ```bash
-bun run tauri android build --apk --target aarch64
+bun run tandem:release -- --version <version>
+```
+
+For Android-only release verification, run:
+
+```bash
+bun run tandem:release -- --version <version> --skip-cli --skip-ios --allow-partial
 ```
 
 The imported Whisper notes recommend an arm64 release build because all-target APKs can exceed GitHub's 100 MB file limit.
@@ -42,4 +48,5 @@ packages/android/src-tauri/gen/android/app/build/outputs/apk/universal/release/a
 
 - `packages/android/release.keystore` is intentionally ignored.
 - `packages/android/src-tauri/gen/` is intentionally ignored as generated Tauri Android output.
-- Native Android build/signing was not verified during the Windows import.
+- Android release signing is wired through `packages/android/patch-android-generated.ts`, which patches the generated Gradle project to read `src-tauri/gen/android/keystore.properties` when present.
+- Android release signing was verified locally with `apksigner verify` for the APK and `jarsigner -verify` for the AAB.

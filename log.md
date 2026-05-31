@@ -10,6 +10,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 - Adds Android release/build guidance and generated/signing artifact caveats. Files: `ANDROID_BUILD.md`.
 - Adds separate push-notification feature notes outside this final-state inventory. Files: `PUSH_NOTIFICATIONS.md`.
 - Adds iOS and Android workspace package metadata and updates workspace dependency resolution. Files: `bun.lock`, `packages/ios/package.json`, `packages/android/package.json`.
+- Adds one-command Tandem release building/packaging that keeps upstream-shaped build outputs intact while building common CLI targets, Android ARM64 release APK/AAB, and iOS web assets; requiring an explicit release version and the common release set when strict; staging user-facing release assets as `tandem-*`, `tandem-android-*`, and `tandem-ios-*`; excluding debug Android APKs unless explicitly requested; writing checksums and a manifest; supporting optional GitHub release upload; and installing the local Windows CLI to `C:\Program_Files\tandem.exe`. Files: `script/build-tandem-release.ts`, `script/package-tandem-release.ts`, `package.json`, `context.md`.
 
 ## Shared Platform And Persistence
 
@@ -46,6 +47,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 - Adds Android first-run onboarding with setup instructions, manual URL entry, optional display name/Basic auth credentials, and `/global/health` then `/health` checks. Files: `packages/android/src/onboarding.tsx`, `packages/android/src/entry-android.tsx`.
 - Adds Android voice input bridge integration and overlay. Files: `packages/android/src/entry-android.tsx`, `packages/android/src/voice-input.tsx`, `packages/android/src-tauri/mobile-bridge/src/commands.rs`, `packages/android/src-tauri/mobile-bridge/android/src/main/java/MobileBridgePlugin.kt`.
 - Adds Android debug build/install helpers, including dependency-free launcher icon generation and side-by-side Y700 variant builds that restore generated metadata, save full logs, and explicitly return after a successful install. Files: `packages/android/build-and-install.sh`, `packages/android/install-y700-variant.ts`, `packages/android/generate-icons.py`.
+- Adds generated Android release-signing patching so release builds use ignored local `release.keystore`/`keystore.properties` files when present. Files: `packages/android/patch-android-generated.ts`, `ANDROID_BUILD.md`.
 
 ## Shared Mobile UI And Session Behavior
 
@@ -92,6 +94,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 - Brands Android/iOS native display labels, titles, permissions, and onboarding screens as Tandem while keeping package IDs, bundle IDs, storage keys, bridge events, and default Basic auth username compatible. Files: `packages/android/src-tauri/tauri.conf.json`, `packages/android/patch-android-generated.ts`, `packages/android/src/onboarding.tsx`, `packages/ios/index.html`, `packages/ios/OpenCode/Info.plist`, `packages/ios/src/onboarding.tsx`.
 - Makes mobile onboarding and LAN scanning prefer Tandem's parallel-install web port `4097`, with native scanners retaining `4096` fallback for opencode-compatible servers. Files: `packages/app/src/pages/home.tsx`, `packages/android/src/onboarding.tsx`, `packages/android/src-tauri/mobile-bridge/android/src/main/java/MobileBridgePlugin.kt`, `packages/ios/src/onboarding.tsx`, `packages/ios/OpenCode/Bridge/NetworkScanBridge.swift`.
 - Brands Android side-by-side debug variant app labels as Tandem while leaving variant package IDs/APK naming in the opencode namespace for compatibility. Files: `packages/android/install-y700-variant.ts`.
+- Replaces the generated Android launcher icon with a Tandem `T` icon so release and debug APKs no longer show the old Whisper/OpenCode mark. Files: `packages/android/generate-icons.py`.
 - Deliberately leaves the `@opencode-ai/*` package scope, `OPENCODE_*` env vars/flags, HTTP User-Agent/install identity (`opencode/<channel>/<version>/<client>`), build output binary name, provider IDs, `.opencode` project/config conventions, internal bridge event names, and TUI ASCII wordmark unchanged to preserve upstream-sync and wire compatibility.
 
 ## Test-Only Compatibility

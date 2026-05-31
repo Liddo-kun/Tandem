@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate WhisperCode Android launcher icons."""
+"""Generate Tandem Android launcher icons."""
 
 import struct
 import zlib
@@ -7,18 +7,14 @@ import os
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 RES_DIR = os.path.join(SCRIPT_DIR, "src-tauri", "gen", "android", "app", "src", "main", "res")
-W_RECTS = [
-    (128, 96, 160, 320),
-    (352, 96, 384, 320),
-    (224, 224, 288, 288),
-    (192, 256, 224, 288),
-    (288, 256, 320, 288),
-    (160, 288, 192, 352),
-    (320, 288, 352, 352),
-    (192, 320, 224, 416),
-    (288, 320, 320, 416),
+T_RECTS = [
+    (128, 112, 384, 176),
+    (224, 176, 288, 400),
 ]
-SHADOW_RECT = (224, 288, 288, 352)
+SHADOW_RECTS = [
+    (144, 128, 400, 192),
+    (240, 192, 304, 416),
+]
 
 FOREGROUND_SIZES = {
     "mdpi": 108,
@@ -46,7 +42,7 @@ ADAPTIVE_ICON_XML = """\
 IC_LAUNCHER_BACKGROUND_XML = """\
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <color name="ic_launcher_background">#131010</color>
+  <color name="ic_launcher_background">#101828</color>
 </resources>"""
 
 
@@ -76,9 +72,10 @@ def fill_rect(image, rect, fill, base_size=512, offset=0, target_size=None):
 def draw_icon(size, bg_color, letter_color, shadow_color=None, transparent_bg=False):
     image = empty_image(size, (0, 0, 0, 0) if transparent_bg else color(bg_color))
     if shadow_color:
-        fill_rect(image, SHADOW_RECT, color(shadow_color))
+        for rect in SHADOW_RECTS:
+            fill_rect(image, rect, color(shadow_color))
 
-    for rect in W_RECTS:
+    for rect in T_RECTS:
         fill_rect(image, rect, color(letter_color))
 
     return image
@@ -89,7 +86,7 @@ def draw_foreground(size):
     visible = int(size * 72 / 108)
     offset = (size - visible) // 2
 
-    for rect in W_RECTS:
+    for rect in T_RECTS:
         fill_rect(image, rect, color("#FFFFFF"), offset=offset, target_size=visible)
 
     return image
@@ -123,7 +120,7 @@ def main():
     for density, size in ICON_SIZES.items():
         out_dir = os.path.join(RES_DIR, f"mipmap-{density}")
         os.makedirs(out_dir, exist_ok=True)
-        icon = draw_icon(size, bg_color="#131010", letter_color="#FFFFFF", shadow_color="#5A5858")
+        icon = draw_icon(size, bg_color="#101828", letter_color="#FFFFFF", shadow_color="#2563EB")
         write_png(os.path.join(out_dir, "ic_launcher.png"), icon)
         write_png(os.path.join(out_dir, "ic_launcher_round.png"), icon)
 
@@ -138,7 +135,7 @@ def main():
     with open(os.path.join(values_dir, "ic_launcher_background.xml"), "w") as f:
         f.write(IC_LAUNCHER_BACKGROUND_XML)
 
-    print(f"Generated WhisperCode Android launcher icons in {RES_DIR}")
+    print(f"Generated Tandem Android launcher icons in {RES_DIR}")
 
 
 if __name__ == "__main__":
