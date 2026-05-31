@@ -17,6 +17,7 @@ const includeDebugAndroid = has("--include-debug-android")
 const uploadTag = value("--upload")
 const uploadRepo = value("--repo") ?? process.env["GH_REPO"]
 const installWindows = has("--install-windows")
+const installAndroid = has("--install-android")
 const explicitIosIpas = values("--ios-ipa").map((item) => path.resolve(root, item))
 
 type ArtifactKind = "cli" | "android" | "ios"
@@ -46,6 +47,7 @@ Options:
                         Include debug Android APKs. Release packaging excludes them by default
   --ios-ipa <path>      Include an exported iOS .ipa outside packages/ios; can repeat
   --install-windows     Copy tandem-windows-x64.exe to C:\\Program_Files\\tandem.exe
+  --install-android     Install the signed release Android APK with adb install -r
   --upload <tag>        Upload staged files to an existing GitHub release tag
   --repo <owner/name>   GitHub repo for --upload. Defaults to GH_REPO
 `)
@@ -94,6 +96,7 @@ const checksumEntries = [
 await Bun.write(path.join(outDir, "SHA256SUMS"), checksumEntries.map((entry) => `${entry.sha256}  ${entry.name}`).join("\n") + "\n")
 
 if (installWindows) await installWindowsBinary()
+if (installAndroid) await installAndroidApk()
 if (uploadTag) await uploadReleaseFiles(uploadTag, uploadRepo)
 
 console.log(`\nStaged ${artifacts.length} Tandem release artifact${artifacts.length === 1 ? "" : "s"} in ${outDir}`)
@@ -194,6 +197,19 @@ async function installWindowsBinary() {
   if (!(await isDirectory(path.dirname(target)))) throw new Error(`Install parent does not exist: ${path.dirname(target)}`)
   await fs.copyFile(source, target)
   console.log(`Installed ${target}`)
+}
+
+async function installAndroidApk() {
+  const candidates = artifacts
+    .filter((artifact) => artifact.kind === "android" && artifact.output.endsWith(".apk"))
+    .map((artifact) => path.resolve(root, artifact.output))
+  const apk = candidates.find((file) => path.basename(file) === "tandem-android-universal-release.apk") ?? candidates[0]
+  if (!apk) throw new Error("--install-android requires a signed release Android APK. Build/package Android first.")
+
+  const proc = Bun.spawn(["adb", "install", "-r", apk], { stdin: "inherit", stdout: "inherit", stderr: "inherit" })
+  const code = await proc.exited
+  if (code !== 0) throw new Error(`adb install failed with exit code ${code}.`)
+  console.log(`Installed Android APK ${path.basename(apk)}`)
 }
 
 async function uploadReleaseFiles(tag: string, repo: string | undefined) {

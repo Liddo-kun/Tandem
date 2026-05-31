@@ -26,7 +26,6 @@ let packageOnly = false
 let skipCli = false
 let skipAndroid = false
 let skipIos = false
-let allowPartial = false
 let debugAndroid = false
 let allowDevVersion = false
 let releaseVersion = process.env["OPENCODE_VERSION"]
@@ -56,7 +55,6 @@ for (let i = 0; i < args.length; i++) {
       skipIos = true
       break
     case "--allow-partial":
-      allowPartial = true
       break
     case "--debug-android":
       debugAndroid = true
@@ -79,6 +77,7 @@ for (let i = 0; i < args.length; i++) {
       break
     case "--strict":
     case "--install-windows":
+    case "--install-android":
     case "--no-clean":
     case "--required-common":
     case "--include-debug-android":
@@ -90,14 +89,10 @@ for (let i = 0; i < args.length; i++) {
 }
 
 await fs.mkdir(logDir, { recursive: true })
+if (!releaseVersion && !allowDevVersion) releaseVersion = await defaultReleaseVersion()
 if (releaseVersion) process.env["OPENCODE_VERSION"] = releaseVersion
-if (!releaseVersion && !allowDevVersion) {
-  throw new Error("Tandem release builds require --version <version> or OPENCODE_VERSION. Use --allow-dev-version only for local test builds.")
-}
-if (!allowPartial && !packageArgs.includes("--required-common")) packageArgs.push("--required-common")
-if (!allowPartial && !packageArgs.includes("--strict")) packageArgs.push("--strict")
 if (!packageOnly && !skipAndroid && !debugAndroid) await ensureAndroidSigning()
-if (!packageOnly && !allowPartial) await preflightReleaseInputs()
+if (!packageOnly && (hasForwarded("--strict") || hasForwarded("--required-common"))) await preflightReleaseInputs()
 
 const steps: RunStep[] = []
 if (!packageOnly && !skipCli) {
@@ -148,10 +143,14 @@ Default steps:
   3. iOS web asset build
   4. Tandem release packaging into dist/tandem-release
 
-Default packaging is strict and requires macOS arm64/x64, Windows x64/arm64,
-Linux x64/arm64, Android APK/AAB, and iOS IPA. The repo currently has iOS web
-source but no checked-in Xcode project, so put a signed .ipa under packages/ios/build
-or pass --ios-ipa <path> before a full strict release.
+Default local behavior builds all CLI targets, signed Android release APK/AAB,
+iOS web assets, and packages every available release artifact. It does not fail
+just because this Windows checkout cannot export a signed iOS IPA.
+
+Strict public-release packaging requires macOS arm64/x64, Windows x64/arm64,
+Linux x64/arm64, Android APK/AAB, and iOS IPA. Pass --strict --required-common
+and put a signed .ipa under packages/ios/build, packages/ios/dist,
+packages/ios/export, or pass --ios-ipa <path>.
 
 Android release signing uses ignored local files at packages/android/release.keystore
 and packages/android/keystore.properties. If neither exists, this script creates
@@ -159,7 +158,7 @@ both on first run. If only one exists, restore the missing file or delete both t
 create a fresh local signing pair.
 
 Options:
-  --version <version>   Version to embed in CLI builds. Can also use OPENCODE_VERSION
+  --version <version>   Version to embed in CLI builds. Defaults to packages/opencode/package.json. Can also use OPENCODE_VERSION
   --single-cli          Build only the current-platform CLI instead of all CLI targets
   --package-only        Skip builds and package existing outputs
   --skip-cli            Skip the CLI build
@@ -174,13 +173,14 @@ Options:
   --strict              Forwarded to tandem:package; require CLI, Android, and iOS artifacts
   --required-common     Forwarded to tandem:package; require the common full release set
   --install-windows     Forwarded to tandem:package; install C:\\Program_Files\\tandem.exe
+  --install-android     Forwarded to tandem:package; install the signed release APK with adb install -r
   --upload <tag>        Forwarded to tandem:package; upload to existing GitHub release
   --repo <owner/name>   Forwarded to tandem:package; repo for --upload
   --no-clean            Forwarded to tandem:package
 
 Examples:
-  bun run tandem:release -- --version 1.2.3
-  bun run tandem:release -- --version 1.2.3 --ios-ipa packages/ios/build/Tandem.ipa
+  bun run tandem:release -- --install-windows --install-android
+  bun run tandem:release -- --version 1.2.3 --strict --required-common --ios-ipa packages/ios/build/Tandem.ipa
   bun run tandem:release -- --single-cli --allow-partial --allow-dev-version --debug-android --install-windows
 `)
 }
@@ -257,6 +257,7 @@ async function run(step: RunStep) {
 
   const proc = Bun.spawn(step.command, {
     cwd: root,
+    env: { ...process.env },
     stdin: "inherit",
     stdout: "pipe",
     stderr: "pipe",
@@ -322,6 +323,12 @@ function stripAnsi(value: string) {
 
 function defaultLogDir() {
   return process.platform === "win32" ? "C:\\Temp\\opencode" : path.join(os.tmpdir(), "opencode")
+}
+
+async function defaultReleaseVersion() {
+  const pkg = await Bun.file(path.join(root, "packages/opencode/package.json")).json()
+  if (!pkg.version) throw new Error("packages/opencode/package.json does not contain a version. Pass --version <version>.")
+  return String(pkg.version)
 }
 
 async function hasStandardIosIpa() {

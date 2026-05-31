@@ -183,9 +183,9 @@ Enhanced-only features should be additive or feature-detected where possible.
 
 ## Tandem Release Packaging
 
-- Normal full release build: `bun run tandem:release -- --version <version>` from repo root.
-- If the signed iOS IPA is not already under `packages/ios/build`, `packages/ios/dist`, or `packages/ios/export`, pass it with `bun run tandem:release -- --ios-ipa <path>`.
-- Android release signing uses ignored local files at `packages/android/release.keystore` and `packages/android/keystore.properties`; `bun run tandem:release -- --version <version>` creates both on first run if neither exists, and fails if only one exists. Do not put signing config under `packages/android/src-tauri/gen` because Tauri regeneration deletes that folder.
+- Fresh-session Windows full build/install command: `bun run tandem:release -- --install-windows --install-android` from repo root. This builds all CLI targets, signed Android release APK/AAB, iOS web assets, packages available artifacts, installs `C:\Program_Files\tandem.exe`, and installs the signed Android APK on the connected device.
+- Strict public release packaging with iOS IPA: `bun run tandem:release -- --version <version> --strict --required-common --ios-ipa <path>`.
+- Android release signing uses ignored local files at `packages/android/release.keystore` and `packages/android/keystore.properties`; `bun run tandem:release -- --install-windows --install-android` creates both on first run if neither exists, and fails if only one exists. Do not put signing config under `packages/android/src-tauri/gen` because Tauri regeneration deletes that folder.
 - Local partial Windows/Y700 test build: `bun run tandem:release -- --single-cli --allow-partial --allow-dev-version --debug-android --install-windows`. More options: `bun run tandem:release -- --help`.
 
 ## Tablet Ubuntu Tandem CLI Install

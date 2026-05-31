@@ -22,10 +22,16 @@ keyPassword=your_password
 
 ## Build
 
-Normal Tandem release builds run from repo root:
+Normal Windows Tandem release builds run from repo root and install both the Windows CLI and connected Android app:
 
 ```bash
-bun run tandem:release -- --version <version>
+bun run tandem:release -- --install-windows --install-android
+```
+
+Strict public release packaging with an iOS IPA uses:
+
+```bash
+bun run tandem:release -- --version <version> --strict --required-common --ios-ipa <path>
 ```
 
 For Android-only release verification, run:
