@@ -92,6 +92,7 @@ await fs.mkdir(logDir, { recursive: true })
 if (!releaseVersion && !allowDevVersion) releaseVersion = await defaultReleaseVersion()
 if (releaseVersion) process.env["OPENCODE_VERSION"] = releaseVersion
 if (!packageOnly && !skipAndroid && !debugAndroid) await ensureAndroidSigning()
+if (!packageOnly && !skipAndroid) await ensureAndroidGeneratedProject()
 if (!packageOnly && (hasForwarded("--strict") || hasForwarded("--required-common"))) await preflightReleaseInputs()
 
 const steps: RunStep[] = []
@@ -156,6 +157,9 @@ Android release signing uses ignored local files at packages/android/release.key
 and packages/android/keystore.properties. If neither exists, this script creates
 both on first run. If only one exists, restore the missing file or delete both to
 create a fresh local signing pair.
+
+The ignored Tauri Android generated project under packages/android/src-tauri/gen
+is regenerated automatically when it is missing or points at the wrong package path.
 
 Options:
   --version <version>   Version to embed in CLI builds. Defaults to packages/opencode/package.json. Can also use OPENCODE_VERSION
@@ -247,6 +251,24 @@ async function ensureAndroidSigning() {
   console.log("Created local Android release signing files under packages/android")
 }
 
+async function ensureAndroidGeneratedProject() {
+  const androidDir = path.join(root, "packages/android")
+  const genDir = path.join(androidDir, "src-tauri/gen/android")
+  const config = (await Bun.file(path.join(androidDir, "src-tauri/tauri.conf.json")).json()) as { identifier?: string }
+  const identifier = config.identifier ?? "app.liddokun.tandem"
+  const expectedMainActivity = path.join(genDir, "app/src/main/java", ...identifier.split("."), "MainActivity.kt")
+
+  if ((await exists(expectedMainActivity)) && (await exists(path.join(genDir, "app/build.gradle.kts")))) return
+
+  console.log("Regenerating Tauri Android project under packages/android/src-tauri/gen/android")
+  await fs.rm(genDir, { recursive: true, force: true })
+  await runCommand(
+    [bun, "x", "tauri", "android", "init", "--ci", "--skip-targets-install"],
+    androidDir,
+    "Tauri Android project generation failed",
+  )
+}
+
 async function run(step: RunStep) {
   console.log(`\n=== ${step.name} ===`)
   console.log(`Full log: ${step.log}`)
@@ -304,6 +326,14 @@ async function streamText(stream: ReadableStream<Uint8Array> | null) {
     text += decoder.decode(value, { stream: true })
   }
   return text + decoder.decode()
+}
+
+async function runCommand(command: string[], cwd: string, failure: string) {
+  const proc = Bun.spawn(command, { cwd, env: { ...process.env }, stdout: "pipe", stderr: "pipe" })
+  const [code, stdout, stderr] = await Promise.all([proc.exited, streamText(proc.stdout), streamText(proc.stderr)])
+  if (stdout) console.log(stdout.trimEnd())
+  if (stderr) console.error(stderr.trimEnd())
+  if (code !== 0) throw new Error(`${failure} with exit code ${code}.`)
 }
 
 function printCompleteLines(text: string, filter: RegExp | undefined) {

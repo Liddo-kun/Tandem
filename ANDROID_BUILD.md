@@ -54,6 +54,6 @@ packages/android/src-tauri/gen/android/app/build/outputs/apk/universal/release/a
 
 - `packages/android/release.keystore` and `packages/android/keystore.properties` are intentionally ignored.
 - If only one Android signing file exists, restore the missing file or delete both files so `bun run tandem:release -- --version <version>` can create a fresh local signing pair.
-- `packages/android/src-tauri/gen/` is intentionally ignored as generated Tauri Android output.
+- `packages/android/src-tauri/gen/` is intentionally ignored as generated Tauri Android output. The release script regenerates `src-tauri/gen/android` automatically when it is missing or stale.
 - Android release signing is wired through `packages/android/patch-android-generated.ts`, which patches the generated Gradle project to read `packages/android/keystore.properties` when present.
 - Android release signing was verified locally with `apksigner verify` for the APK and `jarsigner -verify` for the AAB.
