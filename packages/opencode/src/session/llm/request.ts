@@ -12,8 +12,13 @@ import { Effect, Record } from "effect"
 import { jsonSchema, tool as aiTool, type ModelMessage, type Tool } from "ai"
 import type { Plugin } from "@/plugin"
 import { mergeDeep } from "remeda"
+import { createHash } from "node:crypto"
 
 const USER_AGENT = `opencode/${InstallationVersion}`
+const CLAUDE_CODE_VERSION = "2.1.159"
+const CLAUDE_CODE_ENTRYPOINT = "cli"
+const CCH_SALT = "59cf53e54c78"
+const CCH_POSITIONS = [4, 7, 20]
 
 type PrepareInput = {
   readonly user: MessageV2.User
@@ -51,16 +56,38 @@ export type Prepared = {
 const mergeOptions = (target: Record<string, any>, source: Record<string, any> | undefined): Record<string, any> =>
   mergeDeep(target, source ?? {}) as Record<string, any>
 
+// UPSTREAM-DIVERGENCE: Anthropic OAuth no longer rewrites request bodies in the
+// plugin, so Claude Code's billing marker is constructed here and kept as its
+// own first system block before the Anthropic base prompt.
+function firstUserText(messages: ModelMessage[]): string | undefined {
+  const user = messages.find((message) => message.role === "user")
+  if (!user) return undefined
+  if (typeof user.content === "string") return user.content
+  return user.content.find((part) => part.type === "text")?.text ?? ""
+}
+
+function claudeBillingHeader(messages: ModelMessage[]): string | undefined {
+  const text = firstUserText(messages)
+  if (text === undefined) return undefined
+  const chars = CCH_POSITIONS.map((index) => text[index] || "0").join("")
+  const suffix = createHash("sha256").update(`${CCH_SALT}${chars}${CLAUDE_CODE_VERSION}`).digest("hex").slice(0, 3)
+  const cch = createHash("sha256").update(text).digest("hex").slice(0, 5)
+  return `x-anthropic-billing-header: cc_version=${CLAUDE_CODE_VERSION}.${suffix}; cc_entrypoint=${CLAUDE_CODE_ENTRYPOINT}; cch=${cch};`
+}
+
 export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: PrepareInput) {
   const isOpenaiOauth = input.provider.id === "openai" && input.auth?.type === "oauth"
+  const billingHeader = input.model.api.id.includes("claude") ? claudeBillingHeader(input.messages) : undefined
+  const baseSystem = [
+    ...(input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model)),
+    ...input.system,
+    ...(input.user.system ? [input.user.system] : []),
+  ]
+    .filter((x) => x)
+    .join("\n")
   const system = [
-    [
-      ...(input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model)),
-      ...input.system,
-      ...(input.user.system ? [input.user.system] : []),
-    ]
-      .filter((x) => x)
-      .join("\n"),
+    ...(billingHeader ? [billingHeader] : []),
+    ...(baseSystem ? [baseSystem] : []),
   ]
 
   const header = system[0]

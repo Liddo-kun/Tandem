@@ -56,6 +56,7 @@ whisper  = Whispercode
 - `packages/android` is the Tauri Android wrapper around `@opencode-ai/app`. Platform wiring is `src/entry-android.tsx`, bridge code is `src/bridge.ts`, native storage is `src/storage.ts`, and the native plugin is under `src-tauri/mobile-bridge`.
 - `packages/ios` is the Swift WebView wrapper around `@opencode-ai/app`. Platform wiring is `src/entry-ios.tsx`, JS bridge/storage are `src/bridge.ts` and `src/ios-storage.ts`, and native code is under `OpenCode/Bridge`, `OpenCode/WebView`, and `OpenCode/Whisper`.
 - `packages/llm` is a private Effect Schema-first LLM core with its own `AGENTS.md`; do not assume it is the production provider path for `packages/opencode` unless imports show that.
+- Claude Code tool-name/parameter disguise for Claude models is applied only in the `packages/opencode/src/session/llm.ts` AI SDK middleware; the experimental native LLM runtime remains undisguised until those helpers are ported to its request/stream adapters.
 - Check nested `AGENTS.md` before editing package-specific code, especially under `packages/opencode`, `packages/app`, `packages/llm`, `packages/desktop`, and `packages/opencode/test`.
 
 ## Server And API Flow
@@ -182,12 +183,13 @@ Enhanced-only features should be additive or feature-detected where possible.
 
 ## Tablet Ubuntu Tandem CLI Install
 
-- The Y700/Android Ubuntu environment uses the Linux ARM64 binary, not `opencode.exe`. The installed command lives at `/home/jon/.opencode/bin/opencode` inside Ubuntu.
+- The Y700/Android Ubuntu environment uses the Linux ARM64 binary, not `opencode.exe`. The installed command is `tandem` and lives at `/home/jon/.opencode/bin/tandem` inside Ubuntu (NOT `opencode` — that name is unused on the tablet; installing there does nothing).
 - Build Tandem from Windows with the full `packages/opencode` build so the Linux ARM64 target is produced: `C:\Program_Files\Bun\bin\bun.exe run --cwd packages/opencode build`.
 - The tablet binary to install is `packages/opencode/dist/opencode-linux-arm64/bin/opencode`. Do not copy the Windows binary from `opencode-windows-x64` to the tablet.
 - Copy the built binary to Termux: `scp -i C:\Temp\opencode\tablet_setup_key -P 8022 C:\Users\Jon\Tandem\packages\opencode\dist\opencode-linux-arm64\bin\opencode u0_a253@192.168.1.85:/data/data/com.termux/files/home/opencode-tandem`.
-- Replace the Ubuntu-installed opencode with the Tandem build: `ssh -i C:\Temp\opencode\tablet_setup_key -p 8022 u0_a253@192.168.1.85 "proot-distro login ubuntu -- bash -lc 'install -m 755 /data/data/com.termux/files/home/opencode-tandem /home/jon/.opencode/bin/opencode && chown jon:jon /home/jon/.opencode/bin/opencode'"`.
-- Verify from Ubuntu: `proot-distro login ubuntu --user jon -- bash -lc 'export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$PATH"; opencode --version'`.
+- Replace the Ubuntu-installed `tandem` binary with the new build: `ssh -i C:\Temp\opencode\tablet_setup_key -p 8022 u0_a253@192.168.1.85 "proot-distro login ubuntu -- bash -lc 'install -m 755 /data/data/com.termux/files/home/opencode-tandem /home/jon/.opencode/bin/tandem && chown jon:jon /home/jon/.opencode/bin/tandem'"`.
+- Verify from Ubuntu: `proot-distro login ubuntu --user jon -- bash -lc 'export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$PATH"; tandem --version'`.
+- Clean up the Termux staging copy afterward: `rm -f /data/data/com.termux/files/home/opencode-tandem`.
 
 ## Android Testing And Build
 

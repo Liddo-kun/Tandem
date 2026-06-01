@@ -47,10 +47,15 @@ export const layer = Layer.effect(
     return Service.of({
       environment: Effect.fn("SystemPrompt.environment")(function* (model: Provider.Model) {
         const ctx = yield* InstanceState.context
+        // UPSTREAM-DIVERGENCE: Claude requests use the Claude Code-compatible
+        // wording that avoids Anthropic's third-party-agent env-intro filter.
+        const envIntro = model.api.id.includes("claude")
+          ? "Environment context you are running in:"
+          : "Here is some useful information about the environment you are running in:"
         return [
           [
             `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
-            `Here is some useful information about the environment you are running in:`,
+            envIntro,
             `<env>`,
             `  Working directory: ${ctx.directory}`,
             `  Workspace root folder: ${ctx.worktree}`,

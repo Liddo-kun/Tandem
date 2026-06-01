@@ -2266,11 +2266,13 @@ describe("ProviderTransform.message - cache control on gateway", () => {
       anthropic: {
         cacheControl: {
           type: "ephemeral",
+          ttl: "1h",
         },
       },
       openrouter: {
         cacheControl: {
           type: "ephemeral",
+          ttl: "1h",
         },
       },
       bedrock: {
@@ -2291,7 +2293,48 @@ describe("ProviderTransform.message - cache control on gateway", () => {
       alibaba: {
         cacheControl: {
           type: "ephemeral",
+          ttl: "1h",
         },
+      },
+    })
+  })
+
+  test("leading claude billing-header system block does not receive cache control", () => {
+    const model = createModel({
+      providerID: "anthropic",
+      api: {
+        id: "claude-sonnet-4",
+        url: "https://api.anthropic.com",
+        npm: "@ai-sdk/anthropic",
+      },
+    })
+    const msgs = [
+      {
+        role: "system",
+        content: "x-anthropic-billing-header: cc_version=2.1.87.6ff; cc_entrypoint=sdk-cli; cch=4ffc3;",
+      },
+      {
+        role: "system",
+        content: "You are a helpful assistant",
+      },
+      {
+        role: "user",
+        content: "Hello",
+      },
+    ] as any[]
+
+    const result = ProviderTransform.message(msgs, model, {}) as any[]
+
+    // Billing header is still sent as the first system message, but must not
+    // consume an ephemeral cache breakpoint.
+    expect(result[0].content).toBe(
+      "x-anthropic-billing-header: cc_version=2.1.87.6ff; cc_entrypoint=sdk-cli; cch=4ffc3;",
+    )
+    expect(result[0].providerOptions).toBeUndefined()
+    expect(result[1].providerOptions?.anthropic).toEqual({
+      cacheControl: {
+        type: "ephemeral",
+        ttl: "1h",
       },
     })
   })
@@ -2323,11 +2366,13 @@ describe("ProviderTransform.message - cache control on gateway", () => {
       anthropic: {
         cacheControl: {
           type: "ephemeral",
+          ttl: "1h",
         },
       },
       openrouter: {
         cacheControl: {
           type: "ephemeral",
+          ttl: "1h",
         },
       },
       bedrock: {
@@ -2348,6 +2393,7 @@ describe("ProviderTransform.message - cache control on gateway", () => {
       alibaba: {
         cacheControl: {
           type: "ephemeral",
+          ttl: "1h",
         },
       },
     })

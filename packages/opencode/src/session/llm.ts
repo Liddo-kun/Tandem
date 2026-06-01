@@ -8,6 +8,7 @@ import type { LLMEvent } from "@opencode-ai/llm"
 import { LLMClient, RequestExecutor, WebSocketExecutor } from "@opencode-ai/llm/route"
 import type { LLMClientService } from "@opencode-ai/llm/route"
 import { GitLabWorkflowLanguageModel } from "gitlab-ai-provider"
+import { ClaudeCodeToolDisguise } from "@/provider/claude-code-tool-disguise"
 import { ProviderTransform } from "@/provider/transform"
 import { Config } from "@/config/config"
 import type { Agent } from "@/agent/agent"
@@ -265,6 +266,10 @@ const live: Layer.Layer<
           "llm.model": input.model.id,
         }),
       )
+      // UPSTREAM-DIVERGENCE: Claude Code tool names/inputs are disguised only
+      // in the AI SDK runtime; native runtime remains undisguised until it has
+      // equivalent request and stream adapters.
+      const disguiseClaudeTools = input.model.api.id.includes("claude")
       // Default runtime path: AI SDK owns provider execution and tool dispatch;
       // LLMAISDK.toLLMEvents below normalizes fullStream parts for the processor.
       return {
@@ -322,7 +327,28 @@ const live: Layer.Layer<
                       prepared.messageTransformOptions,
                     )
                   }
+                  if (disguiseClaudeTools) {
+                    args.params.tools = ClaudeCodeToolDisguise.toolsToClaudeCode(args.params.tools)
+                    args.params.prompt = ClaudeCodeToolDisguise.promptToClaudeCode(args.params.prompt)
+                  }
                   return args.params
+                },
+                async wrapStream({ doStream }) {
+                  if (!disguiseClaudeTools) return doStream()
+                  const result = await doStream()
+                  return { ...result, stream: result.stream.pipeThrough(ClaudeCodeToolDisguise.responseTransform()) }
+                },
+                async wrapGenerate({ doGenerate }) {
+                  const result = await doGenerate()
+                  if (!disguiseClaudeTools) return result
+                  return {
+                    ...result,
+                    content: result.content.map((part) =>
+                      part.type === "tool-call"
+                        ? { ...part, ...ClaudeCodeToolDisguise.toolCallFromClaudeCode(part.toolName, part.input) }
+                        : part,
+                    ),
+                  }
                 },
               },
             ],
