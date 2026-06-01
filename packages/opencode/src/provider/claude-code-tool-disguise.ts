@@ -20,10 +20,14 @@ const TOOL_NAME_TO_CLAUDE_CODE: Record<string, string> = {
   edit: "Edit",
   glob: "Glob",
   grep: "Grep",
-  question: "Question",
+  // CC 2.1.159 renamed its clarifying-question tool to AskUserQuestion and its
+  // subagent tool to Agent; match those so the request fingerprints as the tool
+  // surface Opus was trained against. Name-only swap — opencode keeps its own
+  // schema/description for these tools.
+  question: "AskUserQuestion",
   read: "Read",
   skill: "Skill",
-  task: "Task",
+  task: "Agent",
   todowrite: "TodoWrite",
   webfetch: "WebFetch",
   websearch: "WebSearch",
@@ -34,11 +38,52 @@ const TOOL_NAME_FROM_CLAUDE_CODE: Record<string, string> = Object.fromEntries(
   Object.entries(TOOL_NAME_TO_CLAUDE_CODE).map(([opencode, claude]) => [claude, opencode]),
 )
 
+// Parameter key renames presented at the provider boundary and reversed before
+// opencode validates/executes the call. Covers two classes:
+//   - camelCase -> snake_case (edit/read/write) — Claude Code's actual param keys.
+//   - same-concept-different-name (grep include -> glob, skill name -> skill,
+//     task background -> run_in_background) — Claude Code names the equivalent
+//     param differently; matching it tightens the trained tool fingerprint.
+// All renamed keys are top-level so the shallow round-trip (renameKeys) reverses
+// them correctly.
 const TOOL_INPUT_TO_CLAUDE_CODE: Record<string, Record<string, string>> = {
   edit: { filePath: "file_path", oldString: "old_string", newString: "new_string", replaceAll: "replace_all" },
   read: { filePath: "file_path" },
   write: { filePath: "file_path" },
+  grep: { include: "glob" },
+  skill: { name: "skill" },
+  task: { background: "run_in_background" },
 }
+
+// Keys whose opencode name is a plain English word that also appears in the
+// tool's description prose (and, for "include"/"background", as a value-style
+// reference like `background=true`). Claude Code keeps these words in its own
+// prose, so we rename the schema key + round-trip the value but never rewrite
+// the description text — a naive global string replace would corrupt it.
+const PROSE_UNSAFE_INPUT_KEYS: Record<string, ReadonlySet<string>> = {
+  grep: new Set(["include"]),
+  skill: new Set(["name"]),
+  task: new Set(["background"]),
+}
+
+function descriptionKeyMap(opencodeName: string, keyMap: Record<string, string>): Record<string, string> {
+  const unsafe = PROSE_UNSAFE_INPUT_KEYS[opencodeName]
+  if (!unsafe) return keyMap
+  return Object.fromEntries(Object.entries(keyMap).filter(([from]) => !unsafe.has(from)))
+}
+
+// Tool-name mentions in description prose (e.g. "use the Task tool") must track
+// the renamed tool — Claude is shown `Agent`, so the prose must say "Agent tool",
+// not "Task tool". Derived from the rename table so it survives future renames;
+// capitalize-only renames (bash -> Bash) produce identical phrases and drop out,
+// leaving only genuine renames like task -> Agent and question -> AskUserQuestion.
+// The matched phrase ("Task tool") is specific enough that a plain substring
+// replace cannot corrupt unrelated prose.
+const TOOL_NAME_PROSE_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(TOOL_NAME_TO_CLAUDE_CODE)
+    .map(([opencode, claude]) => [`${capitalizeName(opencode)} tool`, `${claude} tool`] as const)
+    .filter(([from, to]) => from !== to),
+)
 
 const decodeJson = Schema.decodeUnknownOption(Schema.UnknownFromJsonString)
 
@@ -75,13 +120,19 @@ function rewriteDescriptionKeys(description: unknown, keyMap: Record<string, str
   return Object.entries(keyMap).reduce((result, [from, to]) => result.split(from).join(to), description)
 }
 
-function rewriteJsonSchemaKeys(schema: unknown, keyMap: Record<string, string>): unknown {
-  if (Array.isArray(schema)) return schema.map((item) => rewriteJsonSchemaKeys(item, keyMap))
+// keyMap renames property keys + required entries; proseMap (a subset of keyMap
+// that excludes prose-unsafe keys) rewrites embedded description strings.
+function rewriteJsonSchemaKeys(
+  schema: unknown,
+  keyMap: Record<string, string>,
+  proseMap: Record<string, string>,
+): unknown {
+  if (Array.isArray(schema)) return schema.map((item) => rewriteJsonSchemaKeys(item, keyMap, proseMap))
   if (!isRecord(schema)) return schema
 
   return Object.fromEntries(
     Object.entries(schema).map(([key, value]) => {
-      if (key === "description") return [key, rewriteDescriptionKeys(value, keyMap)]
+      if (key === "description") return [key, rewriteDescriptionKeys(value, proseMap)]
       if (key === "properties" && isRecord(value)) {
         const properties = renameKeys(value, keyMap) as Record<string, unknown>
         return [
@@ -89,7 +140,7 @@ function rewriteJsonSchemaKeys(schema: unknown, keyMap: Record<string, string>):
           Object.fromEntries(
             Object.entries(properties).map(([property, propertySchema]) => [
               property,
-              rewriteJsonSchemaKeys(propertySchema, keyMap),
+              rewriteJsonSchemaKeys(propertySchema, keyMap, proseMap),
             ]),
           ),
         ]
@@ -97,7 +148,7 @@ function rewriteJsonSchemaKeys(schema: unknown, keyMap: Record<string, string>):
       if (key === "required" && Array.isArray(value)) {
         return [key, value.map((item) => (typeof item === "string" ? (keyMap[item] ?? item) : item))]
       }
-      return [key, rewriteJsonSchemaKeys(value, keyMap)]
+      return [key, rewriteJsonSchemaKeys(value, keyMap, proseMap)]
     }),
   )
 }
@@ -108,15 +159,14 @@ export function toolsToClaudeCode(tools: Array<LanguageModelV3Tool> | undefined)
     if (tool.type !== "function") return tool
     const opencodeName = fromClaudeCodeToolName(tool.name)
     const keyMap = TOOL_INPUT_TO_CLAUDE_CODE[opencodeName]
+    // Every tool's description is rewritten for tool-name prose; param-key prose
+    // is merged in only for tools that rename keys. Key sets never overlap.
+    const proseMap = { ...TOOL_NAME_PROSE_MAP, ...(keyMap ? descriptionKeyMap(opencodeName, keyMap) : {}) }
     return {
       ...tool,
       name: toClaudeCodeToolName(opencodeName),
-      ...(keyMap
-        ? {
-            description: rewriteDescriptionKeys(tool.description, keyMap) as string | undefined,
-            inputSchema: rewriteJsonSchemaKeys(tool.inputSchema, keyMap) as JSONSchema7,
-          }
-        : {}),
+      description: rewriteDescriptionKeys(tool.description, proseMap) as string | undefined,
+      ...(keyMap ? { inputSchema: rewriteJsonSchemaKeys(tool.inputSchema, keyMap, proseMap) as JSONSchema7 } : {}),
     }
   })
 }

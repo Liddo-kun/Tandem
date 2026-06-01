@@ -114,6 +114,23 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
         providerOptions: input.provider.options,
       })
   const options = mergeOptions(mergeOptions(mergeOptions(base, input.model.options), input.agent.options), variant)
+
+  // UPSTREAM-DIVERGENCE: match Claude Code's request shape — opt into context management
+  // with `keep: "all"` so older thinking blocks are never cleared (real CC sends this to
+  // maximize prompt-cache hits and hedge model tiers that otherwise default to keeping only
+  // the last turn's thinking). `clear_thinking_20251015` 400s unless extended thinking is
+  // enabled/adaptive for THIS request, so gate on the resolved thinking config (after the
+  // variant merge), not just on the model being reasoning-capable — otherwise subagents and
+  // any thinking-off request fail. The AI SDK emits the `context_management` body field and
+  // auto-adds the `context-management-2025-06-27` beta header.
+  if (
+    input.model.api.npm === "@ai-sdk/anthropic" &&
+    input.model.api.id.includes("claude") &&
+    (options.thinking?.type === "adaptive" || options.thinking?.type === "enabled")
+  ) {
+    options.contextManagement = { edits: [{ type: "clear_thinking_20251015", keep: "all" }] }
+  }
+
   if (isOpenaiOauth) options.instructions = system.join("\n")
 
   const messages =

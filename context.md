@@ -239,3 +239,5 @@ Keep commits focused so they can be cherry-picked later if needed.
 
 - Avoid mocks as much as possible.
 - Test actual implementation behavior instead of duplicating implementation logic in tests.
+- When a Tandem behavior change breaks an upstream test or fixture, prefer asserting the Tandem-specific expectation in a separate Tandem-only test file and leave the upstream test/fixture as close to upstream as possible. Hand-editing upstream test expectations (or recorded cassettes) inline couples them to Tandem values and conflicts on every sync; only do it when isolation is genuinely impractical, and mark it so it is easy to spot.
+- Recorded HTTP cassettes (e.g. `test/fixtures/recordings/*`) are upstream fixtures: when a Tandem request-shape change (disguise, billing header, cache control) breaks one, first ask whether the change should even reach that path before editing the fixture to accept it. A failing cassette is often a signal that a Tandem divergence leaked somewhere it should not (e.g. the billing header reaching the undisguised native runtime).

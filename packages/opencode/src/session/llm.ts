@@ -224,7 +224,10 @@ const live: Layer.Layer<
           provider: item,
           auth: info,
           llmClient,
-          messages: prepared.messages,
+          // UPSTREAM-DIVERGENCE: the native runtime stays undisguised, so strip
+          // the Claude Code billing marker (an AI SDK/OAuth-path fingerprint)
+          // before handing messages to it, keeping native requests upstream-shaped.
+          messages: prepared.messages.filter((message) => !ProviderTransform.isClaudeBillingMessage(message)),
           tools: prepared.tools,
           toolChoice: input.toolChoice,
           temperature: prepared.params.temperature,
@@ -281,15 +284,20 @@ const live: Layer.Layer<
             })
           },
           async experimental_repairToolCall(failed) {
-            const lower = failed.toolCall.toolName.toLowerCase()
-            if (lower !== failed.toolCall.toolName && prepared.tools[lower]) {
+            // When disguising, map a Claude Code tool name (e.g. Agent,
+            // AskUserQuestion, Bash) back to its opencode name; otherwise fall
+            // back to a plain lowercase capitalization fix.
+            const mapped = disguiseClaudeTools
+              ? ClaudeCodeToolDisguise.fromClaudeCodeToolName(failed.toolCall.toolName)
+              : failed.toolCall.toolName.toLowerCase()
+            if (mapped !== failed.toolCall.toolName && prepared.tools[mapped]) {
               l.info("repairing tool call", {
                 tool: failed.toolCall.toolName,
-                repaired: lower,
+                repaired: mapped,
               })
               return {
                 ...failed.toolCall,
-                toolName: lower,
+                toolName: mapped,
               }
             }
             return {

@@ -345,7 +345,7 @@ function normalizeMessages(
 // UPSTREAM-DIVERGENCE: the Claude billing-header block is a tiny per-request
 // system block; it must not consume an ephemeral cache breakpoint (it is below
 // Anthropic's min cacheable size and would waste 1 of the 4 breakpoint slots).
-function isClaudeBillingMessage(msg: ModelMessage): boolean {
+export function isClaudeBillingMessage(msg: ModelMessage): boolean {
   return msg.role === "system" && typeof msg.content === "string" && msg.content.startsWith("x-anthropic-billing-header:")
 }
 
@@ -1062,20 +1062,6 @@ export function options(input: {
     (!input.model.api.id.includes("claude") && input.model.api.npm === "@ai-sdk/anthropic")
   ) {
     result["toolStreaming"] = false
-  }
-
-  // UPSTREAM-DIVERGENCE: match Claude Code's request shape — opt into context management
-  // with `keep: "all"` so older thinking blocks are never cleared (real CC sends this to
-  // maximize prompt-cache hits and hedge model tiers that otherwise default to keeping only
-  // the last turn's thinking). clear_thinking requires extended thinking, which opencode
-  // enables for reasoning-capable Claude models. The AI SDK emits the `context_management`
-  // body field and auto-adds the `context-management-2025-06-27` beta header.
-  if (
-    input.model.api.npm === "@ai-sdk/anthropic" &&
-    input.model.api.id.includes("claude") &&
-    input.model.capabilities.reasoning
-  ) {
-    result["contextManagement"] = { edits: [{ type: "clear_thinking_20251015", keep: "all" }] }
   }
 
   // openai and providers using openai package should set store to false by default.

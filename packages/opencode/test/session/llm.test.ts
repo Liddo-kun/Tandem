@@ -1756,17 +1756,19 @@ describe("session.llm.stream", () => {
         const toolUseIndex = messages.findIndex((message) => message.content.some((part) => part.type === "tool_use"))
         expect(toolUseIndex).toBeGreaterThan(0)
         expect(messages[toolUseIndex].role).toBe("assistant")
+        // Tandem disguises Claude tool calls in Claude Code shape on the wire:
+        // read -> Read with filePath -> file_path; glob -> Glob (no key rename).
         expect(messages[toolUseIndex].content.filter((part) => part.type === "tool_use")).toMatchObject([
           {
             type: "tool_use",
             id: "toolu_01N8mDEzG8DSTs7UPHFtmgCT",
-            name: "read",
-            input: { filePath: "/root" },
+            name: "Read",
+            input: { file_path: "/root" },
           },
           {
             type: "tool_use",
             id: "toolu_01APxrADs7VozN8uWzw9WwHr",
-            name: "glob",
+            name: "Glob",
             input: { pattern: "**/*.pdf", path: "/root" },
           },
         ])

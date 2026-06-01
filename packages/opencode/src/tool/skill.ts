@@ -8,7 +8,7 @@ import * as Tool from "./tool"
 import DESCRIPTION from "./skill.txt"
 
 export const Parameters = Schema.Struct({
-  name: Schema.String.annotate({ description: "The name of the skill from available_skills" }),
+  name: Schema.String.annotate({ description: "The name of the skill from the available skills list" }),
 })
 
 export const SkillTool = Tool.define(

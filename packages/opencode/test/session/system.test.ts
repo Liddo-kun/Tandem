@@ -71,9 +71,9 @@ describe("session.system", () => {
 
       expect(first).toBe(second)
 
-      const alpha = output.indexOf("<name>alpha-skill</name>")
-      const middle = output.indexOf("<name>middle-skill</name>")
-      const zeta = output.indexOf("<name>zeta-skill</name>")
+      const alpha = output.indexOf("- alpha-skill: Alpha skill.")
+      const middle = output.indexOf("- middle-skill: Middle skill.")
+      const zeta = output.indexOf("- zeta-skill: Zeta skill.")
 
       expect(alpha).toBeGreaterThan(-1)
       expect(middle).toBeGreaterThan(alpha)
