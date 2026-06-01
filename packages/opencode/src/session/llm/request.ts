@@ -1,4 +1,5 @@
 import type { Auth } from "@/auth"
+import { SessionLegacy } from "@opencode-ai/core/session/legacy"
 import type { RuntimeFlags } from "@/effect/runtime-flags"
 import { InstanceState } from "@/effect/instance-state"
 import { Permission } from "@/permission"
@@ -21,7 +22,7 @@ const CCH_SALT = "59cf53e54c78"
 const CCH_POSITIONS = [4, 7, 20]
 
 type PrepareInput = {
-  readonly user: MessageV2.User
+  readonly user: SessionLegacy.User
   readonly sessionID: string
   readonly parentSessionID?: string
   readonly model: Provider.Model
