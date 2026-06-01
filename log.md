@@ -11,6 +11,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 - Adds separate push-notification feature notes outside this final-state inventory. Files: `PUSH_NOTIFICATIONS.md`.
 - Adds iOS and Android workspace package metadata and updates workspace dependency resolution. Files: `bun.lock`, `packages/ios/package.json`, `packages/android/package.json`.
 - Adds one-command Tandem release building/packaging for the Windows-buildable release set: all CLI targets, signed Android release APK/AAB, iOS web assets, staged Tandem-named artifacts, checksums/manifest, optional GitHub upload, Windows CLI install, and Android APK install; strict mode still requires the full common set including a signed iOS IPA. The script also bootstraps local Android signing and stale generated Android output when needed. Files: `script/build-tandem-release.ts`, `script/package-tandem-release.ts`, `package.json`, `context.md`.
+- Replaces upstream OpenCode's root coding-style `AGENTS.md` with a Tandem thin pointer that defers substantive guidance to `context.md` (Windows) and `contextL.md` (Ubuntu/proot); upstream coding conventions are carried forward inside `context.md`'s code-style section instead. This file conflicts on upstream syncs whenever upstream edits its root `AGENTS.md`; keep the pointer and port any genuinely new upstream rule into `context.md`. Files: `AGENTS.md`, `context.md`.
 
 ## Shared Platform And Persistence
 
