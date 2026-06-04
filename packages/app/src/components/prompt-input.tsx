@@ -298,6 +298,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     draggingType: "image" | "@mention" | null
     mode: "normal" | "shell"
     applyingHistory: boolean
+    variantOpen: boolean
   }>({
     popover: null,
     historyIndex: -1,
@@ -306,6 +307,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     draggingType: null,
     mode: "normal",
     applyingHistory: false,
+    variantOpen: false,
   })
   const [picker, setPicker] = createStore({
     projectOpen: false,
@@ -1175,6 +1177,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     const fmt = (n: number) => (n ?? 0).toLocaleString(language.intl())
     return `R ${fmt(ctx?.cacheRead ?? 0)} · W ${fmt(ctx?.cacheWrite ?? 0)} · I ${fmt(ctx?.input ?? 0)}`
   })
+  // Check provider variants directly: `variants` also includes the UI-only default option.
+  const showVariantControl = createMemo(() => local.model.variant.list().length > 0)
   const accepting = createMemo(() => {
     const id = params.id
     if (!id) return permission.isAutoAcceptingDirectory(sdk.directory)
@@ -1680,10 +1684,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     <ComposerPickerTrigger state={newProjectTriggerState()} />
                   </Show>
                   <ComposerModelControl state={modelControlState()} />
-                  <Show when={variants().length > 2}>
+                  <Show when={store.mode !== "shell" && showVariantControl()}>
                     <div
-                      data-component="prompt-thinking-effort-control"
-                      style={providersShouldFadeIn() ? { animation: "fade-in 0.3s" } : undefined}
+                      data-component="prompt-variant-control"
+                      classList={{
+                        "hidden group-hover/prompt-input:block group-focus-within/prompt-input:block":
+                          !local.model.variant.current() && !store.variantOpen,
+                      }}
                     >
                       <TooltipKeybind
                         placement="top"
@@ -1695,15 +1702,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                           size="normal"
                           options={variants()}
                           current={local.model.variant.current() ?? "default"}
-                          label={(value) => (value === "default" ? language.t("common.default") : value)}
+                          label={(x) => (x === "default" ? language.t("common.default") : x)}
+                          onOpenChange={(open) => setStore("variantOpen", open)}
                           onSelect={(value) => {
                             local.model.variant.set(value === "default" ? undefined : value)
                             restoreFocus()
                           }}
-                          class="max-w-[150px] justify-start capitalize text-v2-text-text-faint"
+                          class="capitalize max-w-[160px] justify-start text-v2-text-text-faint"
                           valueClass="truncate text-[13px] font-[440] leading-5 text-v2-text-text-faint"
                           triggerStyle={control()}
-                          triggerProps={{ "data-action": "prompt-thinking-effort" }}
+                          triggerProps={{ "data-action": "prompt-model-variant" }}
                           variant="ghost"
                         />
                       </TooltipKeybind>
@@ -2054,7 +2062,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                             </TooltipKeybind>
                           </Show>
                         </div>
-                        <Show when={variants().length > 2}>
+                        <Show when={showVariantControl()}>
                           <div
                             data-component="prompt-variant-control"
                             style={providersShouldFadeIn() ? { animation: "fade-in 0.3s" } : undefined}
