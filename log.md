@@ -78,7 +78,6 @@ For each item, reference the modified files or stable symbols; line numbers are 
 
 - Compacts chat feed spacing by reducing user bubble padding, user and assistant copy/meta row height, assistant text spacing, inter-turn padding, assistant content gap, and turn-list gap. Files: `packages/app/src/pages/session/message-timeline.tsx`, `packages/ui/src/components/message-part.css`, `packages/ui/src/components/session-turn.css`.
 - Adds compact multiline tool summary triggers for Bash and `apply_patch`, including status dots, command/file subjects, and first-line output/change previews while preserving existing expanded details. Files: `packages/ui/src/components/basic-tool.tsx`, `packages/ui/src/components/basic-tool.css`, `packages/ui/src/components/collapsible.css`, `packages/ui/src/components/message-part.tsx`, `packages/ui/src/components/tool-error-card.tsx`.
-- Adds an `@opencode-ai/ui` package export for v2 component stylesheets (`"./v2/*.css": "./src/v2/components/*.css"`) so `@import "@opencode-ai/ui/v2/<name>.css"` resolves to the real file. Upstream's v2 desktop UI (#29689) introduced `settings-v2.css` importing those stylesheets, but upstream's export map only declares `"./v2/*": "./src/v2/components/*.tsx"`, which appends `.tsx` and breaks the embedded-web-UI/app bundle. The more-specific `.css` pattern wins for `.css` requests. Remove this once upstream adds an equivalent export. Files: `packages/ui/package.json`.
 
 ## Backend Tool Defaults
 
