@@ -57,6 +57,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 - Adds prompt keyboard delete-word behavior for native mobile toolbar events. Files: `packages/app/src/components/prompt-input.tsx`, `packages/app/src/components/prompt-input/editor-dom.ts`, `packages/ios/src/entry-ios.tsx`.
 - Truncates long prompt model names while preserving full-value tooltips. Files: `packages/app/src/components/prompt-input.tsx`.
 - Adds prompt footer context-token display while otherwise following upstream v2 prompt controls. Files: `packages/app/src/components/prompt-input.tsx`.
+ - Adds a cache breakdown (`R` cache.read / `W` cache.write / `I` uncached input) of the last request next to the prompt footer context-token display, derived from `getSessionContextMetrics` last-assistant tokens. Files: `packages/app/src/components/prompt-input.tsx`.
  - Adds a visible v2 prompt thinking-effort selector next to the model control while preserving the existing cycle command. Files: `packages/app/src/components/prompt-input.tsx`.
  - Tightens the composer control row by giving the shared `control()` trigger style a 0px gap, so each model/agent/effort/project label sits flush against its dropdown chevron instead of the default 8px button gap. Files: `packages/app/src/components/prompt-input.tsx`.
  - Shortens prompt composer model labels by removing a leading `Claude ` prefix from the trigger text only, so `Claude Opus 4.8` displays as `Opus 4.8` without changing model data elsewhere. Files: `packages/app/src/components/prompt-input.tsx`.

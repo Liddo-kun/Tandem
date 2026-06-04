@@ -1163,10 +1163,18 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const variants = createMemo(() => ["default", ...local.model.variant.list()])
   const sessionMessages = createMemo(() => (params.id ? (sync.data.message[params.id] ?? []) : []))
-  const contextTokens = createMemo(
-    () => getSessionContextMetrics(sessionMessages(), [...providers.all().values()]).context?.total ?? 0,
+  const contextMetrics = createMemo(() =>
+    getSessionContextMetrics(sessionMessages(), [...providers.all().values()]),
   )
+  const contextTokens = createMemo(() => contextMetrics().context?.total ?? 0)
   const contextTokenLabel = createMemo(() => contextTokens().toLocaleString(language.intl()))
+  // Cache breakdown of the last request: read (cache hit, 0.1x), write (cache create, 1.25x),
+  // input (uncached, 1x). read + write + input = the prompt that was sent.
+  const contextBucketLabel = createMemo(() => {
+    const ctx = contextMetrics().context
+    const fmt = (n: number) => (n ?? 0).toLocaleString(language.intl())
+    return `R ${fmt(ctx?.cacheRead ?? 0)} · W ${fmt(ctx?.cacheWrite ?? 0)} · I ${fmt(ctx?.input ?? 0)}`
+  })
   const accepting = createMemo(() => {
     const id = params.id
     if (!id) return permission.isAutoAcceptingDirectory(sdk.directory)
@@ -1711,6 +1719,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       <span>Context: </span>
                       <span class="text-v2-text-text-faint">{contextTokenLabel()}</span>
                       <span>t</span>
+                      <span class="ml-2 text-v2-text-text-faint">{contextBucketLabel()}</span>
                     </button>
                   </Show>
                 </div>
@@ -2084,6 +2093,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                             <span>Context: </span>
                             <span class="text-text-base">{contextTokenLabel()}</span>
                             <span>t</span>
+                            <span class="ml-2 text-text-weak">{contextBucketLabel()}</span>
                           </button>
                         </Show>
                       </Show>
