@@ -1,6 +1,6 @@
-import { PermissionLegacy } from "@opencode-ai/core/permission/legacy"
+import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import type { Auth } from "@/auth"
-import { SessionLegacy } from "@opencode-ai/core/session/legacy"
+import { SessionV1 } from "@opencode-ai/core/v1/session"
 import type { RuntimeFlags } from "@/effect/runtime-flags"
 import { InstanceState } from "@/effect/instance-state"
 import { Permission } from "@/permission"
@@ -23,12 +23,12 @@ const CCH_SALT = "59cf53e54c78"
 const CCH_POSITIONS = [4, 7, 20]
 
 type PrepareInput = {
-  readonly user: SessionLegacy.User
+  readonly user: SessionV1.User
   readonly sessionID: string
   readonly parentSessionID?: string
   readonly model: Provider.Model
   readonly agent: Agent.Info
-  readonly permission?: PermissionLegacy.Ruleset
+  readonly permission?: PermissionV1.Ruleset
   readonly system: string[]
   readonly messages: ModelMessage[]
   readonly small?: boolean
