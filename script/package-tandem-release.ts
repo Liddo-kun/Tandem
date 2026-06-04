@@ -116,6 +116,9 @@ async function stageCliArtifacts() {
   let found = 0
   for (const entry of await fs.readdir(dist, { withFileTypes: true })) {
     if (!entry.isDirectory() || !entry.name.startsWith("opencode-")) continue
+    // Bun ships no separate non-AVX2 runtime for macOS, so the darwin-x64 baseline build is
+    // byte-identical to darwin-x64. Skip the duplicate (the linux/windows baselines do differ).
+    if (entry.name === "opencode-darwin-x64-baseline") continue
     const source = await firstExisting([
       path.join(dist, entry.name, "bin", "opencode.exe"),
       path.join(dist, entry.name, "bin", "opencode"),
