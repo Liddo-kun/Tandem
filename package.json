@@ -16,6 +16,7 @@
     "typecheck": "bun turbo typecheck",
     "tandem:package": "bun run script/package-tandem-release.ts",
     "tandem:release": "bun run script/build-tandem-release.ts",
+    "tandem:tablet": "bun run script/build-tablet-android.ts",
     "upgrade-opentui": "bun run script/upgrade-opentui.ts",
     "postinstall": "bun run --cwd packages/core fix-node-pty",
     "prepare": "husky",

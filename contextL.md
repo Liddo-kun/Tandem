@@ -177,32 +177,29 @@ Enhanced-only features should be additive or feature-detected where possible.
 - Focused `packages/ui` test: `bun test src/path/to/file.test.ts`.
 - HTTP API gates: from `packages/opencode`, run `bun run test:httpapi`.
 - App e2e: from repo root, run `bun --cwd packages/app test:e2e:local`; install Chromium first with `bunx playwright install chromium` from `packages/app` if the browser is missing.
-- Build opencode with filtered logs: `bun run --cwd packages/opencode build 2>&1 | tee /tmp/opencode/opencode-build.log | rg -i "error|fail|exception|warning|building|smoke test|passed"`.
-- Build a single Linux ARM64 opencode binary from `packages/opencode`: `bun run build --single 2>&1 | tee /tmp/opencode/opencode-build.log | rg -i "error|fail|exception|warning|building|smoke test|passed"`.
-- Build current-platform CLI from `packages/opencode`: `bun run build --single`; output is under `packages/opencode/dist/opencode-<platform>/bin/opencode`.
+- Build CLI from `packages/opencode`: `bun run build` (all platforms) or `bun run build --single` (current platform). `dist` is recreated each build; the Linux ARM64 binary is `packages/opencode/dist/opencode-linux-arm64/bin/opencode`. For filtered logs append `2>&1 | tee /tmp/opencode/opencode-build.log | rg -i "error|fail|exception|warning|building|smoke test|passed"`.
 - Build desktop from `packages/desktop`: `bun run build`; this first builds `packages/opencode/dist/node`.
-- Build Android debug APK from `packages/android`: `bun run tauri android build --apk --debug --target aarch64`; output is `packages/android/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`.
-- Build Android debug APK with filtered logs: `bun run --cwd packages/android tauri android build --apk --debug --target aarch64 2>&1 | tee /tmp/opencode/android-build.log | rg -i "error|fail|exception|warning|building|built|assemble|apk|passed"`.
-- Opencode build recreates `packages/opencode/dist`; main Linux ARM64 binary is `packages/opencode/dist/opencode-linux-arm64/bin/opencode`.
+- Build Android debug APK from `packages/android`: `bun run tauri android build --apk --debug --target aarch64` → `src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`. For filtered logs append `2>&1 | tee /tmp/opencode/android-build.log | rg -i "error|fail|exception|warning|building|built|assemble|apk|passed"`.
+
+## Tandem Release Packaging
+
+- `bun run tandem:release` is the canonical full release build set: CLI all platforms, signed Android release APK/AAB, iOS web assets, then packaging into `dist/tandem-release`. Filtered logs land in `/tmp/opencode/*.log`. Add `--install-android` to also `adb install -r` the signed APK (preflights ADB; needs exactly one device unless `ANDROID_SERIAL` is set). Local quick build: `--single-cli --allow-partial --allow-dev-version --debug-android`; see `--help` for more.
+- On this tablet `--install-windows` throws, and `--strict --required-common` cannot pass because a signed iOS `.ipa` is not exportable here; use `--skip-ios` or `--allow-partial` for full local runs.
+- Signing uses ignored `packages/android/release.keystore` + `keystore.properties` (auto-created on first run if both are missing); the script also regenerates `packages/android/src-tauri/gen/android` when stale, so do not hand-delete it.
 
 ## Tablet Ubuntu Tandem CLI Install
 
-- The command is `tandem`, installed at `/usr/local/bin/tandem` (root-owned). There is no `~/.opencode/bin` install.
-- Build from `packages/opencode`: `bun run build --single` (current platform) produces `packages/opencode/dist/opencode-linux-arm64/bin/opencode`.
-- Install: `sudo install -m 755 packages/opencode/dist/opencode-linux-arm64/bin/opencode /usr/local/bin/tandem`. Verify: `tandem --version`.
+- The command is `tandem`, installed at `/usr/local/bin/tandem` (root-owned; no `~/.opencode/bin` install).
+- Build + install: `bun run --cwd packages/opencode build --single` then `sudo install -m 755 packages/opencode/dist/opencode-linux-arm64/bin/opencode /usr/local/bin/tandem`; verify with `tandem --version`.
 
 ## Android Testing And Build
 
-- Normal Android builds should package as `Tandem` with Android package id `app.liddokun.tandem`.
-- Fresh-session Windows full build/install command is documented in `context.md`: `bun run tandem:release -- --install-windows --install-android` from repo root.
-- Android release signing uses ignored local files at `packages/android/release.keystore` and `packages/android/keystore.properties`; `bun run tandem:release -- --install-windows --install-android` creates both on first run if neither exists, and fails if only one exists. Do not put signing config under `packages/android/src-tauri/gen` because Tauri regeneration deletes that folder.
-- The release script regenerates ignored Tauri Android output under `packages/android/src-tauri/gen/android` when it is missing or stale, so do not manually delete/recreate that folder during normal release builds.
-- `bun run prepare:android` regenerates launcher icons and restores generated Android metadata/MainActivity patches from `packages/android/src-tauri/tauri.conf.json`.
-- Use `bun run install:y700 -- -Name <name>` from `packages/android` for a side-by-side Y700 APK build. This builds a temporary parallel-installable debug APK, installs it on the Y700, and restores generated Android metadata afterward.
-- Run the Y700 installer directly, without wrapping it in `tee`, `rg`, or another output-filtering pipeline. `install-y700-variant.ts` already writes full logs and prints progress; an outer pipeline can leave the shell/tool call waiting even after the build and install have completed.
-- The side-by-side installer requires the local Android/Tauri toolchain: `adb`, `cargo`, Java, Android SDK/NDK, and Python. Pass the current wireless debugging endpoint when needed, for example `bun run install:y700 -- -Name test20 -Device 192.168.1.85:<port>`.
-- Y700 was previously seen on ADB as `192.168.1.85:42979` and `adb-HA28HF30-cGyG7x._adb-tls-connect._tcp`; the Linux installer defaults to `192.168.1.85:5555` and falls back to the single connected ADB device.
-- If ADB shows no devices from Ubuntu/proot, run `adb-reconnect`; if it cannot reach the Y700, enable Wireless debugging/pairing again on Android.
+- Normal Android builds package as `Tandem`, Android package id `app.liddokun.tandem`.
+- Build + install on the tablet itself with one command from repo root: `bun run tandem:tablet -- --install` (native aarch64 debug APK; auto-connects ADB, prefers `127.0.0.1:5555`; add `--overwrite` to replace a signature-mismatched/release-signed install). On a fresh chroot run `bun run tandem:tablet -- --setup` once to install the arm64 toolchain (NDK + glibc build-tools + JDK + Rust). Rationale and pinned sources: `packages/android/apkbuildontablet.md`.
+- Signed release APK/AAB build: see "Tandem Release Packaging" (`bun run tandem:release -- --install-android`).
+- `bun run prepare:android` regenerates launcher icons and restores generated Android metadata/MainActivity patches; on aarch64 hosts it also re-injects the arm64 `aapt2` override (`android.aapt2FromMavenOverride`).
+- Side-by-side variant: from `packages/android` run `bun run install:y700 -- -Name <name>` — builds a parallel-installable debug APK (id `ai.opencode.android.<name>`) and installs it without touching the main app. It self-bootstraps the toolchain env and auto-resolves/connects the device, so just run it directly: no `tee`/`rg` wrapper, no ADB pre-check, no `-Device` needed on the tablet (pass `-Device <serial>` only to override).
+- The working `adb` is `/usr/bin/adb` (glibc); the SDK's `platform-tools/adb` is bionic and will not run in the chroot. If ADB shows no devices, run `adb-reconnect`, then re-enable Wireless debugging on Android if it still cannot connect.
 
 ## Branch And Commit Habits
 

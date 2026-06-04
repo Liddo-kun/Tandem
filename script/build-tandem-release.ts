@@ -6,6 +6,7 @@ import { randomBytes } from "crypto"
 import os from "os"
 import path from "path"
 import { fileURLToPath } from "url"
+import { loadAndroidToolchainEnv } from "./android-toolchain-env.ts"
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)))
 const bun = process.execPath
@@ -87,6 +88,10 @@ for (let i = 0; i < args.length; i++) {
       throw new Error(`Unknown option: ${arg}. Run bun run tandem:release -- --help`)
   }
 }
+
+// On the aarch64 tablet, make the Android sub-build (cargo/NDK/JDK) work in any shell.
+// No-op on the Windows/macOS release hosts.
+loadAndroidToolchainEnv()
 
 await fs.mkdir(logDir, { recursive: true })
 if (!releaseVersion && !allowDevVersion) releaseVersion = await defaultReleaseVersion()

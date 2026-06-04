@@ -187,12 +187,8 @@ Enhanced-only features should be additive or feature-detected where possible.
 
 ## Tandem Release Packaging
 
-- Fresh-session Windows full build/install command: `bun run tandem:release -- --install-windows --install-android` from repo root. This builds all CLI targets, signed Android release APK/AAB, iOS web assets, packages available artifacts, installs `C:\Program_Files\tandem.exe`, and installs the signed Android APK on the connected device.
-- `--install-android` preflights ADB before building and requires exactly one connected device unless `ANDROID_SERIAL` is set.
-- Strict public release packaging with iOS IPA: `bun run tandem:release -- --version <version> --strict --required-common --ios-ipa <path>`.
-- Android release signing uses ignored local files at `packages/android/release.keystore` and `packages/android/keystore.properties`; `bun run tandem:release -- --install-windows --install-android` creates both on first run if neither exists, and fails if only one exists. Do not put signing config under `packages/android/src-tauri/gen` because Tauri regeneration deletes that folder.
-- The release script regenerates ignored Tauri Android output under `packages/android/src-tauri/gen/android` when it is missing or stale, so do not manually delete/recreate that folder during normal release builds.
-- Local partial Windows/Y700 test build: `bun run tandem:release -- --single-cli --allow-partial --allow-dev-version --debug-android --install-windows`. More options: `bun run tandem:release -- --help`.
+- `bun run tandem:release` is the full release build set: CLI all platforms, signed Android release APK/AAB, iOS web assets, then packaging into `dist/tandem-release`. Fresh-session full build/install: `bun run tandem:release -- --install-windows --install-android` (installs `C:\Program_Files\tandem.exe` and `adb install -r` the signed APK; `--install-android` preflights ADB and needs exactly one device unless `ANDROID_SERIAL` is set). Strict public release with iOS IPA: `--version <version> --strict --required-common --ios-ipa <path>`. Local quick build: `--single-cli --allow-partial --allow-dev-version --debug-android --install-windows`; see `--help` for more.
+- Signing uses ignored `packages/android/release.keystore` + `keystore.properties` (auto-created on first run if both are missing; fails if only one exists); the script also regenerates `packages/android/src-tauri/gen/android` when stale, so do not hand-delete it.
 
 ## Tablet Ubuntu Tandem CLI Install
 

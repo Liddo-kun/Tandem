@@ -1,4 +1,4 @@
-import { createWriteStream } from "node:fs"
+import { createWriteStream, existsSync, readdirSync } from "node:fs"
 import { copyFile, mkdir, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
@@ -57,6 +57,7 @@ try {
 }
 
 async function main() {
+  loadToolchainEnv()
   requireCommands(["adb", "bun", "cargo", "python"])
   await mkdir(workDir, { recursive: true })
   const resolvedDevice = await resolveDevice(options)
@@ -194,7 +195,9 @@ async function resolveDevice({ device, deviceRetryDelaySeconds, deviceRetrySecon
 }
 
 function requireCommands(commands: string[]) {
-  const missing = commands.filter((command) => !Bun.which(command))
+  // Bun.which() snapshots PATH at startup; pass the live PATH so loadToolchainEnv()'s
+  // additions (e.g. ~/.cargo/bin) are honored in non-login shells.
+  const missing = commands.filter((command) => !Bun.which(command, { PATH: process.env.PATH }))
   if (missing.length > 0) throw new Error(`Missing required command(s): ${missing.join(", ")}`)
 }
 
@@ -240,6 +243,34 @@ async function setVariantMetadata() {
       .replace(appNameRegex, `<string name="app_name">${escapeXml(appName)}</string>`)
       .replace(activityTitleRegex, `<string name="main_activity_title">${escapeXml(appName)}</string>`),
   )
+}
+
+// Make on-tablet (aarch64 chroot) runs work in any shell, even when
+// /etc/profile.d/50-android.sh was not sourced. No-op off the tablet (e.g. Windows),
+// so existing toolchain env there is left untouched. See apkbuildontablet.md.
+function loadToolchainEnv() {
+  if (process.platform !== "linux" || process.arch !== "arm64") return
+
+  const sdk = process.env.ANDROID_HOME ?? path.join(os.homedir(), "Android/Sdk")
+  process.env.ANDROID_HOME = sdk
+  process.env.ANDROID_SDK_ROOT = sdk
+
+  const ndkRoot = path.join(sdk, "ndk")
+  if (!process.env.NDK_HOME && existsSync(ndkRoot)) {
+    const latest = readdirSync(ndkRoot).sort().at(-1)
+    if (latest) process.env.NDK_HOME = path.join(ndkRoot, latest)
+  }
+  if (process.env.NDK_HOME) process.env.ANDROID_NDK_HOME = process.env.NDK_HOME
+
+  const java = "/usr/lib/jvm/java-17-openjdk-arm64"
+  if (!process.env.JAVA_HOME && existsSync(java)) process.env.JAVA_HOME = java
+
+  const prepend = [
+    path.join(os.homedir(), ".cargo/bin"),
+    process.env.JAVA_HOME ? path.join(process.env.JAVA_HOME, "bin") : "",
+    path.join(sdk, "cmdline-tools/latest/bin"),
+  ].filter((dir) => dir && existsSync(dir))
+  process.env.PATH = [...prepend, process.env.PATH].join(path.delimiter)
 }
 
 async function runLoggedCommand(

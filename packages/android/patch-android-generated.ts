@@ -134,14 +134,32 @@ async function patchGradleProperties() {
   const gradleProperties = Bun.file(gradlePropertiesPath)
   if (!(await gradleProperties.exists())) return
 
-  await Bun.write(
-    gradlePropertiesPath,
-    setProperties(await gradleProperties.text(), {
-      // CI-style local builds should exit cleanly instead of leaving Gradle/Kotlin daemons alive.
-      "org.gradle.daemon": "false",
-      "kotlin.compiler.execution.strategy": "in-process",
-    }),
-  )
+  const properties: Record<string, string> = {
+    // CI-style local builds should exit cleanly instead of leaving Gradle/Kotlin daemons alive.
+    "org.gradle.daemon": "false",
+    "kotlin.compiler.execution.strategy": "in-process",
+  }
+
+  // UPSTREAM-DIVERGENCE: When building on an arm64 Linux host (e.g. the tablet itself), AGP would
+  // otherwise download an x86_64 aapt2 from Maven that cannot execute. Point it at the SDK's native
+  // arm64 aapt2 instead. No-op on x86_64 release hosts, so the normal release build is unaffected.
+  const arm64Aapt2 = findArm64Aapt2()
+  if (arm64Aapt2) properties["android.aapt2FromMavenOverride"] = arm64Aapt2
+
+  await Bun.write(gradlePropertiesPath, setProperties(await gradleProperties.text(), properties))
+}
+
+function findArm64Aapt2() {
+  if (process.platform !== "linux" || process.arch !== "arm64") return
+  const sdk = process.env.ANDROID_HOME ?? process.env.ANDROID_SDK_ROOT
+  if (!sdk) return
+
+  const buildToolsDir = path.join(sdk, "build-tools")
+  if (!existsSync(buildToolsDir)) return
+
+  // Highest installed build-tools version that ships an aapt2 binary.
+  const candidates = [...new Bun.Glob("*/aapt2").scanSync({ cwd: buildToolsDir, absolute: true })].sort()
+  return candidates.at(-1)
 }
 
 async function patchStrings() {
