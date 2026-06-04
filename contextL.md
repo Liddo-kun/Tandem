@@ -227,6 +227,8 @@ Keep commits focused so they can be cherry-picked later if needed.
 - In `packages/opencode`, follow the flat ESM self-export pattern described in `packages/opencode/AGENTS.md`; do not add barrels in multi-sibling directories such as `src/session` or `src/config`.
 - In `packages/opencode/src/config`, follow the existing self-export pattern at the top of the file, for example `export * as ConfigAgent from "./agent"`, when adding a new config module.
 - In Drizzle schemas, use snake_case field names so column names do not need duplicate string definitions.
+- Never alias imports or use star imports; if a namespace-style value is needed, import the module's own exported namespace by name (for example `import { Project } from "@opencode-ai/core/project"`) and reference `Project.ID`.
+- Prefer dynamic imports for heavy modules only needed on selected code paths, especially in startup-sensitive entrypoints. Destructure dynamic-import bindings near the top of the narrowest scope that needs them so they read like normal imports; avoid inline chains like `(await import("./module")).value()`, and keep branch-specific imports inside the branch that needs them to preserve lazy loading.
 
 ## Testing Bias
 

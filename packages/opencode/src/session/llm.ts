@@ -1,3 +1,4 @@
+import { PermissionLegacy } from "@opencode-ai/core/permission/legacy"
 import { Provider } from "@/provider/provider"
 import { SessionLegacy } from "@opencode-ai/core/session/legacy"
 import { serviceUse } from "@opencode-ai/core/effect/service-use"
@@ -16,7 +17,6 @@ import type { Agent } from "@/agent/agent"
 import type { MessageV2 } from "./message-v2"
 import { Plugin } from "@/plugin"
 import { Permission } from "@/permission"
-import { PermissionID } from "@/permission/schema"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { EventV2 } from "@opencode-ai/core/event"
 import { Wildcard } from "@/util/wildcard"
@@ -39,7 +39,7 @@ export type StreamInput = {
   parentSessionID?: string
   model: Provider.Model
   agent: Agent.Info
-  permission?: Permission.Ruleset
+  permission?: PermissionLegacy.Ruleset
   system: string[]
   messages: ModelMessage[]
   small?: boolean
@@ -166,7 +166,7 @@ const live: Layer.Layer<
             return { approved: true }
           }
 
-          const id = PermissionID.ascending()
+          const id = PermissionLegacy.ID.ascending()
           let unsub: EventV2.Unsubscribe | undefined
           try {
             unsub = await bridge.promise(
