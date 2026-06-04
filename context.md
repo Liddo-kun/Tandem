@@ -196,7 +196,8 @@ Enhanced-only features should be additive or feature-detected where possible.
 
 ## Tablet Ubuntu Tandem CLI Install
 
-- The Y700/Android Ubuntu environment uses the Linux ARM64 binary, not `opencode.exe`. The installed command is `tandem` and lives at `/home/jon/.opencode/bin/tandem` inside Ubuntu (NOT `opencode` — that name is unused on the tablet; installing there does nothing).
+- The command is `tandem`, installed at `/usr/local/bin/tandem` (root-owned, `sudo` to overwrite). Not `opencode`, not `~/.opencode/bin`.
+- STALE: the tablet now runs a root chroot, not `proot-distro`. The `proot-distro login ubuntu` commands below are out of date.
 - Build Tandem from Windows with the full `packages/opencode` build so the Linux ARM64 target is produced: `C:\Program_Files\Bun\bin\bun.exe run --cwd packages/opencode build`.
 - The tablet binary to install is `packages/opencode/dist/opencode-linux-arm64/bin/opencode`. Do not copy the Windows binary from `opencode-windows-x64` to the tablet.
 - Copy the built binary to Termux: `scp -i C:\Temp\opencode\tablet_setup_key -P 8022 C:\Users\Jon\Tandem\packages\opencode\dist\opencode-linux-arm64\bin\opencode u0_a253@192.168.1.85:/data/data/com.termux/files/home/opencode-tandem`.

@@ -187,11 +187,9 @@ Enhanced-only features should be additive or feature-detected where possible.
 
 ## Tablet Ubuntu Tandem CLI Install
 
-- The Y700/Android Ubuntu environment uses the Linux ARM64 binary, not `opencode.exe`. The installed command lives at `/home/jon/.opencode/bin/opencode` inside Ubuntu.
-- Build Tandem from Ubuntu with the full `packages/opencode` build so the Linux ARM64 target is produced: `bun run --cwd packages/opencode build`.
-- The tablet binary to install is `packages/opencode/dist/opencode-linux-arm64/bin/opencode`. Do not copy the Windows binary from `opencode-windows-x64` to the tablet.
-- Replace the Ubuntu-installed opencode directly: `install -m 755 packages/opencode/dist/opencode-linux-arm64/bin/opencode /home/jon/.opencode/bin/opencode`.
-- Verify from Ubuntu: `export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$PATH"; opencode --version`.
+- The command is `tandem`, installed at `/usr/local/bin/tandem` (root-owned). There is no `~/.opencode/bin` install.
+- Build from `packages/opencode`: `bun run build --single` (current platform) produces `packages/opencode/dist/opencode-linux-arm64/bin/opencode`.
+- Install: `sudo install -m 755 packages/opencode/dist/opencode-linux-arm64/bin/opencode /usr/local/bin/tandem`. Verify: `tandem --version`.
 
 ## Android Testing And Build
 
