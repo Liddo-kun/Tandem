@@ -44,7 +44,7 @@ import { Select } from "@opencode-ai/ui/select"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ModelSelectorPopover } from "@/components/dialog-select-model"
 import { useProviders } from "@/hooks/use-providers"
-import { getSessionContextMetrics } from "@/components/session/session-context-metrics"
+import { ContextTokenButton } from "@/components/session/context-token-button"
 import { useCommand } from "@/context/command"
 import { Persist, persisted } from "@/utils/persist"
 import { usePermission } from "@/context/permission"
@@ -1165,18 +1165,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const variants = createMemo(() => ["default", ...local.model.variant.list()])
   const sessionMessages = createMemo(() => (params.id ? (sync.data.message[params.id] ?? []) : []))
-  const contextMetrics = createMemo(() =>
-    getSessionContextMetrics(sessionMessages(), [...providers.all().values()]),
-  )
-  const contextTokens = createMemo(() => contextMetrics().context?.total ?? 0)
-  const contextTokenLabel = createMemo(() => contextTokens().toLocaleString(language.intl()))
-  // Cache breakdown of the last request: read (cache hit, 0.1x), write (cache create, 1.25x),
-  // input (uncached, 1x). read + write + input = the prompt that was sent.
-  const contextBucketLabel = createMemo(() => {
-    const ctx = contextMetrics().context
-    const fmt = (n: number) => (n ?? 0).toLocaleString(language.intl())
-    return `R ${fmt(ctx?.cacheRead ?? 0)} · W ${fmt(ctx?.cacheWrite ?? 0)} · I ${fmt(ctx?.input ?? 0)}`
-  })
   // Check provider variants directly: `variants` also includes the UI-only default option.
   const showVariantControl = createMemo(() => local.model.variant.list().length > 0)
   const accepting = createMemo(() => {
@@ -1718,19 +1706,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     </div>
                   </Show>
                   <Show when={params.id}>
-                    <button
-                      type="button"
-                      data-action="prompt-context-tokens"
-                      data-component="prompt-context-tokens"
-                      class="shrink-0 whitespace-nowrap border-0 bg-transparent p-0 text-[13px] font-[440] leading-4 text-v2-text-text-muted transition-colors hover:text-v2-text-text-base"
+                    {/* UPSTREAM-DIVERGENCE: Tandem cache-health context button (context-token-button.tsx) */}
+                    <ContextTokenButton
+                      messages={sessionMessages()}
+                      providers={[...providers.all().values()]}
                       onClick={openContext}
-                      aria-label={language.t("context.usage.view")}
-                    >
-                      <span>Context: </span>
-                      <span class="text-v2-text-text-faint">{contextTokenLabel()}</span>
-                      <span>t</span>
-                      <span class="ml-2 text-v2-text-text-faint">{contextBucketLabel()}</span>
-                    </button>
+                    />
                   </Show>
                 </div>
                 <Tooltip placement="top" inactive={!working() && blank()} value={tip()}>
@@ -2092,19 +2073,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                           </div>
                         </Show>
                         <Show when={params.id}>
-                          <button
-                            type="button"
-                            data-action="prompt-context-tokens"
-                            data-component="prompt-context-tokens"
-                            class="shrink-0 whitespace-nowrap border-0 bg-transparent p-0 text-13-regular text-text-weak transition-colors hover:text-text-base"
+                          {/* UPSTREAM-DIVERGENCE: Tandem cache-health context button (context-token-button.tsx) */}
+                          <ContextTokenButton
+                            messages={sessionMessages()}
+                            providers={[...providers.all().values()]}
                             onClick={openContext}
-                            aria-label={language.t("context.usage.view")}
-                          >
-                            <span>Context: </span>
-                            <span class="text-text-base">{contextTokenLabel()}</span>
-                            <span>t</span>
-                            <span class="ml-2 text-text-weak">{contextBucketLabel()}</span>
-                          </button>
+                            legacy
+                          />
                         </Show>
                       </Show>
                     </Show>

@@ -171,3 +171,49 @@
     }
   }
 }
+
+/* Composer cache-health indicator. Kept UNLAYERED on purpose: the tint must override the
+   Tailwind text-color utility on the count span, and unlayered rules beat all @layer rules
+   regardless of specificity. Persistent tint on the token count by health band, plus a
+   one-shot background pulse each turn (driven by data-cache-pulse). */
+[data-component="prompt-context-tokens"][data-cache-band="good"] {
+  --cache-flash: var(--v2-state-bg-success);
+}
+[data-component="prompt-context-tokens"][data-cache-band="warn"] {
+  --cache-flash: var(--v2-state-bg-warning);
+}
+[data-component="prompt-context-tokens"][data-cache-band="bad"] {
+  --cache-flash: var(--v2-state-bg-danger);
+}
+
+[data-component="prompt-context-tokens"][data-cache-band="good"] [data-slot="cache-tint"] {
+  color: var(--v2-state-fg-success);
+}
+[data-component="prompt-context-tokens"][data-cache-band="warn"] [data-slot="cache-tint"] {
+  color: var(--v2-state-fg-warning);
+}
+[data-component="prompt-context-tokens"][data-cache-band="bad"] [data-slot="cache-tint"] {
+  color: var(--v2-state-fg-danger);
+}
+
+[data-component="prompt-context-tokens"][data-cache-pulse="true"] {
+  animation: cache-pulse 1.6s ease-out;
+}
+
+@keyframes cache-pulse {
+  0% {
+    background-color: transparent;
+  }
+  10% {
+    background-color: var(--cache-flash, var(--v2-state-bg-success));
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-component="prompt-context-tokens"][data-cache-pulse="true"] {
+    animation: none;
+  }
+}
