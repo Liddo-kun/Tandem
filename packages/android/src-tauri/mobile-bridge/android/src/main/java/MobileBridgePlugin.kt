@@ -163,9 +163,10 @@ class MobileBridgePlugin(private val activity: Activity) : Plugin(activity), Rec
                 putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, usingOnDeviceRecognizer)
                 // On-device SODA punctuation/casing model; Google gates EXTRA_ENABLE_FORMATTING
                 // to the offline path (discarded when PREFER_OFFLINE=false), so only send it
-                // for the on-device engine. Values: "quality" / "latency".
+                // for the on-device engine. The constants are compile-time strings, so this is
+                // safe below their API 33 introduction (minSdk 24).
                 if (usingOnDeviceRecognizer) {
-                    putExtra("android.speech.extra.ENABLE_FORMATTING", "quality")
+                    putExtra(RecognizerIntent.EXTRA_ENABLE_FORMATTING, RecognizerIntent.FORMATTING_OPTIMIZE_QUALITY)
                     Log.i(voiceLogTag, "Requested ENABLE_FORMATTING=quality (on-device punctuation)")
                 }
             }
