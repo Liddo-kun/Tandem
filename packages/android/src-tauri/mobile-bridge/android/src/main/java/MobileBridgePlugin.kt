@@ -2,6 +2,7 @@ package ai.opencode.mobilebridge
 
 import android.Manifest
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,8 +12,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.speech.RecognitionListener
+import android.speech.RecognitionService
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.util.Log
 import android.webkit.WebView
 import androidx.core.content.ContextCompat
 import app.tauri.annotation.Command
@@ -44,6 +47,18 @@ private data class WifiAddressInfo(val address: String, val prefixLength: Int)
 // UPSTREAM-DIVERGENCE: Prefer Tandem's parallel-install port while keeping opencode scan compatibility.
 private val tandemScanPorts = listOf(4097, 4096)
 
+// UPSTREAM-DIVERGENCE: Some devices (e.g. China-ROM tablets) default to a strict or
+// power-frozen recognizer that never returns results. Prefer a known-good engine,
+// favouring Google's on-device "Speech Services" before the (cloud) Google app.
+// On-device is first so EXTRA_PREFER_OFFLINE + ENABLE_FORMATTING engage the SODA
+// punctuation model; the cloud Google app remains as graceful fallback.
+private val preferredRecognizerPackages = listOf(
+    "com.google.android.tts",
+    "com.google.android.googlequicksearchbox",
+)
+private const val onDeviceRecognizerPackage = "com.google.android.tts"
+private const val voiceLogTag = "TandemVoice"
+
 @TauriPlugin(
     permissions = [
         Permission(strings = [Manifest.permission.RECORD_AUDIO], alias = "microphone")
@@ -54,6 +69,7 @@ class MobileBridgePlugin(private val activity: Activity) : Plugin(activity), Rec
     private val scanExecutor = Executors.newSingleThreadExecutor()
 
     private var recognizer: SpeechRecognizer? = null
+    private var usingOnDeviceRecognizer = false
     private var pendingStop: Invoke? = null
     private var stopTimeout: Runnable? = null
     private var latestText = ""
@@ -121,8 +137,15 @@ class MobileBridgePlugin(private val activity: Activity) : Plugin(activity), Rec
 
         try {
             if (recognizer == null) {
-                recognizer = SpeechRecognizer.createSpeechRecognizer(activity)
+                val component = pickRecognizer()
+                recognizer = if (component != null) {
+                    SpeechRecognizer.createSpeechRecognizer(activity, component)
+                } else {
+                    SpeechRecognizer.createSpeechRecognizer(activity)
+                }
                 recognizer?.setRecognitionListener(this)
+                usingOnDeviceRecognizer = component?.packageName == onDeviceRecognizerPackage
+                Log.i(voiceLogTag, "Created recognizer component=${component?.flattenToShortString() ?: "<system-default>"} onDevice=$usingOnDeviceRecognizer")
             }
 
             latestText = ""
@@ -131,9 +154,20 @@ class MobileBridgePlugin(private val activity: Activity) : Plugin(activity), Rec
 
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                // EXTRA_LANGUAGE expects an IETF BCP-47 tag String (e.g. "en-US"); passing a
+                // Locale object leaves strict engines with a null language and no results.
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                // Only force offline when we picked the on-device engine; otherwise a cloud
+                // engine with no offline model would fail to return results.
+                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, usingOnDeviceRecognizer)
+                // On-device SODA punctuation/casing model; Google gates EXTRA_ENABLE_FORMATTING
+                // to the offline path (discarded when PREFER_OFFLINE=false), so only send it
+                // for the on-device engine. Values: "quality" / "latency".
+                if (usingOnDeviceRecognizer) {
+                    putExtra("android.speech.extra.ENABLE_FORMATTING", "quality")
+                    Log.i(voiceLogTag, "Requested ENABLE_FORMATTING=quality (on-device punctuation)")
+                }
             }
 
             recognizer?.startListening(intent)
@@ -177,6 +211,35 @@ class MobileBridgePlugin(private val activity: Activity) : Plugin(activity), Rec
         }
         stopTimeout = timeout
         main.postDelayed(timeout, 5000)
+    }
+
+    // Choose the most reliable installed RecognitionService instead of the system default,
+    // which on some devices is a strict/frozen vendor engine that never returns results.
+    // Returns null to fall back to the platform default when no preferred engine is present.
+    private fun pickRecognizer(): ComponentName? {
+        val services = try {
+            activity.packageManager.queryIntentServices(
+                Intent(RecognitionService.SERVICE_INTERFACE),
+                0,
+            )
+        } catch (_: Throwable) {
+            return null
+        }
+
+        val available = services
+            .mapNotNull { it.serviceInfo }
+            .associateBy({ it.packageName }, { ComponentName(it.packageName, it.name) })
+
+        Log.i(voiceLogTag, "Available recognizers: ${available.values.joinToString { it.flattenToShortString() }}")
+
+        for (pkg in preferredRecognizerPackages) {
+            available[pkg]?.let {
+                Log.i(voiceLogTag, "Selected recognizer: ${it.flattenToShortString()}")
+                return it
+            }
+        }
+        Log.i(voiceLogTag, "No preferred recognizer found; using system default")
+        return null
     }
 
     @Command
@@ -467,6 +530,7 @@ class MobileBridgePlugin(private val activity: Activity) : Plugin(activity), Rec
     override fun onEndOfSpeech() {}
 
     override fun onError(error: Int) {
+        Log.e(voiceLogTag, "onError raw code=$error (pendingStop=${pendingStop != null}, latestText='${latestText}')")
         val reason = when (error) {
             SpeechRecognizer.ERROR_AUDIO -> "Audio recording error."
             SpeechRecognizer.ERROR_CLIENT -> "Speech recognition client error."
@@ -501,6 +565,8 @@ class MobileBridgePlugin(private val activity: Activity) : Plugin(activity), Rec
             ?.firstOrNull()
             ?.trim()
             .orEmpty()
+
+        Log.i(voiceLogTag, "onResults text='${text}'")
 
         if (pendingStop != null) {
             val finalText = if (text.isNotEmpty()) text else latestText.trim()
