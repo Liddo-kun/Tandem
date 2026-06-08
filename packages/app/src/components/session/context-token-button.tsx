@@ -71,20 +71,28 @@ export function ContextTokenButton(props: {
     return `${Math.floor(remaining / 60)}:${(remaining % 60).toString().padStart(2, "0")}`
   })
 
-  // Pulse + swap to "cache hit" whenever a new turn lands (new assistant message id). Sticky:
-  // while turns keep landing, push back the fade-out instead of toggling off→on (avoids flip-flop).
+  // Pulse + swap to "cache hit" when a turn COMPLETES in the currently shown session. This button
+  // stays mounted across tab/session switches (only `messages` changes), so tracking is scoped to
+  // the session id: switching tabs never fires the animation on its own, and never re-shows the
+  // session's prior turn as if it just landed. Gated on time.completed so the shown value is the
+  // just-finished turn's final cache numbers, not a mid-stream or stale reading. Sticky: while
+  // turns keep landing, push back the fade-out instead of toggling off→on (avoids flip-flop).
   const [cachePulse, setCachePulse] = createSignal(false)
-  let lastPulseId: string | undefined
+  let pulseSessionID: string | undefined
+  let lastCompletedID: string | undefined
   let pulseTimer: ReturnType<typeof setTimeout> | undefined
   createEffect(() => {
-    const id = contextMetrics().context?.message.id
-    if (!id) return
-    if (lastPulseId === undefined) {
-      lastPulseId = id
+    const message = contextMetrics().context?.message
+    if (!message) return
+    if (message.sessionID !== pulseSessionID) {
+      // Switched into this session: adopt its current turn without animating. An in-flight turn
+      // (no completed timestamp yet) is left unadopted so it still pulses once it finishes.
+      pulseSessionID = message.sessionID
+      lastCompletedID = message.time.completed ? message.id : undefined
       return
     }
-    if (id === lastPulseId) return
-    lastPulseId = id
+    if (!message.time.completed || message.id === lastCompletedID) return
+    lastCompletedID = message.id
     setCachePulse(true)
     clearTimeout(pulseTimer)
     pulseTimer = setTimeout(() => setCachePulse(false), 1700)
