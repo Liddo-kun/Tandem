@@ -1448,7 +1448,21 @@ export const layer = Layer.effect(
               instruction.system().pipe(Effect.orDie),
             ])
             const useInstructionReminder = model.api.id.includes("claude")
-            if (useInstructionReminder && instructions.length > 0) {
+            // UPSTREAM-DIVERGENCE (Tandem): the prompt-corrector plugin spawns
+            // throwaway sessions that must receive ONLY the raw user text. Detect
+            // those turns via the part metadata marker it sets and skip the
+            // AGENTS.md/instruction injection so the corrector model is not fed
+            // (and confused by) project context. See plugin/prompt-corrector.ts.
+            const isInternalPrompt = msgs.some(
+              (m) =>
+                m.info.role === "user" &&
+                m.parts.some(
+                  (p) =>
+                    p.type === "text" &&
+                    (p.metadata as Record<string, unknown> | undefined)?.["tandemPromptCorrector"] === true,
+                ),
+            )
+            if (useInstructionReminder && instructions.length > 0 && !isInternalPrompt) {
               const firstUserMsg = msgs.find((m) => m.info.role === "user")
               if (firstUserMsg) {
                 firstUserMsg.parts.unshift({

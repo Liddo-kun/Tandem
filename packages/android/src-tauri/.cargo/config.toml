@@ -1,0 +1,31 @@
+# UPSTREAM-DIVERGENCE (Tandem): force the Android soft keyboard to disable autocorrect /
+# word suggestions for every WebView editable, contenteditable included (Chromium does not set
+# any IME no-suggestions flag for contenteditable on its own, so the composer in @opencode-ai/app
+# was being autocorrected). Raw typed text then reaches Tandem's server-side prompt corrector
+# instead of two correctors fighting (see PromptEnhance.md).
+#
+# We override RustWebView.onCreateInputConnection and force the field's IME inputType. Verified by
+# dumpsys: SwiftKey ignores TYPE_TEXT_FLAG_NO_SUGGESTIONS on a WebView contenteditable and keeps
+# autocorrecting, but it (and Gboard/AOSP) honor the TYPE_TEXT_VARIATION_VISIBLE_PASSWORD variation,
+# which disables autocorrect/suggestions/learning. We keep TYPE_TEXT_FLAG_MULTI_LINE so Enter /
+# newline handling is unchanged; inputType only affects keyboard behavior, not how the WebView
+# renders the text. NO_SUGGESTIONS is left on as a belt-and-suspenders hint for other keyboards.
+#
+# wry's build.rs substitutes WRY_RUSTWEBVIEW_CLASS_EXTENSION into the {{class-extension}} slot of
+# its generated RustWebView.kt template, so this is the supported extension point — no patching of
+# generated Kotlin and no Gradle hooks. Setting it via cargo's [env] applies to every build
+# entrypoint (tandem:tablet, install:y700, tandem:release) that runs cargo in this src-tauri dir.
+# Fully-qualified type names are used so the generated file needs no extra imports.
+# `force` is required: the tauri/cargo build chain already provides this var (empty), and cargo's
+# [env] will not override an already-set environment variable without it.
+[env]
+WRY_RUSTWEBVIEW_CLASS_EXTENSION = { force = true, value = """
+    override fun onCreateInputConnection(outAttrs: android.view.inputmethod.EditorInfo): android.view.inputmethod.InputConnection? {
+        val connection = super.onCreateInputConnection(outAttrs)
+        outAttrs.inputType = android.text.InputType.TYPE_CLASS_TEXT or
+            android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or
+            android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+            android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        return connection
+    }
+""" }

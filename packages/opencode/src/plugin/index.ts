@@ -19,6 +19,8 @@ import { CloudflareAIGatewayAuthPlugin, CloudflareWorkersAuthPlugin } from "./cl
 import { AzureAuthPlugin } from "./azure"
 import { DigitalOceanAuthPlugin } from "./digitalocean"
 import { XaiAuthPlugin } from "./xai"
+// UPSTREAM-DIVERGENCE: Tandem-only prompt corrector. See prompt-corrector.ts.
+import { PromptCorrectorPlugin } from "./prompt-corrector"
 import { Effect, Layer, Context } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
@@ -78,6 +80,8 @@ function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
     AzureAuthPlugin,
     DigitalOceanAuthPlugin,
     XaiAuthPlugin,
+    // UPSTREAM-DIVERGENCE: Tandem-only prompt corrector (enabled by default; opt out with TANDEM_PROMPT_CORRECTOR=0).
+    PromptCorrectorPlugin,
   ]
 }
 

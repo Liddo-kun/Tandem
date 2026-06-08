@@ -10,6 +10,8 @@ Use `log.md` as the exhaustive final-state inventory of Tandem changes relative 
 
 Always read and update log.md when making a change to opencode, the web ui or the mobile apps.
 
+See `PromptEnhance.md` for the built-in prompt-corrector/RePrompt plugin (a Tandem personal enhancement): what it corrects, how it works, and its env-var configuration.
+
 Before changing `packages/opencode` backend source, first check whether OpenCode config, a plugin, the opencode configuration skill, or documented extension points can solve the request without creating fork divergence.
 
 ## Source Priorities

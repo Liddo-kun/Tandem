@@ -1,0 +1,116 @@
+# Prompt Enhance (Prompt Corrector + RePrompt)
+
+A Tandem-only built-in plugin that quietly improves every outgoing user prompt
+before the agent acts on it. It is enabled by default and ships inside the
+binary; there is no config file to set up.
+
+It does two things:
+
+1. **Correct** — rewrites the user's message to fix spelling, punctuation,
+   capitalization, and speech-to-text artifacts, plus light cleanup of dictated
+   technical text (file paths, spoken symbols, etc.). The corrected text
+   replaces the stored/visible message; the original is preserved in metadata.
+2. **RePrompt** — for short, substantive prose prompts, appends a hidden,
+   model-only duplication (`"<text>. Repeated again: <text>"`) to reinforce the
+   instruction. This is never stored or shown to the user.
+
+## What gets corrected
+
+- Spelling, punctuation (incl. comma placement), capitalization, run-ons, and
+  common voice-transcription mistakes.
+- Dictated technical text **only when the text is clearly a path, filename,
+  command, flag, identifier, or URL**:
+  - spoken symbols → characters: `dot`→`.`, `slash`→`/`, `dash`→`-`,
+    `underscore`→`_`, `tilde`→`~`, `colon`→`:`
+    (e.g. `handoff dot md` → `handoff.md`, `dash dash single` → `--single`)
+  - strip stray spaces inside a path (`handoff . md` → `handoff.md`)
+  - lowercase file extensions (`.Md` → `.md`)
+  - lowercase path segments capitalized only by dictation (`code/Random` →
+    `code/random`) **while keeping real proper-noun dirs** (`Android`, `README`,
+    `Dockerfile`)
+  - fix well-known names: `get hub`→`GitHub`, `type script`→`TypeScript`,
+    `java script`→`JavaScript`, `node js`→`Node.js`
+- Ordinary prose is left alone (e.g. "let's dash to the store" is untouched).
+
+## How it works
+
+The plugin lives entirely in `packages/opencode/src/plugin/prompt-corrector.ts`
+and is registered in `internalPlugins()` (`plugin/index.ts`). It uses three
+plugin hooks:
+
+- **`chat.message`** — on each outgoing user message, spawns a throwaway
+  "Prompt corrector (Tandem)" session, sends the **raw** message text to a cheap
+  model with all tools disabled, reads back the corrected text, and replaces the
+  message part's text (saving the pre-correction text under the
+  `tandemPromptCorrectorOriginal` metadata key). The throwaway session is
+  deleted afterward (kept only in debug mode).
+- **`experimental.chat.system.transform`** — fully **replaces** the corrector
+  session's system prompt with the correction instruction. (A prompt body's
+  `system` field only *appends* to the agent prompt, so replacement via this
+  hook is what makes the spawned session behave as a pure text corrector instead
+  of running as the real coding agent.)
+- **`experimental.chat.messages.transform`** — performs the model-only RePrompt
+  duplication.
+
+### Why a corrector turn doesn't "do work"
+
+Reusing `session.prompt` runs a full agent turn, so two things are forced:
+disabling all tools (`tools: { "*": false }`) and replacing the system prompt
+(above). Together these make the spawned session correct text rather than act on
+it.
+
+### Safety net (never corrupts your prompt)
+
+The model's output is accepted only if it is a faithful copy-edit of the
+original — checked by a length bound plus a bounded edit-distance budget. Any
+reply, refusal, preamble, or echo of injected context is **discarded** and the
+original message is kept. The worst case is "no correction this turn", never a
+corrupted prompt.
+
+### Process-wide state
+
+opencode constructs the plugin once per project/directory instance, so a single
+server can hold several instances. The recursion guard and corrector-session
+tracking therefore use **module-level** state shared across all instances in the
+process; otherwise a corrector turn re-entering the hooks on a different instance
+would recurse and/or run as the real agent.
+
+### Cheap model selection
+
+The corrector uses a small/cheap model, mirroring opencode's `getSmallModel`
+priority (Claude Haiku / Gemini Flash / GPT-5-nano, GPT-5-mini for Copilot),
+honoring a `small_model` config override when present, and falling back to the
+session's model.
+
+### RePrompt gating
+
+RePrompt fires only when the (corrected) message is 10–160 characters, has at
+least 3 words, and contains no newline or backtick (so code and one-/two-word
+answers are skipped).
+
+## Configuration (environment variables)
+
+| Variable | Default | Effect |
+|---|---|---|
+| `TANDEM_PROMPT_CORRECTOR` | on | Master switch; `0`/`false`/`off`/`no` disables the whole feature. |
+| `TANDEM_PROMPT_CORRECTOR_DEBUG` | off | Keeps the throwaway corrector sessions (visible in the session list) for inspection. |
+| `TANDEM_PROMPT_CORRECTOR_REPROMPT_MAX` | 160 | Max characters for RePrompt; `0` disables RePrompt. |
+| `TANDEM_PROMPT_CORRECTOR_REPROMPT_MIN` | 10 | Min characters for RePrompt. |
+
+## Files / divergence
+
+- `packages/opencode/src/plugin/prompt-corrector.ts` — the whole feature (new file).
+- `packages/opencode/src/plugin/index.ts` — one import + one `internalPlugins()`
+  entry (marked `UPSTREAM-DIVERGENCE`).
+- `packages/opencode/src/session/prompt.ts` — a small gate (marked
+  `UPSTREAM-DIVERGENCE (Tandem)`) that skips the `AGENTS.md`/instruction
+  injection for corrector turns (detected via the `tandemPromptCorrector` part
+  metadata marker), so the corrector model receives only the raw user text.
+
+## Notes / limitations
+
+- The corrector adds one extra (cheap) model call per prompt, run synchronously
+  before the main turn, so it adds a little latency; a rate-limited corrector
+  call can delay the prompt.
+- It is intentionally conservative: borderline edits that the safety net rejects
+  simply result in no correction rather than a risky rewrite.
