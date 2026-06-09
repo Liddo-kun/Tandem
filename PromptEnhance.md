@@ -8,16 +8,21 @@ It does two things:
 
 1. **Correct** — rewrites the user's message to fix spelling, punctuation,
    capitalization, and speech-to-text artifacts, plus light cleanup of dictated
-   technical text (file paths, spoken symbols, etc.). The corrected text
-   replaces the stored/visible message; the original is preserved in metadata.
-2. **RePrompt** — for short, substantive prose prompts, appends a hidden,
-   model-only duplication (`"<text>. Repeated again: <text>"`) to reinforce the
+   technical text (file paths, spoken symbols, etc.) and light clarity edits
+   (comma placement, minor word reordering) that preserve the original meaning.
+   The corrected text replaces the stored/visible message; the original is
+   preserved in metadata.
+2. **RePrompt** — for short, substantive prompts, appends a hidden, model-only
+   duplication that repeats the message under a `Read it again:` marker (inline
+   for single-line prose, on its own line for multiline) to reinforce the
    instruction. This is never stored or shown to the user.
 
 ## What gets corrected
 
 - Spelling, punctuation (incl. comma placement), capitalization, run-ons, and
   common voice-transcription mistakes.
+- Light clarity edits — adding/moving commas and minor word reordering — when
+  they make the intent read more clearly, as long as the meaning is unchanged.
 - Dictated technical text **only when the text is clearly a path, filename,
   command, flag, identifier, or URL**:
   - spoken symbols → characters: `dot`→`.`, `slash`→`/`, `dash`→`-`,
@@ -38,12 +43,14 @@ The plugin lives entirely in `packages/opencode/src/plugin/prompt-corrector.ts`
 and is registered in `internalPlugins()` (`plugin/index.ts`). It uses three
 plugin hooks:
 
-- **`chat.message`** — on each outgoing user message, spawns a throwaway
-  "Prompt corrector (Tandem)" session, sends the **raw** message text to a cheap
-  model with all tools disabled, reads back the corrected text, and replaces the
+- **`chat.message`** — on each outgoing user message (skipped when it exceeds
+  the corrector size cap, default 600 chars), spawns a throwaway "Prompt
+  corrector (Tandem)" session, sends the **raw** message text to a cheap model
+  with all tools disabled, reads back the corrected text, and replaces the
   message part's text (saving the pre-correction text under the
-  `tandemPromptCorrectorOriginal` metadata key). The throwaway session is
-  deleted afterward (kept only in debug mode).
+  `tandemPromptCorrectorOriginal` metadata key). The throwaway session is deleted
+  afterward; in debug mode it is kept, but only the newest few corrector sessions
+  are retained (older ones pruned).
 - **`experimental.chat.system.transform`** — fully **replaces** the corrector
   session's system prompt with the correction instruction. (A prompt body's
   `system` field only *appends* to the agent prompt, so replacement via this
@@ -62,7 +69,9 @@ it.
 ### Safety net (never corrupts your prompt)
 
 The model's output is accepted only if it is a faithful copy-edit of the
-original — checked by a length bound plus a bounded edit-distance budget. Any
+original — checked by a length bound plus a bounded edit-distance budget (sized
+to still accept heavily dictated text, where spoken symbols written out as
+`://`, `/`, `.` shrink the message a lot). Any
 reply, refusal, preamble, or echo of injected context is **discarded** and the
 original message is kept. The worst case is "no correction this turn", never a
 corrupted prompt.
@@ -84,17 +93,20 @@ session's model.
 
 ### RePrompt gating
 
-RePrompt fires only when the (corrected) message is 10–160 characters, has at
-least 3 words, and contains no newline or backtick (so code and one-/two-word
-answers are skipped).
+RePrompt fires only when the (corrected) message is 10–300 characters, has at
+least 3 words, and contains no backtick (so code is skipped). Newlines are
+allowed — multiline prose gets the standalone-marker form; one-/two-word answers
+are skipped by the word-count rule.
 
 ## Configuration (environment variables)
 
 | Variable | Default | Effect |
 |---|---|---|
 | `TANDEM_PROMPT_CORRECTOR` | on | Master switch; `0`/`false`/`off`/`no` disables the whole feature. |
+| `TANDEM_PROMPT_CORRECTOR_MAX` | 600 | Max characters to send to the corrector; longer prompts skip correction entirely. `0` = no cap. |
 | `TANDEM_PROMPT_CORRECTOR_DEBUG` | off | Keeps the throwaway corrector sessions (visible in the session list) for inspection. |
-| `TANDEM_PROMPT_CORRECTOR_REPROMPT_MAX` | 160 | Max characters for RePrompt; `0` disables RePrompt. |
+| `TANDEM_PROMPT_CORRECTOR_DEBUG_KEEP` | 2 | In debug mode, retain only this many newest corrector sessions (older ones pruned). `0` = keep all. |
+| `TANDEM_PROMPT_CORRECTOR_REPROMPT_MAX` | 300 | Max characters for RePrompt; `0` disables RePrompt. |
 | `TANDEM_PROMPT_CORRECTOR_REPROMPT_MIN` | 10 | Min characters for RePrompt. |
 
 ## Files / divergence
