@@ -896,6 +896,8 @@ function NewSessionTabItem(props: { ref?: HTMLDivElement; href: string; title: s
 }
 
 function ChannelIndicator() {
+  // UPSTREAM-DIVERGENCE: the Android bundle builds without OPENCODE_CHANNEL set, so hide the DEV/BETA badge there.
+  if (import.meta.env.VITE_TANDEM_ANDROID_V2_ONLY === "true") return null
   return (
     <>
       {["beta", "dev"].includes(import.meta.env.VITE_OPENCODE_CHANNEL) && (
