@@ -20,7 +20,7 @@ import {
 } from "@opentui/core"
 import * as Locale from "@/util/locale"
 import { go } from "@/cli/logo"
-import { wordmark } from "@/cli/brand-logo"
+import { wordmark } from "@opencode-ai/tui/brand-logo"
 import { Brand } from "@opencode-ai/core/brand"
 import type { RunSplashTheme } from "./theme"
 

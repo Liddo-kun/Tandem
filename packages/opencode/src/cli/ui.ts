@@ -1,6 +1,6 @@
 import { EOL } from "os"
 import { Schema } from "effect"
-import { BrandLogo } from "./brand-logo"
+import { BrandLogo } from "@opencode-ai/tui/brand-logo"
 
 export class CancelledError extends Schema.TaggedErrorClass<CancelledError>()("UICancelledError", {}) {}
 
