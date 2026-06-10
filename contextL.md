@@ -50,7 +50,7 @@ whisper  = Whispercode
 
 ## Package Boundaries
 
-- `packages/opencode` owns the CLI, API server, TUI, storage, session/domain services, and provider integration. Start at `src/index.ts`, `src/cli/cmd/*`, `src/server/server.ts`, and `src/server/routes/instance/httpapi/server.ts`.
+- `packages/opencode` owns the CLI, API server, storage, session/domain services, and provider integration. Start at `src/index.ts`, `src/cli/cmd/*`, `src/server/server.ts`, and `src/server/routes/instance/httpapi/server.ts`. The interactive OpenTUI terminal UI lives in the standalone `packages/tui` package (`@opencode-ai/tui`), which also hosts the fork-owned `src/brand-logo.ts`.
 - `packages/app` is the shared Solid web UI used by standalone web, embedded CLI web UI, desktop renderer, Android, and iOS. Start at `src/entry.tsx`, `src/app.tsx`, `src/context/platform.tsx`, `src/context/server.tsx`, and `src/pages/session.tsx`.
 - `packages/ui` is shared chat/component/CSS infrastructure. Message rendering lives in `src/components/session-turn.tsx`, `src/components/message-part.tsx`, `src/components/basic-tool.tsx`, and their CSS; changes affect web, desktop, Android, iOS, and embedded web UI.
 - `packages/sdk/js` is generated from the HTTP API. Generated v2 client code lives under `src/v2/gen`.
