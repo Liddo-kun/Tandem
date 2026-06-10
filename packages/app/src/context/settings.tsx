@@ -36,9 +36,6 @@ export interface Settings {
     showCustomAgents: boolean
     newLayoutDesigns?: boolean
   }
-  updates: {
-    startup: boolean
-  }
   appearance: {
     fontSize: number
     mono: string
@@ -132,9 +129,6 @@ const defaultSettings: Settings = {
     editToolPartsExpanded: false,
     showSessionProgressBar: true,
     showCustomAgents: false,
-  },
-  updates: {
-    startup: true,
   },
   appearance: {
     fontSize: 14,
@@ -303,12 +297,6 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         newLayoutDesigns: withFallback(() => store.general?.newLayoutDesigns, newLayoutDesignsDefault),
         setNewLayoutDesigns(value: boolean) {
           setStore("general", "newLayoutDesigns", value)
-        },
-      },
-      updates: {
-        startup: withFallback(() => store.updates?.startup, defaultSettings.updates.startup),
-        setStartup(value: boolean) {
-          setStore("updates", "startup", value)
         },
       },
       appearance: {

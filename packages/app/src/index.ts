@@ -13,6 +13,7 @@ export {
   type VoiceStatus,
   type VoiceStopResult,
 } from "./context/platform"
+export { type UpdaterPlatform, type UpdaterState } from "./updater"
 export {
   type WslDistroProbe,
   type WslInstalledDistro,
