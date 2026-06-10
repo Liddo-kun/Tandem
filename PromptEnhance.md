@@ -102,7 +102,7 @@ are skipped by the word-count rule.
 
 | Variable | Default | Effect |
 |---|---|---|
-| `TANDEM_PROMPT_CORRECTOR` | on | Master switch; `0`/`false`/`off`/`no` disables the whole feature. |
+| `TANDEM_PROMPT_CORRECTOR` | on | Master switch; `0`/`false`/`off`/`no` disables the whole feature. Always off for the `tandem run` CLI command (see Notes). |
 | `TANDEM_PROMPT_CORRECTOR_MAX` | 600 | Max characters to send to the corrector; longer prompts skip correction entirely. `0` = no cap. |
 | `TANDEM_PROMPT_CORRECTOR_DEBUG` | off | Keeps the throwaway corrector sessions (visible in the session list) for inspection. |
 | `TANDEM_PROMPT_CORRECTOR_DEBUG_KEEP` | 2 | In debug mode, retain only this many newest corrector sessions (older ones pruned). `0` = keep all. |
@@ -126,3 +126,10 @@ are skipped by the word-count rule.
   call can delay the prompt.
 - It is intentionally conservative: borderline edits that the safety net rejects
   simply result in no correction rather than a risky rewrite.
+- The whole feature is disabled for the `tandem run` CLI command: non-attach
+  `run` hosts the server in-process and waits on the prompt request, and the
+  corrector's nested `session.prompt` hangs that path (the command never
+  returned until Ctrl-C). The plugin detects the `run` command via
+  `process.argv` (first non-flag token) at construction and returns no hooks.
+  `run --attach` talks to a separate `serve` process, where the corrector stays
+  active and works normally.

@@ -31,6 +31,13 @@ function envInt(name: string, fallback: number): number {
 
 // Enabled by default; opt out with TANDEM_PROMPT_CORRECTOR=0.
 const ENABLED = envBool("TANDEM_PROMPT_CORRECTOR", true)
+// `opencode run` (non-attach) hosts the server in-process and waits on the
+// prompt request; the corrector's nested session.prompt hangs that path, so the
+// corrector is disabled for the `run` CLI command. The plugin is constructed in
+// the same process there, so the CLI command is visible in argv (first
+// non-flag token after the executable/script). Attach mode talks to a separate
+// `serve` process, where the corrector stays active and works normally.
+const IS_RUN_COMMAND = process.argv.slice(2).find((arg) => !arg.startsWith("-")) === "run"
 // Keep the throwaway corrector sessions instead of deleting them, so they can be
 // inspected in the session list while debugging. Off by default (clean runtime).
 const KEEP_SESSION = envBool("TANDEM_PROMPT_CORRECTOR_DEBUG", false)
@@ -193,7 +200,7 @@ const correctorSessions = new Set<string>()
 const smallModelCache = new Map<string, ModelRef>()
 
 export async function PromptCorrectorPlugin(input: PluginInput): Promise<Hooks> {
-  if (!ENABLED) return {}
+  if (!ENABLED || IS_RUN_COMMAND) return {}
   const { client } = input
 
   async function pickModel(current: ModelRef): Promise<ModelRef> {
