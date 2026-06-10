@@ -177,13 +177,10 @@ function normalizeDisplayScale(value: number | undefined) {
 
 export const { use: useSettings, provider: SettingsProvider } = createSimpleContext({
   name: "Settings",
+  gate: false,
   init: () => {
     const platform = usePlatform()
     const [store, setStore, _, ready] = persisted("settings.v3", createStore<Settings>(defaultSettings))
-
-    createEffect(() => {
-      console.log("settings", { ready: ready() })
-    })
 
     createEffect(() => {
       if (typeof document === "undefined") return

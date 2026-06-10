@@ -116,6 +116,13 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
         providerOptions: input.provider.options,
       })
   const options = mergeOptions(mergeOptions(mergeOptions(base, input.model.options), input.agent.options), variant)
+  if (
+    input.model.api.npm === "@ai-sdk/azure" &&
+    (input.provider.options.useCompletionUrls || input.model.options.useCompletionUrls || options.useCompletionUrls)
+  ) {
+    delete options.reasoningSummary
+    delete options.include
+  }
 
   // UPSTREAM-DIVERGENCE: match Claude Code's request shape — opt into context management
   // with `keep: "all"` so older thinking blocks are never cleared (real CC sends this to
