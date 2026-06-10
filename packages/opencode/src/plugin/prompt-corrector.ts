@@ -1,5 +1,4 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
-import * as Log from "@opencode-ai/core/util/log"
 
 // UPSTREAM-DIVERGENCE: Tandem-only built-in plugin. Runs every outgoing user
 // prompt through a cheap "corrector" LLM (spelling, punctuation, voice-
@@ -9,7 +8,13 @@ import * as Log from "@opencode-ai/core/util/log"
 // this file so upstream merges only ever touch the one-line registration in
 // plugin/index.ts.
 
-const log = Log.create({ service: "plugin.prompt-corrector" })
+// Plugins run as plain async hooks outside the Effect runtime; upstream removed
+// the legacy core logger, so diagnostics go through console in this file.
+const log = {
+  warn(message: string, data?: Record<string, unknown>) {
+    console.warn(`[plugin.prompt-corrector] ${message}`, data ?? "")
+  },
+}
 
 // opencode config is loaded once at startup (not hot-reloaded), so reading the
 // env once at construction matches the rest of the runtime-flags behavior.
