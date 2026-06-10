@@ -7,6 +7,7 @@ import { EventV2 } from "@opencode-ai/core/event"
 import { EventTable } from "@opencode-ai/core/event/sql"
 import { PermissionV2 } from "@opencode-ai/core/permission"
 import { AgentV2 } from "@opencode-ai/core/agent"
+import { Config } from "@opencode-ai/core/config"
 import { Project } from "@opencode-ai/core/project"
 import { ProjectTable } from "@opencode-ai/core/project/sql"
 import { AbsolutePath } from "@opencode-ai/core/schema"
@@ -20,6 +21,7 @@ import { SessionRunnerModel } from "@opencode-ai/core/session/runner/model"
 import { ToolRegistry } from "@opencode-ai/core/tool/registry"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionStore } from "@opencode-ai/core/session/store"
+import { Location } from "@opencode-ai/core/location"
 import { SystemContextRegistry } from "@opencode-ai/core/system-context/registry"
 import { SystemContext } from "@opencode-ai/core/system-context"
 import { SkillGuidance } from "@opencode-ai/core/skill/guidance"
@@ -61,7 +63,9 @@ const model = OpenAIChat.route
   .model({ id: "gpt-4o-mini" })
 const models = SessionRunnerModel.layerWith(() => Effect.succeed(model))
 const systemContext = SystemContextRegistry.layer
+const location = Location.layer({ directory: AbsolutePath.make("/project") }).pipe(Layer.provide(Project.defaultLayer))
 const skillGuidance = Layer.mock(SkillGuidance.Service, { load: () => Effect.succeed(SystemContext.empty) })
+const config = Layer.succeed(Config.Service, Config.Service.of({ entries: () => Effect.succeed([]) }))
 const runner = SessionRunnerLLM.defaultLayer.pipe(
   Layer.provide(database),
   Layer.provide(store),
@@ -70,14 +74,22 @@ const runner = SessionRunnerLLM.defaultLayer.pipe(
   Layer.provide(registry),
   Layer.provide(models),
   Layer.provide(systemContext),
+  Layer.provide(location),
   Layer.provide(agents),
   Layer.provide(skillGuidance),
+  Layer.provide(config),
 )
 const coordinator = SessionRunCoordinator.layer.pipe(Layer.provide(runner))
 const execution = Layer.effect(
   SessionExecution.Service,
   SessionRunCoordinator.Service.pipe(
-    Effect.map((coordinator) => SessionExecution.Service.of({ resume: coordinator.run, wake: coordinator.wake })),
+    Effect.map((coordinator) =>
+      SessionExecution.Service.of({
+        resume: coordinator.run,
+        wake: coordinator.wake,
+        interrupt: coordinator.interrupt,
+      }),
+    ),
   ),
 ).pipe(Layer.provide(coordinator))
 const sessions = SessionV2.layer.pipe(
@@ -100,7 +112,9 @@ const it = testEffect(
     registry,
     models,
     systemContext,
+    location,
     skillGuidance,
+    config,
     runner,
     coordinator,
     execution,

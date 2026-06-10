@@ -6,6 +6,7 @@ import {
   Model,
   Tool,
   TransportReason,
+  InvalidRequestReason,
   type LLMClientShape,
   type LLMRequest,
 } from "@opencode-ai/llm"
@@ -32,8 +33,11 @@ import { SessionRunner } from "@opencode-ai/core/session/runner"
 import * as SessionRunnerLLM from "@opencode-ai/core/session/runner/llm"
 import { SessionRunnerModel } from "@opencode-ai/core/session/runner/model"
 import { ToolRegistry } from "@opencode-ai/core/tool/registry"
+import { ToolOutputStore } from "@opencode-ai/core/tool-output-store"
 import { ApplicationTools } from "@opencode-ai/core/tool/application-tools"
 import { AgentV2 } from "@opencode-ai/core/agent"
+import { Config } from "@opencode-ai/core/config"
+import { ConfigCompaction } from "@opencode-ai/core/config/compaction"
 import { NativeTool } from "@opencode-ai/core/tool/native"
 import {
   SessionContextEpochTable,
@@ -46,6 +50,7 @@ import { SystemContext } from "@opencode-ai/core/system-context"
 import { SystemContextRegistry } from "@opencode-ai/core/system-context/registry"
 import { SkillGuidance } from "@opencode-ai/core/skill/guidance"
 import { ModelV2 } from "@opencode-ai/core/model"
+import { Location } from "@opencode-ai/core/location"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { Cause, DateTime, Deferred, Effect, Exit, Fiber, Layer, Schema, Stream } from "effect"
 import { asc, eq } from "drizzle-orm"
@@ -95,6 +100,16 @@ const client = Layer.succeed(
 )
 const model = Model.make({ id: "fake-model", provider: "fake", route: OpenAIChat.route })
 const replacementModel = Model.make({ id: "replacement", provider: "fake", route: OpenAIChat.route })
+const compactModel = Model.make({
+  id: "compact",
+  provider: "fake",
+  route: OpenAIChat.route.with({ limits: { context: 4_000, output: 50 } }),
+})
+const recoveryModel = Model.make({
+  id: "recovery",
+  provider: "fake",
+  route: OpenAIChat.route.with({ limits: { context: 20_000, output: 1_000 } }),
+})
 const authorizations: ToolRegistry.AuthorizeInput[] = []
 const executions: string[] = []
 const permission = Layer.succeed(
@@ -109,7 +124,11 @@ const permission = Layer.succeed(
   }),
 )
 const applications = ApplicationTools.layer
-const registry = ToolRegistry.layer.pipe(Layer.provide(permission), Layer.provide(applications))
+const registry = ToolRegistry.layer.pipe(
+  Layer.provide(permission),
+  Layer.provide(applications),
+  Layer.provide(ToolOutputStore.defaultLayer),
+)
 const agents = AgentV2.layer
 const echo = Layer.effectDiscard(
   ToolRegistry.Service.use((registry) =>
@@ -149,8 +168,9 @@ const echo = Layer.effectDiscard(
   ),
 ).pipe(Layer.provide(registry))
 let modelResolveHook = Effect.void
+let currentModel = model
 const models = SessionRunnerModel.layerWith((session) =>
-  modelResolveHook.pipe(Effect.as(session.model?.id === "replacement" ? replacementModel : model)),
+  modelResolveHook.pipe(Effect.as(session.model?.id === "replacement" ? replacementModel : currentModel)),
 )
 const systemContextKey = SystemContext.Key.make("test/context")
 let systemBaseline = "Initial context"
@@ -187,6 +207,7 @@ const systemContext = Layer.effectDiscard(
     ),
   ),
 ).pipe(Layer.provideMerge(SystemContextRegistry.layer))
+const location = Location.layer({ directory: AbsolutePath.make("/project") }).pipe(Layer.provide(Project.defaultLayer))
 const skillGuidance = Layer.mock(SkillGuidance.Service, {
   load: (agent) =>
     Effect.succeed(
@@ -202,6 +223,23 @@ const skillGuidance = Layer.mock(SkillGuidance.Service, {
         : SystemContext.empty,
     ),
 })
+const config = Layer.succeed(
+  Config.Service,
+  Config.Service.of({
+    entries: () =>
+      Effect.succeed([
+        new Config.Document({
+          type: "document",
+          info: new Config.Info({
+            compaction: new ConfigCompaction.Info({
+              buffer: 3_000,
+              keep: new ConfigCompaction.Keep({ tokens: 1_000 }),
+            }),
+          }),
+        }),
+      ]),
+  }),
+)
 const runner = SessionRunnerLLM.layer.pipe(
   Layer.provide(database),
   Layer.provide(store),
@@ -210,14 +248,22 @@ const runner = SessionRunnerLLM.layer.pipe(
   Layer.provide(registry),
   Layer.provide(models),
   Layer.provide(systemContext),
+  Layer.provide(location),
   Layer.provide(agents),
   Layer.provide(skillGuidance),
+  Layer.provide(config),
 )
 const coordinator = SessionRunCoordinator.layer.pipe(Layer.provide(runner))
 const execution = Layer.effect(
   SessionExecution.Service,
   SessionRunCoordinator.Service.pipe(
-    Effect.map((coordinator) => SessionExecution.Service.of({ resume: coordinator.run, wake: coordinator.wake })),
+    Effect.map((coordinator) =>
+      SessionExecution.Service.of({
+        resume: coordinator.run,
+        wake: coordinator.wake,
+        interrupt: coordinator.interrupt,
+      }),
+    ),
   ),
 ).pipe(Layer.provide(coordinator))
 const sessions = SessionV2.layer.pipe(
@@ -242,7 +288,9 @@ const it = testEffect(
     echo,
     models,
     systemContext,
+    location,
     skillGuidance,
+    config,
     runner,
     coordinator,
     execution,
@@ -278,6 +326,7 @@ const setup = Effect.gen(function* () {
   systemUnavailable = false
   systemLoadHook = Effect.void
   modelResolveHook = Effect.void
+  currentModel = model
   skillBaselines.clear()
   responses = undefined
   streamFailure = undefined
@@ -304,6 +353,21 @@ const providerUnavailable = () =>
     method: "stream",
     reason: new TransportReason({ message: "Provider unavailable" }),
   })
+
+const setupOverflowRecovery = Effect.gen(function* () {
+  yield* setup
+  const session = yield* SessionV2.Service
+  response = fragmentFixture("text", "text-earlier", ["Earlier answer"]).completeEvents
+  yield* session.prompt({
+    sessionID,
+    prompt: new Prompt({ text: "Earlier question ".repeat(700) }),
+    resume: false,
+  })
+  yield* session.resume(sessionID)
+  currentModel = recoveryModel
+  requests.length = 0
+  return session
+})
 
 const userTexts = (request: LLMRequest) =>
   request.messages.flatMap((message) =>
@@ -624,7 +688,7 @@ describe("SessionRunnerLLM", () => {
     }),
   )
 
-  it.effect("requires a complete new baseline after a Session moves", () =>
+  it.effect("interrupts a source Location runner after a Session moves", () =>
     Effect.gen(function* () {
       yield* setup
       const session = yield* SessionV2.Service
@@ -648,12 +712,10 @@ describe("SessionRunnerLLM", () => {
           .get(),
       ).toBeUndefined()
 
-      systemUnavailable = true
       yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Second" }), resume: false })
       const exit = yield* session.resume(sessionID).pipe(Effect.exit)
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toBeInstanceOf(SystemContext.InitializationBlocked)
+      expect(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)).toBe(true)
       expect(requests).toHaveLength(1)
       expect(yield* SessionInput.hasPending(db, sessionID, "steer")).toBe(true)
     }),
@@ -1329,16 +1391,20 @@ describe("SessionRunnerLLM", () => {
       requests.length = 0
       response = []
       yield* session.resume(sessionID)
+      const compactionID = SessionMessage.ID.create()
       yield* events.publish(SessionEvent.Compaction.Started, {
         sessionID,
-        messageID: SessionMessage.ID.create(),
+        messageID: compactionID,
         timestamp: DateTime.makeUnsafe(1),
         reason: "manual",
       })
       yield* events.publish(SessionEvent.Compaction.Ended, {
         sessionID,
+        messageID: compactionID,
         timestamp: DateTime.makeUnsafe(2),
+        reason: "manual",
         text: "summary",
+        recent: "",
       })
       systemBaseline = "Replacement context"
       yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Second" }), resume: false })
@@ -1351,6 +1417,193 @@ describe("SessionRunnerLLM", () => {
       yield* replaySessionProjection(sessionID)
       yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Third" }), resume: false })
       yield* session.resume(sessionID)
+    }),
+  )
+
+  it.effect("automatically compacts into a completed summary and retained recent turn", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* SessionV2.Service
+      response = fragmentFixture("text", "text-first", ["Earlier answer"]).completeEvents
+      yield* session.prompt({
+        sessionID,
+        prompt: new Prompt({ text: "Earlier question ".repeat(180) }),
+        resume: false,
+      })
+      yield* session.resume(sessionID)
+
+      currentModel = compactModel
+      requests.length = 0
+      responses = [
+        fragmentFixture("text", "text-summary", ["## Goal\n- Preserve the task"]).completeEvents,
+        fragmentFixture("text", "text-final", ["Continued"]).completeEvents,
+      ]
+      yield* session.prompt({
+        sessionID,
+        prompt: new Prompt({ text: "Recent exact request ".repeat(180) }),
+        resume: false,
+      })
+      yield* session.resume(sessionID)
+
+      expect(requests).toHaveLength(2)
+      expect(userTexts(requests[0])[0]).toContain("## Goal")
+      expect(userTexts(requests[1])).toHaveLength(1)
+      expect(userTexts(requests[1])[0]).toContain("<summary>\n## Goal\n- Preserve the task\n</summary>")
+      expect(userTexts(requests[1])[0]).toContain(`[User]: ${"Recent exact request ".repeat(180)}`)
+
+      const context = yield* (yield* SessionStore.Service).context(sessionID)
+      expect(context.map((message) => message.type)).toEqual(["compaction", "assistant"])
+      expect(context[0]).toMatchObject({
+        type: "compaction",
+        summary: "## Goal\n- Preserve the task",
+      })
+
+      requests.length = 0
+      responses = [
+        fragmentFixture("text", "text-summary-2", ["## Goal\n- Preserve the updated task"]).completeEvents,
+        fragmentFixture("text", "text-final-2", ["Continued again"]).completeEvents,
+      ]
+      yield* session.prompt({
+        sessionID,
+        prompt: new Prompt({ text: "Newest exact request ".repeat(180) }),
+        resume: false,
+      })
+      yield* session.resume(sessionID)
+
+      expect(requests).toHaveLength(2)
+      expect(userTexts(requests[0])[0]).toContain(
+        "<previous-summary>\n## Goal\n- Preserve the task\n</previous-summary>",
+      )
+      expect(userTexts(requests[0])[0]).toContain("Recent exact request")
+      expect((yield* (yield* SessionStore.Service).context(sessionID))[0]).toMatchObject({
+        type: "compaction",
+        summary: "## Goal\n- Preserve the updated task",
+      })
+    }),
+  )
+
+  it.effect("forces one compaction and retries after provider context overflow", () =>
+    Effect.gen(function* () {
+      const session = yield* setupOverflowRecovery
+      responses = [
+        [
+          LLMEvent.stepStart({ index: 0 }),
+          LLMEvent.providerError({ message: "prompt too long", classification: "context-overflow" }),
+        ],
+        fragmentFixture("text", "text-summary", ["## Goal\n- Recover overflow"]).completeEvents,
+        fragmentFixture("text", "text-final", ["Recovered"]).completeEvents,
+      ]
+      yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Continue" }), resume: false })
+      yield* session.resume(sessionID)
+
+      expect(requests).toHaveLength(3)
+      expect(userTexts(requests[1])[0]).toContain("## Goal")
+      expect(userTexts(requests[2])[0]).toContain("<summary>\n## Goal\n- Recover overflow\n</summary>")
+      expect(yield* session.context(sessionID)).toMatchObject([
+        { type: "compaction", summary: "## Goal\n- Recover overflow" },
+        { type: "assistant", finish: "stop" },
+      ])
+      yield* replaySessionProjection(sessionID)
+      expect(yield* session.context(sessionID)).toMatchObject([
+        { type: "compaction" },
+        { type: "assistant", finish: "stop" },
+      ])
+    }),
+  )
+
+  it.effect("persists a second context overflow after one recovery", () =>
+    Effect.gen(function* () {
+      const session = yield* setupOverflowRecovery
+      const overflow = () => [
+        LLMEvent.stepStart({ index: 0 }),
+        LLMEvent.providerError({ message: "prompt too long", classification: "context-overflow" }),
+      ]
+      responses = [
+        overflow(),
+        fragmentFixture("text", "text-summary", ["## Goal\n- Recover once"]).completeEvents,
+        overflow(),
+      ]
+      yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Continue" }), resume: false })
+      yield* session.resume(sessionID)
+
+      expect(requests).toHaveLength(3)
+      expect(yield* session.context(sessionID)).toMatchObject([
+        { type: "compaction" },
+        { type: "assistant", finish: "error", error: { message: "prompt too long" } },
+      ])
+    }),
+  )
+
+  it.effect("recovers once from a raw context overflow failure", () =>
+    Effect.gen(function* () {
+      const session = yield* setupOverflowRecovery
+      responseStream = Stream.fail(
+        new LLMError({
+          module: "test",
+          method: "stream",
+          reason: new InvalidRequestReason({
+            message: "prompt too long",
+            classification: "context-overflow",
+          }),
+        }),
+      )
+      responses = [
+        fragmentFixture("text", "text-summary", ["## Goal\n- Recover raw overflow"]).completeEvents,
+        fragmentFixture("text", "text-final", ["Recovered"]).completeEvents,
+      ]
+      yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Continue" }), resume: false })
+      yield* session.resume(sessionID)
+
+      expect(requests).toHaveLength(3)
+      expect(yield* session.context(sessionID)).toMatchObject([
+        { type: "compaction", summary: "## Goal\n- Recover raw overflow" },
+        { type: "assistant", finish: "stop" },
+      ])
+    }),
+  )
+
+  it.effect("publishes the original overflow when recovery summarization fails", () =>
+    Effect.gen(function* () {
+      const session = yield* setupOverflowRecovery
+      responses = [
+        [LLMEvent.providerError({ message: "prompt too long", classification: "context-overflow" })],
+        [LLMEvent.providerError({ message: "summary unavailable" })],
+      ]
+      yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Continue" }), resume: false })
+      yield* session.resume(sessionID)
+
+      expect(requests).toHaveLength(2)
+      const context = yield* session.context(sessionID)
+      expect(context.some((message) => message.type === "compaction")).toBe(false)
+      expect(context.slice(-2)).toMatchObject([
+        { type: "user", text: "Continue" },
+        { type: "assistant", finish: "error", error: { message: "prompt too long" } },
+      ])
+    }),
+  )
+
+  it.effect("interrupts overflow recovery while the summary provider is running", () =>
+    Effect.gen(function* () {
+      const session = yield* setupOverflowRecovery
+      responses = [
+        [LLMEvent.providerError({ message: "prompt too long", classification: "context-overflow" })],
+        fragmentFixture("text", "text-summary", ["## Goal\n- Interrupted"]).completeEvents,
+      ]
+      const firstGate = yield* Deferred.make<void>()
+      const summaryGate = yield* Deferred.make<void>()
+      streamGate = firstGate
+      yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Continue" }), resume: false })
+      const run = yield* session.resume(sessionID).pipe(Effect.forkChild)
+      while (requests.length < 1) yield* Effect.yieldNow
+      streamGate = summaryGate
+      yield* Deferred.succeed(firstGate, undefined)
+      while (requests.length < 2) yield* Effect.yieldNow
+
+      yield* session.interrupt(sessionID)
+      expect(yield* Fiber.await(run)).toMatchObject({ _tag: "Failure" })
+      streamGate = undefined
+      expect(requests).toHaveLength(2)
+      expect((yield* session.context(sessionID)).some((message) => message.type === "compaction")).toBe(false)
     }),
   )
 
@@ -1367,16 +1620,20 @@ describe("SessionRunnerLLM", () => {
       systemBaseline = "Changed context"
       yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Second" }), resume: false })
       yield* session.resume(sessionID)
+      const compactionID = SessionMessage.ID.create()
       yield* events.publish(SessionEvent.Compaction.Started, {
         sessionID,
-        messageID: SessionMessage.ID.create(),
+        messageID: compactionID,
         timestamp: DateTime.makeUnsafe(1),
         reason: "manual",
       })
       yield* events.publish(SessionEvent.Compaction.Ended, {
         sessionID,
+        messageID: compactionID,
         timestamp: DateTime.makeUnsafe(2),
+        reason: "manual",
         text: "summary",
+        recent: "",
       })
       systemUnavailable = true
       yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Third" }), resume: false })
@@ -1986,6 +2243,92 @@ describe("SessionRunnerLLM", () => {
     }),
   )
 
+  it.effect("preserves durable queued input for a later wake after interruption", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* SessionV2.Service
+      const { db } = yield* Database.Service
+      yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Interrupt current work" }), resume: false })
+
+      requests.length = 0
+      responses = [
+        [],
+        [
+          LLMEvent.stepStart({ index: 0 }),
+          LLMEvent.stepFinish({ index: 0, reason: "stop" }),
+          LLMEvent.finish({ reason: "stop" }),
+        ],
+      ]
+      streamGate = yield* Deferred.make<void>()
+      streamStarted = yield* Deferred.make<void>()
+
+      const run = yield* session.resume(sessionID).pipe(Effect.forkChild)
+      yield* Deferred.await(streamStarted)
+      yield* session.prompt({
+        sessionID,
+        prompt: new Prompt({ text: "Run after interrupt" }),
+        delivery: "queue",
+      })
+      yield* session.interrupt(sessionID)
+      expect(yield* Fiber.await(run)).toMatchObject({ _tag: "Failure" })
+      expect(requests).toHaveLength(1)
+      expect(yield* SessionInput.hasPending(db, sessionID, "queue")).toBe(true)
+      const resumed = yield* session.resume(sessionID).pipe(Effect.forkChild)
+      while (requests.length < 2) yield* Effect.yieldNow
+      yield* Deferred.succeed(streamGate, undefined)
+      yield* Fiber.join(resumed)
+      streamGate = undefined
+      streamStarted = undefined
+
+      expect(requests).toHaveLength(2)
+      expect(userTexts(requests[0]!)).toEqual(["Interrupt current work"])
+      expect(userTexts(requests[1]!)).toEqual(["Interrupt current work", "Run after interrupt"])
+    }),
+  )
+
+  it.effect("preserves durable steering input for a later resume after interruption", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* SessionV2.Service
+      const { db } = yield* Database.Service
+      yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Interrupt current work" }), resume: false })
+
+      requests.length = 0
+      responses = [
+        [],
+        [
+          LLMEvent.stepStart({ index: 0 }),
+          LLMEvent.stepFinish({ index: 0, reason: "stop" }),
+          LLMEvent.finish({ reason: "stop" }),
+        ],
+      ]
+      streamGate = yield* Deferred.make<void>()
+      streamStarted = yield* Deferred.make<void>()
+
+      const run = yield* session.resume(sessionID).pipe(Effect.forkChild)
+      yield* Deferred.await(streamStarted)
+      yield* session.prompt({
+        sessionID,
+        prompt: new Prompt({ text: "Steer after interrupt" }),
+      })
+      yield* session.interrupt(sessionID)
+      expect(yield* Fiber.await(run)).toMatchObject({ _tag: "Failure" })
+      expect(requests).toHaveLength(1)
+      expect(yield* SessionInput.hasPending(db, sessionID, "steer")).toBe(true)
+
+      const resumed = yield* session.resume(sessionID).pipe(Effect.forkChild)
+      while (requests.length < 2) yield* Effect.yieldNow
+      yield* Deferred.succeed(streamGate, undefined)
+      yield* Fiber.join(resumed)
+      streamGate = undefined
+      streamStarted = undefined
+
+      expect(requests).toHaveLength(2)
+      expect(userTexts(requests[0]!)).toEqual(["Interrupt current work"])
+      expect(userTexts(requests[1]!)).toEqual(["Interrupt current work", "Steer after interrupt"])
+    }),
+  )
+
   it.effect("runs queued active inputs as separate FIFO activities", () =>
     Effect.gen(function* () {
       yield* setup
@@ -2469,6 +2812,10 @@ describe("SessionRunnerLLM", () => {
       yield* Effect.yieldNow
 
       expect(requests).toHaveLength(2)
+      expect(requests.map((request) => request.providerOptions?.openai?.promptCacheKey)).toEqual([
+        sessionID,
+        otherSessionID,
+      ])
       yield* Deferred.succeed(streamGate, undefined)
       yield* Fiber.join(first)
       yield* Fiber.join(second)
@@ -2697,13 +3044,13 @@ describe("SessionRunnerLLM", () => {
         Stream.never,
       )
 
-      const runner = yield* SessionRunner.Service
-      const run = yield* runner.run({ sessionID, force: true }).pipe(Effect.forkChild)
+      const run = yield* session.resume(sessionID).pipe(Effect.forkChild)
       while (executions.length === 0) yield* Effect.yieldNow
-      yield* Fiber.interrupt(run)
+      yield* session.interrupt(sessionID)
       toolExecutionGate = undefined
 
       expect(yield* Fiber.await(run)).toMatchObject({ _tag: "Failure" })
+      yield* session.interrupt(sessionID)
       expect(yield* session.context(sessionID)).toMatchObject([
         { type: "user", text: "Interrupt blocked tool" },
         {
@@ -2729,6 +3076,29 @@ describe("SessionRunnerLLM", () => {
       response = []
       yield* session.resume(sessionID)
       expect(requests[0]?.messages.map((message) => message.role)).toEqual(["user", "assistant", "tool"])
+    }),
+  )
+
+  it.effect("interrupts a blocked provider turn without local tool activity", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* SessionV2.Service
+      yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Interrupt provider" }), resume: false })
+      requests.length = 0
+      response = []
+      streamGate = yield* Deferred.make<void>()
+      streamStarted = yield* Deferred.make<void>()
+
+      const run = yield* session.resume(sessionID).pipe(Effect.forkChild)
+      yield* Deferred.await(streamStarted)
+      yield* session.interrupt(sessionID)
+      const exit = yield* Fiber.await(run)
+      streamGate = undefined
+      streamStarted = undefined
+
+      expect(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)).toBeTrue()
+      expect(requests).toHaveLength(1)
+      yield* session.interrupt(sessionID)
     }),
   )
 
@@ -2889,6 +3259,35 @@ describe("SessionRunnerLLM", () => {
       expect(yield* session.context(sessionID)).toMatchObject([
         { type: "user", text: "Fail before step" },
         { type: "assistant", finish: "error", error: { type: "unknown", message: "Provider unavailable" } },
+      ])
+    }),
+  )
+
+  it.effect("does not recover context overflow after durable assistant output", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* SessionV2.Service
+      yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Fail after output" }), resume: false })
+
+      requests.length = 0
+      response = [
+        LLMEvent.stepStart({ index: 0 }),
+        LLMEvent.textStart({ id: "text-partial" }),
+        LLMEvent.textDelta({ id: "text-partial", text: "Partial" }),
+        LLMEvent.textEnd({ id: "text-partial" }),
+        LLMEvent.providerError({ message: "prompt too long", classification: "context-overflow" }),
+      ]
+      yield* session.resume(sessionID)
+
+      expect(requests).toHaveLength(1)
+      expect(yield* session.context(sessionID)).toMatchObject([
+        { type: "user", text: "Fail after output" },
+        {
+          type: "assistant",
+          finish: "error",
+          error: { message: "prompt too long" },
+          content: [{ type: "text", text: "Partial" }],
+        },
       ])
     }),
   )
