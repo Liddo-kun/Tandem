@@ -727,6 +727,26 @@ export const layer = Layer.effect(
               cost: usage.cost,
             })
             yield* session.updateMessage(ctx.assistantMessage)
+            // UPSTREAM-DIVERGENCE(tandem): surface safety-filter blocks. Anthropic's Fable 5
+            // (and similar) silently end flagged cybersecurity/biology requests with
+            // stop_reason "refusal" -> finishReason "content-filter", leaving an empty
+            // assistant turn with no notice and no auto-switch (we don't opt into the
+            // server-side-fallback beta). Emit a visible text part so the user knows why
+            // nothing came back and can retry on another model. Additive; safe to drop on merge.
+            if (value.reason === "content-filter") {
+              yield* session.updatePart({
+                id: PartID.ascending(),
+                messageID: ctx.assistantMessage.id,
+                sessionID: ctx.assistantMessage.sessionID,
+                type: "text",
+                text:
+                  "Safety filter blocked this response, so the model returned no answer. " +
+                  "Some models (such as Fable 5) automatically block cybersecurity and biology " +
+                  "topics and may also flag benign content. Try resending on a different model, " +
+                  "e.g. Opus 4.8.",
+                time: { start: Date.now(), end: Date.now() },
+              })
+            }
             if (ctx.snapshot) {
               const patch = yield* snapshot.patch(ctx.snapshot)
               if (patch.files.length) {
