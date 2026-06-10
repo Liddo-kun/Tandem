@@ -6,6 +6,7 @@ import { Context, Effect, Layer } from "effect"
 import { Flock } from "./util/flock"
 import { Flag } from "./flag/flag"
 import { Brand } from "./brand"
+import { LayerNode } from "./effect/layer-node"
 
 // UPSTREAM-DIVERGENCE: see brand.ts; separates Tandem dirs from opencode for parallel install.
 const app = Brand.dir
@@ -78,6 +79,7 @@ export const layer = Layer.effect(
 )
 
 export const defaultLayer = layer
+export const node = LayerNode.make(layer, [])
 
 export const layerWith = (input: Partial<Interface>) =>
   Layer.effect(

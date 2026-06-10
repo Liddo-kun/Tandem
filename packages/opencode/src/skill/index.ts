@@ -1,3 +1,4 @@
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import path from "path"
 import { Effect, Layer, Context, Schema } from "effect"
 import { NamedError } from "@opencode-ai/core/util/error"
@@ -341,5 +342,14 @@ export function fmt(list: Info[]) {
       .map((skill) => `- ${skill.name}: ${skill.description}`),
   ].join("\n")
 }
+
+export const node = LayerNode.make(layer, [
+  Discovery.node,
+  Config.node,
+  EventV2Bridge.node,
+  FSUtil.node,
+  Global.node,
+  RuntimeFlags.node,
+])
 
 export * as Skill from "."

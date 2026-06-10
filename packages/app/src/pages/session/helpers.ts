@@ -47,6 +47,10 @@ export function openSessionContext(input: OpenSessionContextInput) {
   input.tabs.setActive("context")
 }
 
+export function shouldShowFileTree(input: { desktopV2: boolean; showFileTree: boolean; opened: boolean }) {
+  return input.opened && (!input.desktopV2 || input.showFileTree)
+}
+
 export const createSessionTabs = (input: TabsInput) => {
   const review = input.review ?? (() => false)
   const hasReview = input.hasReview ?? (() => false)
