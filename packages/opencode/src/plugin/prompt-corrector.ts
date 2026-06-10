@@ -376,12 +376,12 @@ export async function PromptCorrectorPlugin(input: PluginInput): Promise<Hooks> 
 
       const text = textPart.text.trim()
       // Only reinforce short-but-substantive prose. Skip: too long, too short,
-      // one- or two-word answers, and anything containing a backtick (code,
+      // answers of three words or fewer, and anything containing a backtick (code,
       // commands, identifiers — duplicating those is noise and can read as
       // "do it twice"). Multiline prose is allowed: it gets a standalone marker.
       if (text.length > REPROMPT_MAX_CHARS) return
       if (text.length < REPROMPT_MIN_CHARS) return
-      if (text.split(/\s+/).filter(Boolean).length < 3) return
+      if (text.split(/\s+/).filter(Boolean).length < 4) return
       if (text.includes("`")) return
 
       if (text.includes("\n")) {
