@@ -38,7 +38,7 @@ export function empty() {
   blank = true
 }
 
-// UPSTREAM-DIVERGENCE: Tandem brand logo lives in ./brand-logo; this stays a thin delegate.
+// UPSTREAM-DIVERGENCE: Tandem brand logo lives in @opencode-ai/tui/brand-logo; this stays a thin delegate.
 export function logo(pad?: string) {
   return BrandLogo.render(pad)
 }
