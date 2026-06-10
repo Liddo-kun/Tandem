@@ -5,7 +5,7 @@ description: Use when syncing official OpenCode upstream/dev into the Tandem rep
 
 # Tandem OpenCode Sync
 
-Use this skill to update `C:\Users\Jon\Tandem` from official OpenCode while preserving Tandem's documented mobile and personal deltas.
+Use this skill to update the Tandem repo (`~/code/Tandem` on Ubuntu, `C:\Users\Jon\Tandem` on Windows) from official OpenCode while preserving Tandem's documented mobile and personal deltas. Run the git commands below in the current environment's native shell; `<sync-target>`, `<target>`, and `<base>` are SHAs you carry between commands.
 
 ## Fresh Session Contract
 
@@ -14,26 +14,27 @@ When the user says "get us up to date from opencode upstream", do not rely on pr
 - Resume point: `git merge-base dev upstream/dev`
 - End target: current `upstream/dev` after `git fetch --no-tags upstream dev`
 - Pending commits: `git rev-list --topo-order --reverse dev..upstream/dev`
-- If the user asks to get up to date, process all pending commits unless review or dry-run finds risk.
+- If the user asks to get up to date, process all pending commits, broken into logical batches and worked batch by batch, unless review or dry-run finds risk.
 - Only use an older pinned target if the user explicitly asks to continue that older target.
 
-Read `context.md` before syncing. Use `log.md` as the final-state inventory of intentional Tandem differences from official OpenCode.
+Read the environment context file (`contextL.md` on Ubuntu/Linux/proot, `context.md` on Windows) and `log.md` in full before syncing. Use `log.md` as the authoritative inventory of intentional Tandem differences from official OpenCode.
 
 ## Hard Rules
 
+- Read `log.md` in full before any merge or conflict resolution. Do not skip it because diffs or `UPSTREAM-DIVERGENCE` markers seem sufficient.
 - Use `dev` as the default Tandem branch unless the user says otherwise.
 - Use `upstream/dev` as official OpenCode.
 - Use merge, not rebase, for normal sync work.
 - Do not use `origin/dev` to choose the next upstream batch; it may be stale.
 - Do not run tests or typechecks from the repo root.
-- Do not write git config. If Git lacks committer identity, use one-shot `git -c user.name=... -c user.email=...` only for that command.
+- Do not write git config. If Git lacks committer identity, use one-shot `git -c user.name=<name> -c user.email=<email>` (values from `git log -1 --format='%an'` / `'%ae'`) only for that command.
 - Never discard dirty worktree changes unless the user explicitly approves it.
 
 ## Preflight
 
-Start in `C:\Users\Jon\Tandem`:
+Start in the Tandem repo root:
 
-```powershell
+```sh
 git status --short --branch
 git remote -v
 git branch -vv
@@ -43,63 +44,68 @@ If the worktree is dirty, stop and ask before syncing. Do not assume the changes
 
 If `upstream` is missing, configure it as:
 
-```powershell
+```sh
 git remote add upstream https://github.com/sst/opencode.git
 ```
 
 Fetch and pin the sync target for this session:
 
-```powershell
+```sh
 git fetch --no-tags upstream dev
-$syncTarget = git rev-parse upstream/dev
+git rev-parse upstream/dev   # pin this SHA as <sync-target>
 ```
 
 The pin is session-local. A future fresh session should fetch again and recompute from `dev..upstream/dev` unless the user asks for a specific older target.
 
-## Choose The Batch
+## Plan Logical Batches
 
-Batch size is user-directed.
+Before merging anything, break the full pending range into logical batches and work them batch by batch. Do not merge the whole range in one shot just because it dry-runs clean.
 
-- Use small batches when the user wants careful review, learning, or risk control.
-- Use all pending commits when the user wants to get fully up to date and dry-run looks safe.
-- If the user says "get us up to date from opencode upstream", set `$requestedSize = $pending`.
-- If unspecified and the range is large or risky, ask briefly or choose a conservative batch.
+First list all pending commits in apply order:
 
-Do not use `git log --reverse --max-count=10`. Git applies `--max-count` before `--reverse`.
-
-Use this pattern:
-
-```powershell
-$commits = @(git rev-list --topo-order --reverse dev..$syncTarget)
-$pending = $commits.Count
-if ($pending -eq 0) { "No upstream commits pending"; return }
-
-# Examples:
-# $requestedSize = 10       # next 10
-# $requestedSize = $pending # all pending
-$requestedSize = $pending
-$batchSize = [Math]::Min($requestedSize, $pending)
-$batch = $commits[0..($batchSize - 1)]
-$target = $batch[-1]
-
-$batch | ForEach-Object { git log -1 --oneline $_ }
-git rev-list --count dev..$target
+```sh
+git log --oneline --reverse dev..<sync-target>
 ```
 
-The final count must equal `$batchSize`. If it does not, stop and inspect.
+If the list is empty, report that no upstream commits are pending and stop. Never combine `--reverse` with `--max-count`; Git applies `--max-count` before `--reverse`.
+
+Read every subject line (and `git show --stat` for anything unclear) and group the commits into logical batches:
+
+- Each batch is a contiguous run of commits in topo order; a batch is defined by its last commit (`<target>`), since merging through `<target>` brings in everything before it.
+- Group by theme/subsystem: server/core refactors, TUI, shared web UI, providers, SDK/codegen, docs/chore runs, release/version bumps.
+- Keep an architectural refactor together with its immediate follow-up fixes in one batch; never split a refactor from its fixups.
+- Cut a batch boundary where the theme changes, before and after large refactors, and before any commit that touches areas with known Tandem divergence (mobile, shared web UI, composer, platform contract) so those merge in their own reviewable batch.
+- Prefer several focused batches over one giant one; trivial chore/docs runs can be one batch.
+
+Present the batch plan to the user before starting the first merge: for each batch, the commit count, a one-line theme, and whether it touches known Tandem-divergent areas. Adjust if the user redirects.
+
+Before working a batch, confirm its slice:
+
+```sh
+git log --oneline --reverse dev..<target>
+git rev-list --count dev..<target>
+```
+
+The count must equal the batch size. If it does not, stop and inspect.
+
+## Work Batch By Batch
+
+Process one batch at a time, in order. For each batch run the full cycle: Review And Dry Run → Merge → Post-Merge Gate → Verification → brief batch report. Do not start the next batch until the current one is merged, verified, and the worktree is clean.
+
+If a batch turns out to be riskier than planned (unexpected conflicts, surprise architectural change), pause and tell the user before proceeding; offer to split the batch further.
 
 ## Review And Dry Run
 
 Review upstream changes from the merge base to the batch target:
 
-```powershell
-$base = git merge-base dev $target
-git show --stat --oneline --find-renames $batch
-git diff --name-status $base $target
-git diff --check $base $target
+```sh
+git merge-base dev <target>          # use as <base>
+git show --stat --oneline --find-renames <batch commits>
+git diff --name-status <base> <target>
+git diff --check <base> <target>
 ```
 
-Do not review with `git diff dev..$target`; Tandem has fork-only files, so that comparison creates false deletion noise.
+Do not review with `git diff dev..<target>`; Tandem has fork-only files, so that comparison creates false deletion noise.
 
 Use these priorities:
 
@@ -108,47 +114,61 @@ Use these priorities:
 - Do not preserve an old Tandem implementation shape just because it is already in the fork. Understand the original intent, preserve documented behavior that is still needed, and drop obsolete code paths instead of keeping needless parallel implementations.
 - If upstream makes a significant UI or behavior change, reassess Tandem customizations against that new design. Some Tandem changes may no longer fit and can be removed, but only after understanding why they existed and confirming they are no longer useful.
 - Use judgment. If it is unclear whether a Tandem customization should survive an upstream refactor, simplification, or UI change, stop and ask the user before deciding.
-- iOS/Android/mobile-specific behavior: preserve Tandem behavior documented in `context.md` and `log.md`.
+- iOS/Android/mobile-specific behavior: preserve Tandem behavior documented in the environment context file and `log.md`.
 - Shared web UI conflicts: manually produce the smallest combined final state.
 - Preserve `UPSTREAM-DIVERGENCE` comments.
 
 Dry-run before merging:
 
-```powershell
-git merge-tree --write-tree dev $target
+```sh
+git merge-tree --write-tree dev <target>
 ```
 
-If it reports conflicts or exits nonzero, stop and resolve deliberately.
+If it reports conflicts or exits nonzero, stop and follow Conflict Resolution before merging.
+
+## Conflict Resolution
+
+Default stance: incoming upstream architecture wins; Tandem customizations are reapplied on top only where they still make sense.
+
+For each conflicted file:
+
+1. Understand both sides: what upstream changed and why, and what the Tandem delta was for (check `log.md` and `UPSTREAM-DIVERGENCE` comments).
+2. Adopt the upstream structure first, then reapply the Tandem customization in the new shape only if its documented purpose still applies.
+3. If the Tandem customization no longer fits the new upstream design, drop it — but only after understanding why it existed.
+
+Keep the user in the loop. Resolve silently only when absolutely sure, meaning all of these hold:
+
+- The Tandem side is documented (in `log.md` or an `UPSTREAM-DIVERGENCE` comment) and clearly still applies, or the conflict is mechanical (adjacent-line noise, lockfiles, version bumps, generated files).
+- The resolution does not change behavior on either side beyond what upstream intends.
+- No mobile/compatibility-contract surface is affected (API shapes, platform contract, WebView/keyboard behavior).
+
+For everything else — ambiguous intent, overlapping behavior changes, a Tandem customization that may be obsolete, or any judgment call about dropping fork behavior — stop and present the conflict to the user before resolving: the file, both sides' intent, and a recommended resolution with reasoning.
+
+Even for silently resolved conflicts, list each conflicted file and the chosen resolution in the batch report so nothing is resolved invisibly.
 
 ## Merge
 
 Use a merge commit:
 
-```powershell
-git merge --no-ff $target -m "opencode-sync: merge upstream batch through $($target.Substring(0, 9))"
+```sh
+git merge --no-ff <target> -m "opencode-sync: merge upstream batch through <short-sha>"
 ```
 
-If committer identity is missing:
-
-```powershell
-$name = git log -1 --format='%an'
-$email = git log -1 --format='%ae'
-git -c user.name="$name" -c user.email="$email" merge --no-ff $target -m "opencode-sync: merge upstream batch through $($target.Substring(0, 9))"
-```
+If committer identity is missing, prefix the command with the one-shot `-c user.name=... -c user.email=...` flags from Hard Rules.
 
 ## Post-Merge Gate
 
 Immediately after the merge:
 
-```powershell
+```sh
 git status --porcelain=v2
-git rev-list --count dev..$syncTarget
+git rev-list --count dev..<sync-target>
 git log --oneline --decorate --max-count=6
 ```
 
 If the worktree is dirty after a successful merge, stop before testing or continuing. Classify the dirty state first:
 
-```powershell
+```sh
 git diff --name-status HEAD
 git diff --numstat HEAD
 git reflog --date=iso --max-count=12
@@ -162,12 +182,14 @@ Run only package-local checks. Never run tests or typecheck from repo root.
 
 Common command from a package directory:
 
-```powershell
-C:\Program_Files\Bun\bin\bun.exe typecheck
+```sh
+bun typecheck
 ```
 
 Use `packages/opencode` when the batch touches server, Effect, CLI, tests, providers, LSP, sync, tools, or generated SDK/server code. Use `packages/plugin` when `packages/plugin` changes. Use app/ui/android/ios package checks when those packages change.
 
 ## Final Report
 
-Report the batch commits, merge commit SHA, conflict status, verification results, remaining commits against `$syncTarget`, and whether the worktree is clean.
+After each batch, report briefly: the batch theme and commits, merge commit SHA, every conflicted file with its resolution, verification results, and remaining commits against `<sync-target>`.
+
+After the last batch, summarize the whole sync: batches merged, all conflict resolutions, any Tandem customizations dropped or reshaped, verification results, and whether the worktree is clean.
