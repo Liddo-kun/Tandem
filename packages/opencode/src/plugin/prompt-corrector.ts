@@ -242,8 +242,15 @@ export async function PromptCorrectorPlugin(input: PluginInput): Promise<Hooks> 
     return resolved
   }
 
-  async function correct(text: string, model: ModelRef | undefined): Promise<string | undefined> {
-    const created = (await client.session.create({ body: { title: CORRECTOR_TITLE } })).data
+  async function correct(text: string, model: ModelRef | undefined, parentID: string): Promise<string | undefined> {
+    // Spawn the corrector session as a child of the session being corrected.
+    // Child sessions are hidden from the UI's root session lists and from
+    // post-delete navigation, so the corrector's create/delete churn can never
+    // be opened, tabbed, or left behind as a ghost tab by any client. Debug
+    // mode intentionally stays root-level so kept sessions remain visible in
+    // the session list for inspection.
+    const body = KEEP_SESSION ? { title: CORRECTOR_TITLE } : { title: CORRECTOR_TITLE, parentID }
+    const created = (await client.session.create({ body })).data
     if (!created?.id) return undefined
     const sessionID = created.id
     correctorSessions.add(sessionID)
@@ -344,7 +351,7 @@ export async function PromptCorrectorPlugin(input: PluginInput): Promise<Hooks> 
         // Skip overly long prompts: pasted/structured text rarely needs a copy
         // edit, and running it just adds cost and correction risk.
         if (CORRECTOR_MAX_CHARS > 0 && original.trim().length > CORRECTOR_MAX_CHARS) continue
-        const corrected = await correct(original, model).catch((error) => {
+        const corrected = await correct(original, model, msg.sessionID).catch((error) => {
           log.warn("prompt correction failed", { sessionID: msg.sessionID, error })
           return undefined
         })

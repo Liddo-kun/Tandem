@@ -48,8 +48,12 @@ plugin hooks:
   corrector (Tandem)" session, sends the **raw** message text to a cheap model
   with all tools disabled, reads back the corrected text, and replaces the
   message part's text (saving the pre-correction text under the
-  `tandemPromptCorrectorOriginal` metadata key). The throwaway session is deleted
-  afterward; in debug mode it is kept, but only the newest few corrector sessions
+  `tandemPromptCorrectorOriginal` metadata key). The throwaway session is created
+  as a **child** (`parentID`) of the session being corrected, so it never appears
+  in the UI's root session lists or post-delete navigation — its create/delete
+  churn cannot be opened, tabbed, or leave ghost tabs on any client. It is
+  deleted afterward; in debug mode it is kept at **root level** instead (visible
+  in the session list for inspection), and only the newest few corrector sessions
   are retained (older ones pruned).
 - **`experimental.chat.system.transform`** — fully **replaces** the corrector
   session's system prompt with the correction instruction. (A prompt body's
