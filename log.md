@@ -79,6 +79,7 @@ For each item, reference the modified files or stable symbols; line numbers are 
 ## Shared Chat And Tool Display
 
 - Compacts chat feed spacing by reducing user bubble padding, user and assistant copy/meta row height, assistant text spacing, inter-turn padding, assistant content gap, and turn-list gap. Files: `packages/app/src/pages/session/message-timeline.tsx`, `packages/ui/src/components/message-part.css`, `packages/ui/src/components/session-turn.css`.
+- Narrows the chat side gutters so messages sit closer to the screen edge (verified on phone): shrinks the new-layout session-card inset from `p-2` (8px) to `p-[3px]` (gated on `newLayoutDesigns`, applies to all four sides) in `session.tsx`, and flattens the per-row message content padding from `px-4 md:px-5` (16px phone / 20px at `md`+) to a constant `px-2` (8px) across breakpoints on every timeline row container. Files: `packages/app/src/pages/session.tsx`, `packages/app/src/pages/session/message-timeline.tsx`.
 - Adds compact multiline tool summary triggers for Bash and `apply_patch`, including status dots, command/file subjects, and first-line output/change previews while preserving existing expanded details. Files: `packages/ui/src/components/basic-tool.tsx`, `packages/ui/src/components/basic-tool.css`, `packages/ui/src/components/collapsible.css`, `packages/ui/src/components/message-part.tsx`, `packages/ui/src/components/tool-error-card.tsx`.
 
 ## Backend Tool Defaults

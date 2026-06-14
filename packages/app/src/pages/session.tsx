@@ -1887,7 +1887,7 @@ export default function Page() {
       <div
         class="flex-1 min-h-0 flex flex-col md:flex-row "
         classList={{
-          "gap-2 p-2": settings.general.newLayoutDesigns(),
+          "gap-2 p-[3px]": settings.general.newLayoutDesigns(),
         }}
       >
         {/* Session panel */}
