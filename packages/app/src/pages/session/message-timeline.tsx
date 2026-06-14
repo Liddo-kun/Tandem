@@ -289,6 +289,8 @@ export function MessageTimeline(props: {
   const { params, sessionKey } = useSessionKey()
   const platform = usePlatform()
   const nativeMobile = platform.platform === "ios" || platform.platform === "android"
+  // Tighter side gutters only in the Android APK; web/desktop/iOS keep upstream padding.
+  const rowPadX = platform.platform === "android" ? "px-2" : "px-4 md:px-5"
 
   let virtualizer: VirtualizerHandle | undefined
   const sessionID = createMemo(() => params.id)
@@ -930,7 +932,7 @@ export function MessageTimeline(props: {
         )
         return (
           <TimelineRowFrame row={commentStripRow}>
-            <div class="w-full px-2 pb-2">
+            <div class={`w-full ${rowPadX} pb-2`}>
               <div class="ml-auto max-w-[82%] overflow-x-auto no-scrollbar">
                 <div class="flex w-max min-w-full justify-end gap-2">
                   <Index each={comments()}>
@@ -971,7 +973,7 @@ export function MessageTimeline(props: {
           <TimelineRowFrame row={userMessageRow}>
             <Show when={message()}>
               {(message) => (
-                <div data-slot="session-turn-message-container" class="w-full px-2">
+                <div data-slot="session-turn-message-container" class={`w-full ${rowPadX}`}>
                   <div data-slot="session-turn-message-content" aria-live="off">
                     <Message
                       message={message()}
@@ -989,7 +991,7 @@ export function MessageTimeline(props: {
         const turnDividerRow = row as Accessor<TimelineRowByTag<"TurnDivider">>
         return (
           <TimelineRowFrame row={turnDividerRow}>
-            <div data-slot="session-turn-message-container" class="w-full px-2">
+            <div data-slot="session-turn-message-container" class={`w-full ${rowPadX}`}>
               <div data-slot="session-turn-compaction">
                 <MessageDivider
                   label={language.t(
@@ -1005,7 +1007,7 @@ export function MessageTimeline(props: {
         const assistantPartRow = row as Accessor<TimelineRowByTag<"AssistantPart">>
         return (
           <TimelineRowFrame row={assistantPartRow}>
-            <div data-slot="session-turn-message-container" class="w-full px-2">
+            <div data-slot="session-turn-message-container" class={`w-full ${rowPadX}`}>
               <div
                 data-slot="session-turn-assistant-content"
                 aria-hidden={workingTurn(assistantPartRow().userMessageID)}
@@ -1020,7 +1022,7 @@ export function MessageTimeline(props: {
         const thinkingRow = row as Accessor<TimelineRowByTag<"Thinking">>
         return (
           <TimelineRowFrame row={thinkingRow}>
-            <div data-slot="session-turn-message-container" class="w-full px-2">
+            <div data-slot="session-turn-message-container" class={`w-full ${rowPadX}`}>
               <TimelineThinkingRow
                 reasoningHeading={thinkingRow().reasoningHeading}
                 showReasoningSummaries={settings.general.showReasoningSummaries()}
@@ -1033,7 +1035,7 @@ export function MessageTimeline(props: {
         const retryRow = row as Accessor<TimelineRowByTag<"Retry">>
         return (
           <TimelineRowFrame row={retryRow}>
-            <div data-slot="session-turn-message-container" class="w-full px-2">
+            <div data-slot="session-turn-message-container" class={`w-full ${rowPadX}`}>
               <SessionRetry status={sessionStatus()} show={activeMessageID() === retryRow().userMessageID} />
             </div>
           </TimelineRowFrame>
@@ -1043,7 +1045,7 @@ export function MessageTimeline(props: {
         const diffSummaryRow = row as Accessor<TimelineRowByTag<"DiffSummary">>
         return (
           <TimelineRowFrame row={diffSummaryRow}>
-            <div data-slot="session-turn-message-container" class="w-full px-2">
+            <div data-slot="session-turn-message-container" class={`w-full ${rowPadX}`}>
               <TimelineDiffSummaryRow diffs={diffSummaryRow().diffs} />
             </div>
           </TimelineRowFrame>
@@ -1053,7 +1055,7 @@ export function MessageTimeline(props: {
         const errorRow = row as Accessor<TimelineRowByTag<"Error">>
         return (
           <TimelineRowFrame row={errorRow}>
-            <div data-slot="session-turn-message-container" class="w-full px-2">
+            <div data-slot="session-turn-message-container" class={`w-full ${rowPadX}`}>
               <Card variant="error" class="error-card">
                 {errorRow().text}
               </Card>

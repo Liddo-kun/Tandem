@@ -190,6 +190,8 @@ export default function Page() {
   const local = useLocal()
   const file = useFile()
   const platform = usePlatform()
+  // Tighter outer card inset only in the Android APK; web/desktop/iOS keep upstream padding.
+  const isAndroid = platform.platform === "android"
   const sync = useSync()
   const queryClient = useQueryClient()
   const dialog = useDialog()
@@ -1887,7 +1889,9 @@ export default function Page() {
       <div
         class="flex-1 min-h-0 flex flex-col md:flex-row "
         classList={{
-          "gap-2 p-[3px]": settings.general.newLayoutDesigns(),
+          "gap-2": settings.general.newLayoutDesigns(),
+          "p-2": settings.general.newLayoutDesigns() && !isAndroid,
+          "p-[3px]": settings.general.newLayoutDesigns() && isAndroid,
         }}
       >
         {/* Session panel */}
