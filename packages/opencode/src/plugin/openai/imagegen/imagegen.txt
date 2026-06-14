@@ -1,0 +1,18 @@
+Generate or edit raster images with OpenAI's image models. Returns a saved PNG file plus an inline preview.
+
+Use this tool when:
+- The user asks for a raster image from a description: a photo, illustration, diagram, mockup, sprite, meme, portrait, logo concept, or any other picture.
+- The user wants to modify an existing image with specific changes: add or remove elements, alter colors, improve quality/resolution, or transform the style (e.g. cartoon, oil painting).
+
+Do NOT use this tool for:
+- Vector/SVG output, icon systems, or anything that should be code-native (write the markup/code instead).
+
+Generating a new image:
+- Provide only `prompt`. Omit `image_paths` and `mask_path`.
+- Write a detailed, concrete `prompt` (subject, scene, composition, style, lighting, colors). Specificity improves results.
+
+Editing an existing image:
+- Provide `image_paths` with the local file path(s) of the source image(s). v1 supports local file paths only; if a target image has no local file, ask the user to attach or save it first.
+- Provide `mask_path` (a PNG whose transparent areas mark the region to change) only when the edit must be constrained to part of the image. The mask applies to the first image and is prompt-guided.
+				
+- Generation is slow and costly; keep `n` small.

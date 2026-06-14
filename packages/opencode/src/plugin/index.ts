@@ -21,6 +21,8 @@ import { DigitalOceanAuthPlugin } from "./digitalocean"
 import { XaiAuthPlugin } from "./xai"
 // UPSTREAM-DIVERGENCE: Tandem-only prompt corrector. See prompt-corrector.ts.
 import { PromptCorrectorPlugin } from "./prompt-corrector"
+// UPSTREAM-DIVERGENCE: Tandem-only OpenAI image generation tool. See openai/imagegen/.
+import { ImagegenPlugin } from "./openai/imagegen/plugin"
 import { Effect, Layer, Context } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
@@ -80,6 +82,8 @@ function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
     XaiAuthPlugin,
     // UPSTREAM-DIVERGENCE: Tandem-only prompt corrector (enabled by default; opt out with TANDEM_PROMPT_CORRECTOR=0).
     PromptCorrectorPlugin,
+    // UPSTREAM-DIVERGENCE: Tandem-only OpenAI image generation tool (hidden unless OpenAI creds exist; opt out with TANDEM_IMAGEGEN=0).
+    ImagegenPlugin,
   ]
 }
 
