@@ -21,14 +21,12 @@ Read the environment context file (`contextL.md` on Ubuntu/Linux/proot, `context
 
 ## Hard Rules
 
-- Read `log.md` in full before any merge or conflict resolution. Do not skip it because diffs or `UPSTREAM-DIVERGENCE` markers seem sufficient.
+- Read `log.md` in full before any merge or conflict resolution.
 - Use `dev` as the default Tandem branch unless the user says otherwise.
 - Use `upstream/dev` as official OpenCode.
 - Use merge, not rebase, for normal sync work.
 - Do not use `origin/dev` to choose the next upstream batch; it may be stale.
 - Do not run tests or typechecks from the repo root.
-- Do not write git config. If Git lacks committer identity, use one-shot `git -c user.name=<name> -c user.email=<email>` (values from `git log -1 --format='%an'` / `'%ae'`) only for that command.
-- Never discard dirty worktree changes unless the user explicitly approves it.
 
 ## Preflight
 
@@ -40,7 +38,7 @@ git remote -v
 git branch -vv
 ```
 
-If the worktree is dirty, stop and ask before syncing. Do not assume the changes are related to the sync.
+If the worktree is dirty, stop and ask before syncing.
 
 If `upstream` is missing, configure it as:
 
@@ -59,7 +57,7 @@ The pin is session-local. A future fresh session should fetch again and recomput
 
 ## Plan Logical Batches
 
-Before merging anything, break the full pending range into logical batches and work them batch by batch. Do not merge the whole range in one shot just because it dry-runs clean.
+Before merging anything, FIRST, break the full pending range into logical batches and work them batch by batch.
 
 First list all pending commits in apply order:
 
@@ -110,13 +108,13 @@ Do not review with `git diff dev..<target>`; Tandem has fork-only files, so that
 Use these priorities:
 
 - Core OpenCode/server behavior: prefer current upstream unless Tandem has a documented compatibility reason.
-- Upstream architectural changes, simplifications, and refactors must be incorporated. Adopt the upstream structure first, then reapply Tandem customizations only where they still make sense.
+- Upstream architectural changes, simplifications, and refactors must be incorporated. Adopt the upstream structure first, then reapply Tandem customizations only where they still make sense. if you are not absolutly sure, consult the user.
 - Do not preserve an old Tandem implementation shape just because it is already in the fork. Understand the original intent, preserve documented behavior that is still needed, and drop obsolete code paths instead of keeping needless parallel implementations.
 - If upstream makes a significant UI or behavior change, reassess Tandem customizations against that new design. Some Tandem changes may no longer fit and can be removed, but only after understanding why they existed and confirming they are no longer useful.
 - Use judgment. If it is unclear whether a Tandem customization should survive an upstream refactor, simplification, or UI change, stop and ask the user before deciding.
-- iOS/Android/mobile-specific behavior: preserve Tandem behavior documented in the environment context file and `log.md`.
+- Tandem includes a dedicated Android and iOS app that uses a version of the webui. be extra careful in the comtext of merging webui changes, review what special customizations Tandem has to the webui relative to the mobile apps.
 - Shared web UI conflicts: manually produce the smallest combined final state.
-- Preserve `UPSTREAM-DIVERGENCE` comments.
+- Preserve `UPSTREAM-DIVERGENCE` comments. remove UPSTREAM-DIVERGENCE comments when we fully adopt upstream
 
 Dry-run before merging:
 
@@ -190,6 +188,8 @@ Use `packages/opencode` when the batch touches server, Effect, CLI, tests, provi
 
 ## Final Report
 
-After each batch, report briefly: the batch theme and commits, merge commit SHA, every conflicted file with its resolution, verification results, and remaining commits against `<sync-target>`.
+After each batch, report briefly: the batch theme and commits, every conflicted file with its resolution, and remaining commits against `<sync-target>`.
 
-After the last batch, summarize the whole sync: batches merged, all conflict resolutions, any Tandem customizations dropped or reshaped, verification results, and whether the worktree is clean.
+After the last batch, summarize the whole sync: batches merged, all conflict resolutions, any Tandem customizations dropped or reshaped, and whether the worktree is clean.
+
+Finally, give a summary of the updates. What functional changes to opencode were made that are user testable?
