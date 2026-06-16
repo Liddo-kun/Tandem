@@ -15,10 +15,13 @@ extracted Codex `imagegen` skill. References:
 ## Goal
 
 A Tandem-owned tool, `imagegen`, that **generates and edits raster images** via
-OpenAI's Images API using **gpt-image-2**, returning a **saved PNG file plus an
-inline image**. The tool is **visible only when OpenAI credentials exist**
-(OAuth login or API key); otherwise it is hidden. It ships as an **internal
-plugin** to minimize fork divergence from upstream OpenCode.
+OpenAI's Images API (API key) or the Responses `image_generation` tool (OAuth),
+**saving a PNG to disk and returning its file path**. The image is **deliberately
+NOT loaded into model context** (see "Image not fed into context" below); the
+caller opens the path with `read` if it wants to view the result. The tool is
+**visible only when OpenAI credentials exist** (OAuth login or API key); otherwise
+it is hidden. It ships as an **internal plugin** to minimize fork divergence from
+upstream OpenCode.
 
 This is a `personal:` Tandem enhancement.
 
@@ -196,7 +199,7 @@ All optional, with the fixed schema defaults above:
 Code-fact corrections (verified against source, supersede earlier optimistic spec lines):
 
 - **Auth read path**: the SDK client (`packages/sdk/js/src/v2/gen/sdk.gen.ts`) exposes **only `auth.set` (PUT) and `auth.remove` (DELETE)** — there is **no `auth.get`/`auth.all`**. The internal `Auth.get` is an Effect service the plain-async plugin cannot call. → The plugin must **read the auth store directly**: parse `OPENCODE_AUTH_CONTENT` if set, else read `path.join(Global.Path.data, "auth.json")` (mode 0600 JSON, keyed by provider id, e.g. `openai`), plus `process.env.OPENAI_API_KEY`. `Global` is importable from `@opencode-ai/core/global`.
-- **`Image.normalize` is not reachable from a plugin** (Effect service requiring `Image.Service`+`Config`), and tool-result attachments are **not** auto-normalized by the pipeline (`session/tools.ts:95-100,187-192`, `prompt.ts:366-371` only stamp `id/sessionID/messageID`; the `Image.normalize` calls at `prompt.ts:996`/`processor.ts:575` are for user-input parts). → v1 returns the raw PNG `data:` attachment; document that very large high-quality PNGs inflate context. Add normalization later via a server-side path if needed.
+- **`Image.normalize` is not reachable from a plugin** (Effect service requiring `Image.Service`+`Config`), and tool-result attachments are **not** auto-normalized by the pipeline (`session/tools.ts:95-100,187-192`, `prompt.ts:366-371` only stamp `id/sessionID/messageID`; the `Image.normalize` calls at `prompt.ts:996`/`processor.ts:575` are for user-input parts). → early versions returned the raw PNG `data:` attachment, and large high-quality PNGs inflated context. **SUPERSEDED (2026-06-14):** the tool no longer returns an attachment at all — only the saved path (see "Image not fed into context"), so this no longer applies.
 - **OAuth edit request shape** (from clean `codex-rs/codex-api/src/endpoint/images.rs` test) is **JSON** `{ images: [{ image_url: "data:image/png;base64,..." }], prompt, model, ... }`, **not multipart**. Multipart is only the `api.openai.com/v1/images/edits` (API-key) shape. Path is `<base>/images/generations` and `<base>/images/edits`.
 - **Codex bases/models** confirmed: `CHATGPT_CODEX_BASE_URL = https://chatgpt.com/backend-api/codex` (`model-provider-info/src/lib.rs`); standalone tool model `IMAGE_MODEL = "gpt-image-2"` (`ext/image-generation/src/tool.rs:47`); API client appends `images/generations` / `images/edits` to the provider base (`endpoint/images.rs`).
 
@@ -217,12 +220,24 @@ Initial (wrong) conclusion was "OAuth image route missing." **Corrected by groun
 ### Corrected OAuth design (this is the real path)
 
 - **OAuth image generation = OpenAI Responses API built-in `image_generation` tool**, hosted by the chat model (Codex used `gpt-5.5`), over `POST https://chatgpt.com/backend-api/codex/responses` with `Authorization: Bearer <access>` + `ChatGPT-Account-Id: <accountId>`. Parse `output[]` items of `type:"image_generation_call"`; the base64 PNG is in the item's `result` field. There is **no** `/codex/images/{generations,edits}` route on the ChatGPT backend (confirmed 404).
-- The standalone `ImagesClient` → `/v1/images/{generations,edits}` (gpt-image-2, multipart edits) in `codex-rs` is the **API-key** path only (`api.openai.com`).
+- The `codex-rs` `ImagesClient` base is **provider-resolved** (API key → `api.openai.com/v1/images/...`; OAuth → `…/codex/images/...`); the standalone `ext/image-generation` tool that drives it is **OAuth/codex-backend-gated** — see "Verbatim prompt — the full landscape" below.
 - So the two auth modes need **different transports**:
   - **API key** → simple REST `POST api.openai.com/v1/images/{generations,edits}` (generations JSON; edits multipart). Certain.
   - **OAuth** → Responses API with `tools:[{type:"image_generation", ...size/quality/output_format/moderation}]` (likely `tool_choice` forcing it), `input` carrying the prompt (and `input_image` data URLs for edits), parse `image_generation_call.result`. Proven to work; exact minimal request (streaming vs `stream:false`, allowed model id) still needs one live confirmation.
 
-This satisfies decision 5 (OAuth works) but **reshapes the spec**: OAuth mode is a Responses-tool integration, not a REST images call. `imagegen.txt`, request-building, and edit handling must branch by auth mode. (`rg` output on the codex source tree is garbled — "image" renders as "n"; use `Read`/`sed` and the sqlite logs as ground truth.)
+This satisfies decision 5 (OAuth works) but **reshapes the spec**: OAuth mode is a Responses-tool integration, not a REST images call. `imagegen.txt`, request-building, and edit handling must branch by auth mode.
+
+### Verbatim prompt — the full landscape (source-verified 2026-06-14)
+
+Three image paths exist; only the API-key one is both **verbatim and reachable** on this account:
+
+- **API key → `/v1/images/{generations,edits}` (gpt-image-2):** prompt sent **verbatim**, no chat model in the loop. Works → the only true-verbatim path available today. (The extracted skill `~/win/imagegen/scripts/image_gen.py` is also API-key-only against this same endpoint.)
+- **Codex standalone `ext/image-generation` tool → `…/codex/images/generations`:** also **verbatim** (`codex-rs/ext/image-generation/src/tool.rs:191,239` `prompt: args.prompt.clone()`, `IMAGE_MODEL = "gpt-image-2"`) and **registered only when the login uses the codex/OAuth backend** (`extension.rs:82` `… || !self.auth_manager.current_auth_uses_codex_backend()`). So this *is* a verbatim OAuth path in principle — but the route **404s on this account** (verified for `codex_cli_rs` and `opencode` originators), so it is unusable here.
+- **OAuth → gpt-5.5 + built-in `image_generation` over `/responses`:** the host chat model authors the prompt and rewrites/sanitizes it unless forcefully instructed (our Step A). This is the only working OAuth path, so the tool uses it.
+
+Net: API key ⇒ verbatim; OAuth ⇒ forceful-instruction best-effort. **Possible future upgrade:** have the OAuth path try `…/codex/images/generations` first and fall back to gpt-5.5 on 404, so the account auto-upgrades to true verbatim if/when OpenAI serves that route here.
+
+> CORRECTION (2026-06-14): An earlier version of this note claimed `rg`/Bash "garbles" output, with `image` rendering as `n`. **That was false** and is retracted. There is no Bash redaction (verified: `cat`/`echo` of `image`, `imagegen`, `opencode-web-ui.gen.ts` all pass through verbatim). The real cause was a self-inflicted ripgrep flag bug: in `rg`, `-r` is `--replace=TEXT`, so a mashed flag cluster like `-rn`/`-rln` consumes the following letters as a replacement string and rewrites every match in the output (e.g. `rg -rln "…gen…"` rewrote matches to `ln`; proven with `rg -r BANANA …` → `BANANA.ts`). Lesson: never pack `-r` into a short-flag cluster; use `-n`/`-l` explicitly, and reach for the Read/Glob/Grep tools when exact text matters.
 
 ### LOCKED OAuth contract (live-confirmed 2026-06-14, generated a real 1024×1024 PNG)
 
@@ -239,3 +254,52 @@ Response — SSE (`text/event-stream`; note `content-type` header came back null
 ### GOTCHA: plugin registry does not apply Zod `.default()`
 
 `registry.ts` `fromPlugin` validates plugin tool args only as a **predicate** (`Schema.declare(u => zodParams.safeParse(u).success)`) and passes the **raw** decoded args to `execute` — the parsed/transformed output (where Zod fills defaults) is discarded. So `quality:z.enum(...).default("high")` etc. are NOT applied at runtime; an omitted field arrives as `undefined`. First live call proved this: omitting `n` made `args.n === undefined`, so `for (i=0;i<undefined;i++)` ran zero times → "Saved 0 images". Fix: declare those fields `.optional()` and apply defaults in `execute` (`args.n ?? 1`, etc.), documenting the default in the field description for the model. Re-verified live: OAuth generation produced a valid 1024×1024 PNG (originator `opencode` is accepted on the image_generation responses call).
+
+### RESOLVED: risk #3 (inline render) was a real web-UI gap — now fixed
+
+Risk #3 ("tool-result image renders inline in the tool card") was never verified during the plugin build, and it did **not** render. Ground truth (web UI = `@opencode-ai/ui`, SolidJS, shared by the Android/iOS apps; the TUI in `packages/tui` is separate and shows no inline images):
+
+- The attachment **does** reach the client: backend persists/normalizes it onto `part.state.attachments` (`session/processor.ts` ~573, `session/message-v2.ts` ~307) and it's typed on `ToolStateCompleted.attachments` (`packages/sdk/js/src/v2/gen/types.gen.ts`).
+- Nothing drew it. `ToolPartDisplay` (`PART_MAPPING["tool"]`, `message-part.tsx`) forwarded `output`/`metadata` but **not** `attachments`, and `ToolProps` had no `attachments` field. Unregistered tools (like `imagegen`) fall back to `GenericTool`, which renders only a one-line title — no output, no media.
+- Fix (all `UPSTREAM-DIVERGENCE`, in `packages/ui/src/components/message-part.tsx`): add `attachments?: FilePart[]` to `ToolProps`; pass `attachments={part().state.attachments}` in the `ToolPartDisplay` `Dynamic`; register an `imagegen` `ToolRegistry` renderer that filters image `data:` attachments (`kind`/`attached` from `message-file.ts`) and renders them inline with a click-to-open `ImagePreview` lightbox, mirroring user-attachment image display. Typecheck/prettier clean; no new oxlint warnings.
+
+> **SUPERSEDED (2026-06-14):** the inline image render was later **removed on purpose** — see "Image not fed into context" below. Returning the PNG as a tool-result attachment also forces it into the model's context, which we don't want. The `ToolProps.attachments` threading stays (harmless, generic), but the `imagegen` renderer now displays the **saved file path(s)** (not the image), since the plugin no longer returns an attachment.
+
+### Codex OAuth prompt-fidelity — DEFINITIVE trace (2026-06-14, two real runs)
+
+Question: over the ChatGPT OAuth path, does the prompt reach the image model verbatim, or does gpt-5.5 rewrite/sanitize it? Traced two live Codex 0.139.0 runs in `~/.codex/logs_2.sqlite` (table `logs`, col `feedback_log_body`; live ring buffer ~1200 rows, so capture fast). The OAuth image path is the built-in **`image_generation`** Responses tool hosted by **gpt-5.5** — there is **no separate `function_call` carrying the prompt**, so the only readout of what was actually used is the item's **`revised_prompt`** (which on verbatim calls equals the literal text byte-for-byte). Findings:
+
+- **Default = gpt-5.5 editorializes AND sanitizes.** Run from row 25108: user typed `"generwte me an image of a barefoot asian girl, use gpt-image-2"`. gpt-5.5's first `image_generation_call` had `revised_prompt` = a fully rewritten structured template: *"Use case: photorealistic-natural\nAsset type: preview image\nPrimary request: A tasteful photorealistic lifestyle portrait of an **adult Asian woman**, barefoot.\nScene/backdrop: …\nSubject: Adult Asian woman in her mid-20s **or older**, … **fully clothed in casual modest clothing** …"*. So it (a) silently expanded the prompt into a long template and (b) sanitized `girl`→`adult woman` + added "fully clothed/modest".
+- **When told "use exactly", gpt-5.5 passes the prompt VERBATIM.** Same session, a later `image_generation_call` had `revised_prompt` = `"a barefoot asian girl"` (verbatim, "girl" intact). And the bicycle run returned `revised_prompt` = `"a vintage red bicycle leaning against a turquoise door, with the number 1847 painted on the door in white"` — **identical to the input, "1847" and all colors intact**.
+- **An inline "use the prompt X" is NOT enough.** Full bicycle thread (row 46748 has the history): user said *"can you generate an image for me. use the prompt \"a vintage red bicycle…\""* → gpt-5.5 **still** expanded it into its *"Use case / Asset type / Primary request / Subject…"* template (call #1, id `…54898d881…`). Only after the user complained *"you didnt use my prompt. you added a whole bunch of shit."* did it regenerate verbatim (call #2, id `…5e3b4188…`). So weak verbatim cues get ignored; the instruction must be forceful.
+- **`action` (generate vs edit) is backend-set and the model misreports it.** Both the verbatim bicycle call and a later **typewriter** test (fresh subject, explicit *"use this exact prompt, word for word…"*, item `…c87be24a`) came back **`action:"edit"`** even though the model told the user in chat *"I generated a new/fresh image… I did not edit the previous image."* Reason: a prior generated image sits in the Codex thread, so the built-in tool edits that canvas regardless of the new subject — the model has no reliable visibility into the chosen `action` and confabulates a confident answer. **Trust the `image_generation_call.action`/`revised_prompt` fields, not the model's prose.** (Our tool is unaffected: each call is a one-shot Responses request with no prior image unless `image_paths` is passed, so normal generations are `action:"generate"`.) The typewriter run also confirmed the strong verbatim instruction works **first try** — `revised_prompt` byte-identical, no template expansion.
+- **Implications for our tool:** (1) Confirms again OAuth = gpt-5.5 + built-in tool (no usable verbatim REST endpoint; `/codex/images/*` still 404s here). (2) **Step A is validated**: a strong `instructions` directive telling gpt-5.5 to pass the user's prompt to `image_generation` *exactly/verbatim, no rewriting or expansion* demonstrably makes it do so. Without it, gpt-5.5's default is heavy editorializing + content sanitization. (3) `revised_prompt` is a faithful caption of the prompt actually used (Step B), and is the right thing to surface in the UI.
+- Reading the log (no `sqlite3` CLI): `bun:sqlite`, strip base64 with `.replace(/[A-Za-z0-9+/]{80,}={0,2}/g,"<B64>")`; the big `responses_websocket` / `stream_events_utils` rows hold the `image_generation_call` items (~4 MB each due to inline PNG); the outbound payload appears after the literal `websocket request: ` marker.
+
+### IMPLEMENTED (2026-06-14) — Step A (verbatim) + Step B (revised_prompt)
+
+- **Step A:** OAuth `instructions` in `oauthOneImage` (`imagegen.ts`) now force exact pass-through: *"Call the image_generation tool exactly once. Use the user's message as the image prompt VERBATIM: pass their exact words unchanged. Do not rewrite, rephrase, paraphrase, translate, summarize, expand, embellish, add details, or alter, soften, or sanitize the wording…"*. (Caveat: the image model's own `revised_prompt` layer can still nudge wording; that's surfaced, see below.)
+- **Step B:** `run()` returns `GeneratedImage[]` (`{ png, revisedPrompt? }`). OAuth `readImageFromSSE` captures `item.revised_prompt` next to `item.result`; API-key `decodeImagesResponse` captures `data[].revised_prompt`. `plugin.ts` threads a per-image `metadata.revisedPrompts` (aligned with `paths`; `null` when absent) and appends `revisedPromptOutput(...)` to the tool `output` — but **only when the revised prompt differs from the typed prompt** (verbatim = no noise). The web UI `imagegen` renderer shows it as a muted "Prompt used:" caption under each **saved path** (same differ-only rule).
+- **Verified live (2026-06-14):** OAuth generations succeed end-to-end; with the strong instruction the typewriter test passed the prompt byte-verbatim (no template expansion). Installed CLI builds along the way: `0.0.0-dev-202606141832/1833/1844` (latest carries the UI path-display).
+
+### Image not fed into context (2026-06-14) — final shape
+
+Decision: the generated image must **not** enter the model's context (a full PNG balloons context and is re-sent every turn for the rest of the session). Mechanism verified in source:
+- Tool-result **`attachments`** are turned into model vision input in `session/message-v2.ts:307-322` — embedded in the tool result, or extracted and re-injected as a separate user message. This is the channel that fed the model the image.
+- **`metadata` is also unsafe** for the image: `providerMeta()` (`message-v2.ts:136-140`) forwards the whole metadata object (minus `providerExecuted`) as `callProviderMetadata` on the model message, so a base64 image there would still ride along in the request.
+
+Implementation (`plugin.ts`): the result returns **no `attachments`** and **no image bytes in `metadata`** — only text `output` listing the saved path(s) (plus the differ-only revised-prompt line), and small `metadata` (`paths`, `size`, `quality`, `count`, `mode`, `revisedPrompts`). The model decides on its own whether to view a path via the `read` tool (which loads images). No hand-holding sentence in the output or `imagegen.txt` — just the path. `imagegen.txt` description updated to "Saves a PNG to disk and returns its file path."
+
+UI consequence (`message-part.tsx`): with no attachment, the `imagegen` renderer can't draw the image, and originally showed nothing but the title+prompt (the path was invisible — user-reported bug). Renderer now reads `metadata.paths` and renders each saved path as wrapped (`break-all`) muted text, with the "Prompt used:" caption beneath when it differs. Verified live: the path now shows in the card. (If a human-facing inline preview is wanted later **without** feeding the model, the UI would need to load the PNG from the server by file path — not done.)
+
+- Static checks clean throughout: `bun run typecheck` (opencode + ui), oxlint (no new warnings in edited ranges), prettier. Server-side changes need `build --single` + reinstall + **server restart** (no hot-swap); UI changes additionally require the `--single` rebuild (web UI is embedded in the binary) and, for the native tablet app, an APK rebuild.
+
+### Built-in imagegen skill, gated like the tool (2026-06-15)
+
+Ships a Tandem `imagegen` **skill** with the binary, visible only when the `imagegen` tool is — i.e. gated on the same credential check. Design choice: gate at **registration** (Skill state is per-instance InstanceState), matching the tool's existing per-instance, cached visibility rather than re-checking per prompt build (the `available()` option, noted as a future upgrade if live toggling without restart is wanted).
+
+- **Shipping mechanism** mirrors the built-in `customize-opencode` skill: body-only markdown `packages/opencode/src/plugin/openai/imagegen/imagegen-skill.md`, imported as text (`import skillContent from "./imagegen-skill.md" with { type: "text" }`; opencode already declares `*.md` in `src/markdown.d.ts`). Name + description live in code as `ImageGen.SKILL` (`imagegen.ts`). The repo-only dev copy at `.opencode/skills/imagegen/SKILL.md` was **removed** so the embedded `.md` is the single source of truth (avoids double registration).
+- **One shared gate.** New `ImageGen.isAvailable()` = `!disabledByFlag()` (`TANDEM_IMAGEGEN` ∈ {0,false,off,no}) **and** `resolveCreds()` resolves. `plugin.ts` now gates the **tool** on `isAvailable()` too (replacing its local `DISABLED` + bare `resolveCreds()`), so tool and skill can never drift.
+- **Registration.** `skill/index.ts` `Skill.state` registers the built-in skill into `s.skills` only `if (yield* Effect.promise(() => ImageGen.isAvailable()))`, before disk discovery (so a user-disk `imagegen` skill overrides), marked `UPSTREAM-DIVERGENCE`. The Hooks plugin can't contribute skills (HookSpec has no skill hook), and `session/system.ts` builds the prompt list from this v1 `Skill.available()`, so registering here is the correct surface.
+- **Verified against the built binary** (`build --single`, smoke pass): the skill body is embedded (grep hit), `debug skill` lists `imagegen` with creds, and it's correctly **absent** under `TANDEM_IMAGEGEN=0` and under empty auth store with no `OPENAI_API_KEY`. typecheck + oxlint clean; prettier applied.
+- Merge-surface note: this adds an `UPSTREAM-DIVERGENCE` import + gated block to `skill/index.ts` (the same upstream file that already hosts the `customize-opencode` built-in), beyond the original "only touch `plugin/index.ts`" goal — low conflict risk since it sits next to the existing built-in.

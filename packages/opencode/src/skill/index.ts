@@ -16,6 +16,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Glob } from "@opencode-ai/core/util/glob"
 import { Discovery } from "./discovery"
 import { isRecord } from "@/util/record"
+import { ImageGen } from "@/plugin/openai/imagegen/imagegen"
 
 const CLAUDE_EXTERNAL_DIR = ".claude"
 const AGENTS_EXTERNAL_DIR = ".agents"
@@ -279,6 +280,18 @@ export const layer = Layer.effect(
           description: CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION,
           location: "<built-in>",
           content: CUSTOMIZE_OPENCODE_SKILL_BODY,
+        }
+        // UPSTREAM-DIVERGENCE: Tandem built-in imagegen skill. Gated on the same
+        // ImageGen.isAvailable() check (opt-out flag + OpenAI creds) as the imagegen
+        // tool, so the skill only appears when the tool does. Registered before disk
+        // discovery so a user-disk skill of the same name can still override it.
+        if (yield* Effect.promise(() => ImageGen.isAvailable())) {
+          s.skills[ImageGen.SKILL.name] = {
+            name: ImageGen.SKILL.name,
+            description: ImageGen.SKILL.description,
+            location: "<built-in>",
+            content: ImageGen.SKILL.content,
+          }
         }
         yield* loadSkills(s, yield* InstanceState.get(discovered), events)
         return s

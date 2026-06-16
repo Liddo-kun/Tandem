@@ -1,20 +1,32 @@
 import type { Hooks, PluginInput, ToolContext } from "@opencode-ai/plugin"
 import { tool } from "@opencode-ai/plugin"
-import path from "node:path"
 import { ImageGen } from "./imagegen"
 
 // UPSTREAM-DIVERGENCE: Tandem-only OpenAI image generation tool. Visible only when
 // an OpenAI credential (API key or ChatGPT OAuth) is resolvable; hidden otherwise.
 // Disable with TANDEM_IMAGEGEN=0. Design + verified contract: notes/imagegen.md.
 
-const DISABLED = ["0", "false", "off", "no"].includes((process.env.TANDEM_IMAGEGEN ?? "").toLowerCase())
+// Append the prompt the image model actually used to the tool output, but only when
+// it differs from what the user typed (i.e. the model revised it) — verbatim prompts
+// would just be redundant noise. Surfaces the model's editorializing to the agent/TUI;
+// the UI shows the same per image. `revised` is aligned with the produced images.
+function revisedPromptOutput(revised: Array<string | null>, original: string): string {
+  const orig = original.trim()
+  const changed = revised
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .filter((entry) => entry.length > 0 && entry !== orig)
+  const unique = [...new Set(changed)]
+  if (unique.length === 0) return ""
+  if (unique.length === 1) return `\n\nImage prompt used (revised by the model): ${JSON.stringify(unique[0])}`
+  return `\n\nImage prompts used (revised by the model):\n${unique.map((entry, index) => `${index + 1}. ${JSON.stringify(entry)}`).join("\n")}`
+}
 
 export async function ImagegenPlugin(input: PluginInput): Promise<Hooks> {
-  if (DISABLED) return {}
-  // Option A visibility: contribute the tool only when a credential resolves at
-  // construction. Re-evaluation on later login is deferred (future option B).
-  const creds = await ImageGen.resolveCreds().catch(() => undefined)
-  if (!creds) return {}
+  // Option A visibility: contribute the tool only when imagegen is available at
+  // construction (opt-out flag + a resolvable credential). The built-in imagegen
+  // skill gates on the same `isAvailable()` so the two stay in lockstep.
+  // Re-evaluation on later login is deferred (future option B).
+  if (!(await ImageGen.isAvailable())) return {}
 
   return {
     tool: {
@@ -84,14 +96,23 @@ export async function ImagegenPlugin(input: PluginInput): Promise<Hooks> {
             image_paths: args.image_paths,
             mask_path: args.mask_path,
           }
-          const pngs = await ImageGen.run(request, live)
+          const images = await ImageGen.run(request, live)
+          const pngs = images.map((image) => image.png)
           const callID = ctx.callID ?? ctx.messageID
           const saved = await ImageGen.saveImages(pngs, ctx.sessionID, callID)
           const sizeLabel = request.size === "auto" ? "auto size" : request.size
-          const output =
+          // The prompt the image model reports it actually used (per image). On OAuth
+          // the host model can still adjust wording despite the verbatim instruction,
+          // so surface this so the caller sees what was rendered. Aligned with `saved`.
+          const revisedPrompts = images.map((image) => image.revisedPrompt ?? null)
+          // Return only the saved path(s) as text — the image is NOT attached, so it is
+          // not fed into the model's context (a full PNG would balloon context and be
+          // re-sent every turn).
+          const fileList =
             saved.length === 1
-              ? `Saved 1 image (${sizeLabel}) to ${saved[0]}`
+              ? `Saved 1 image (${sizeLabel}):\n${saved[0]}`
               : `Saved ${saved.length} images (${sizeLabel}):\n${saved.join("\n")}`
+          const output = `${fileList}${revisedPromptOutput(revisedPrompts, request.prompt)}`
           return {
             title: request.prompt.length > 60 ? `${request.prompt.slice(0, 57)}...` : request.prompt,
             output,
@@ -101,13 +122,8 @@ export async function ImagegenPlugin(input: PluginInput): Promise<Hooks> {
               quality: request.quality,
               count: saved.length,
               mode: live.mode,
+              revisedPrompts,
             },
-            attachments: pngs.map((png, index) => ({
-              type: "file" as const,
-              mime: "image/png",
-              url: `data:image/png;base64,${png.toString("base64")}`,
-              filename: path.basename(saved[index]),
-            })),
           }
         },
       }),

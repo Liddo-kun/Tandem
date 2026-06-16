@@ -1,4 +1,4 @@
-Generate or edit raster images with OpenAI's image models. Returns a saved PNG file plus an inline preview.
+Generate or edit raster images with OpenAI's image models. Saves a PNG to disk and returns its file path.
 
 Use this tool when:
 - The user asks for a raster image from a description: a photo, illustration, diagram, mockup, sprite, meme, portrait, logo concept, or any other picture.

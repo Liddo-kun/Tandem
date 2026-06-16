@@ -1317,6 +1317,9 @@ export interface ToolProps {
   tool: string
   sessionID?: string
   output?: string
+  // UPSTREAM-DIVERGENCE: tool-result file attachments (e.g. imagegen PNGs) threaded
+  // to tool renderers so they can display media inline. See imagegen renderer below.
+  attachments?: FilePart[]
   status?: string
   hideDetails?: boolean
   defaultOpen?: boolean
@@ -1463,6 +1466,8 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
               metadata={partMetadata()}
               // @ts-expect-error
               output={part().state.output}
+              // @ts-expect-error UPSTREAM-DIVERGENCE: only present on completed tool state
+              attachments={part().state.attachments}
               status={part().state.status}
               hideDetails={props.hideDetails}
               defaultOpen={props.defaultOpen}
@@ -1808,6 +1813,62 @@ ToolRegistry.register({
       >
         <ExaOutput output={props.output} />
       </BasicTool>
+    )
+  },
+})
+
+// UPSTREAM-DIVERGENCE: Tandem-only renderer for the imagegen plugin tool. The image is
+// deliberately NOT loaded into model context (no attachment), so the card shows the saved
+// file path(s) instead. See packages/opencode/src/plugin/openai/imagegen/.
+ToolRegistry.register({
+  name: "imagegen",
+  render(props) {
+    const prompt = createMemo(() => (typeof props.input.prompt === "string" ? props.input.prompt : undefined))
+    const paths = createMemo(() =>
+      Array.isArray(props.metadata.paths) ? props.metadata.paths.filter((p): p is string => typeof p === "string") : [],
+    )
+    // Per-image prompt the model reports it used (`revisedPrompts` from the plugin,
+    // aligned with `paths`). Shown only when it differs from the typed prompt, i.e. the
+    // model revised it. See plugin.ts revisedPromptOutput.
+    const revised = createMemo(() =>
+      Array.isArray(props.metadata.revisedPrompts) ? props.metadata.revisedPrompts : [],
+    )
+    const revisedFor = (index: number) => {
+      const value = revised()[index]
+      if (typeof value !== "string") return undefined
+      const trimmed = value.trim()
+      if (!trimmed || trimmed === (prompt() ?? "").trim()) return undefined
+      return trimmed
+    }
+    return (
+      <>
+        <BasicTool
+          {...props}
+          icon="photo"
+          trigger={{
+            title: "Image",
+            subtitle: prompt(),
+          }}
+        />
+        <Show when={paths().length > 0}>
+          <div data-component="imagegen-files">
+            <For each={paths()}>
+              {(filePath, index) => (
+                <div data-component="imagegen-file">
+                  <div data-slot="imagegen-path" class="break-all text-12-regular text-text-weak">
+                    {filePath}
+                  </div>
+                  <Show when={revisedFor(index())}>
+                    <div data-component="imagegen-revised" class="mt-0.5 text-12-regular text-text-weak">
+                      <span class="text-text-muted">Prompt used:</span> {revisedFor(index())}
+                    </div>
+                  </Show>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
+      </>
     )
   },
 })

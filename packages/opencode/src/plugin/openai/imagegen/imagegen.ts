@@ -3,12 +3,34 @@ import path from "node:path"
 import { Global } from "@opencode-ai/core/global"
 import { extractAccountId } from "../codex"
 import description from "./imagegen.txt"
+import skillContent from "./imagegen-skill.md" with { type: "text" }
 
 // UPSTREAM-DIVERGENCE: Tandem-only image generation tool core. Kept fully
 // self-contained so upstream merges only ever touch the one-line registration in
 // plugin/index.ts. Verified request/response contract: notes/imagegen.md.
 
 export const DESCRIPTION: string = description
+
+// Built-in skill shipped with the binary and registered (gated) in skill/index.ts.
+// Name/description live here; the body is the embedded markdown above.
+export const SKILL = {
+  name: "imagegen",
+  description:
+    "Use when the user wants to create or edit a raster image — a photo, illustration, diagram, mockup, sprite, texture, product shot, logo concept, meme, portrait, or icon art — or to modify an existing image (add/remove elements, recolor, restyle, replace background). Drives the Tandem `imagegen` tool (OpenAI gpt-image). Do not use for vector/SVG output, established icon/logo systems, or visuals better built directly in HTML/CSS/canvas or code.",
+  content: skillContent,
+} as const
+
+// Single source of truth for imagegen visibility: the opt-out flag plus a resolvable
+// OpenAI credential. Both the tool (plugin.ts) and the skill (skill/index.ts) gate on
+// this so they can never disagree about whether imagegen is available.
+const DISABLED_VALUES = ["0", "false", "off", "no"]
+export function disabledByFlag(): boolean {
+  return DISABLED_VALUES.includes((process.env.TANDEM_IMAGEGEN ?? "").toLowerCase())
+}
+export async function isAvailable(): Promise<boolean> {
+  if (disabledByFlag()) return false
+  return !!(await resolveCreds().catch(() => undefined))
+}
 
 // gpt-image-2 backs the API-key Images endpoint. The OAuth path instead drives
 // the Responses API's built-in `image_generation` tool, hosted by a chat model.
@@ -38,6 +60,15 @@ export interface Args {
   n: number
   image_paths?: string[]
   mask_path?: string
+}
+
+// A produced image plus the prompt the image model reports it actually used
+// (`revised_prompt`). On the OAuth path the host chat model authors the prompt,
+// so this is how the caller learns what was really rendered. May be undefined
+// when the backend does not return one.
+export interface GeneratedImage {
+  png: Buffer
+  revisedPrompt?: string
 }
 
 interface ApiCreds {
@@ -128,7 +159,7 @@ export async function refreshOAuth(creds: OauthCreds): Promise<OauthCreds> {
   }
 }
 
-export async function run(args: Args, creds: Creds): Promise<Buffer[]> {
+export async function run(args: Args, creds: Creds): Promise<GeneratedImage[]> {
   validate(args)
   const editing = !!args.image_paths?.length
   if (creds.mode === "api") return editing ? editApiKey(args, creds) : generateApiKey(args, creds)
@@ -144,7 +175,7 @@ function validate(args: Args): void {
 
 // ---- API-key transport: REST /v1/images/{generations,edits} ----
 
-async function generateApiKey(args: Args, creds: ApiCreds): Promise<Buffer[]> {
+async function generateApiKey(args: Args, creds: ApiCreds): Promise<GeneratedImage[]> {
   const body: Record<string, unknown> = {
     model: IMAGE_MODEL,
     prompt: args.prompt,
@@ -163,7 +194,7 @@ async function generateApiKey(args: Args, creds: ApiCreds): Promise<Buffer[]> {
   return decodeImagesResponse(await res.json())
 }
 
-async function editApiKey(args: Args, creds: ApiCreds): Promise<Buffer[]> {
+async function editApiKey(args: Args, creds: ApiCreds): Promise<GeneratedImage[]> {
   const form = new FormData()
   form.append("model", IMAGE_MODEL)
   form.append("prompt", args.prompt)
@@ -188,19 +219,24 @@ async function editApiKey(args: Args, creds: ApiCreds): Promise<Buffer[]> {
   return decodeImagesResponse(await res.json())
 }
 
-function decodeImagesResponse(json: { data?: { b64_json?: string }[] }): Buffer[] {
-  const images = (json.data ?? []).filter((item): item is { b64_json: string } => typeof item.b64_json === "string")
+function decodeImagesResponse(json: { data?: { b64_json?: string; revised_prompt?: string }[] }): GeneratedImage[] {
+  const images = (json.data ?? []).filter(
+    (item): item is { b64_json: string; revised_prompt?: string } => typeof item.b64_json === "string",
+  )
   if (!images.length) throw new Error("OpenAI returned no image data")
-  return images.map((item) => Buffer.from(item.b64_json, "base64"))
+  return images.map((item) => ({
+    png: Buffer.from(item.b64_json, "base64"),
+    revisedPrompt: typeof item.revised_prompt === "string" ? item.revised_prompt : undefined,
+  }))
 }
 
 // ---- OAuth transport: Responses API image_generation tool over /codex/responses ----
 
-async function generateOAuth(args: Args, creds: OauthCreds): Promise<Buffer[]> {
+async function generateOAuth(args: Args, creds: OauthCreds): Promise<GeneratedImage[]> {
   return collectN(args.n, () => oauthOneImage(args, creds, undefined))
 }
 
-async function editOAuth(args: Args, creds: OauthCreds): Promise<Buffer[]> {
+async function editOAuth(args: Args, creds: OauthCreds): Promise<GeneratedImage[]> {
   const inputImages = await Promise.all(
     args.image_paths!.map(
       async (file) => `data:${mimeFromPath(file)};base64,${(await readFile(file)).toString("base64")}`,
@@ -213,21 +249,30 @@ async function editOAuth(args: Args, creds: OauthCreds): Promise<Buffer[]> {
 
 // The image_generation tool yields a single image per Responses call, so multiple
 // images are produced by issuing the request N times.
-async function collectN(n: number, once: () => Promise<Buffer>): Promise<Buffer[]> {
-  const out: Buffer[] = []
+async function collectN(n: number, once: () => Promise<GeneratedImage>): Promise<GeneratedImage[]> {
+  const out: GeneratedImage[] = []
   for (let i = 0; i < n; i++) out.push(await once())
   return out
 }
 
-async function oauthOneImage(args: Args, creds: OauthCreds, inputImages: string[] | undefined): Promise<Buffer> {
+async function oauthOneImage(
+  args: Args,
+  creds: OauthCreds,
+  inputImages: string[] | undefined,
+): Promise<GeneratedImage> {
   const content: Array<Record<string, unknown>> = [{ type: "input_text", text: args.prompt }]
   for (const url of inputImages ?? []) content.push({ type: "input_image", image_url: url })
   const body = {
     model: OAUTH_HOST_MODEL,
     stream: true,
     store: false,
+    // On OAuth the host chat model authors the prompt handed to the image_generation
+    // tool — left to itself gpt-5.5 rewrites/expands and sanitizes it (verified via
+    // Codex traces, notes/imagegen.md). Force verbatim pass-through so the user's
+    // wording is what gets rendered. (The image model's own revised_prompt layer may
+    // still adjust it slightly; that is surfaced back to the user.)
     instructions:
-      "Generate the requested image using the image_generation tool. Do not ask questions or add commentary.",
+      "Call the image_generation tool exactly once. Use the user's message as the image prompt VERBATIM: pass their exact words unchanged. Do not rewrite, rephrase, paraphrase, translate, summarize, expand, embellish, add details, or alter, soften, or sanitize the wording in any way. Do not ask questions, explain, or add commentary.",
     input: [{ role: "user", content }],
     tools: [
       { type: "image_generation", size: args.size, quality: args.quality, output_format: "png", moderation: "low" },
@@ -246,15 +291,23 @@ async function oauthOneImage(args: Args, creds: OauthCreds, inputImages: string[
   return readImageFromSSE(res.body)
 }
 
-// Parse the Responses SSE stream and return the first completed image. The base64
-// PNG arrives on `response.output_item.done` (item.type === "image_generation_call",
-// field `result`), with `response.completed` as a fallback.
-async function readImageFromSSE(body: ReadableStream<Uint8Array>): Promise<Buffer> {
+// Parse the Responses SSE stream and return the first completed image plus the
+// prompt the image model reports it used. The base64 PNG arrives on
+// `response.output_item.done` (item.type === "image_generation_call", field
+// `result`), alongside `revised_prompt`; `response.completed` is the fallback.
+async function readImageFromSSE(body: ReadableStream<Uint8Array>): Promise<GeneratedImage> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ""
   let result: string | undefined
+  let revisedPrompt: string | undefined
   let failure: string | undefined
+
+  const capture = (item: any) => {
+    if (item?.type !== "image_generation_call" || typeof item.result !== "string") return
+    result ??= item.result
+    if (revisedPrompt === undefined && typeof item.revised_prompt === "string") revisedPrompt = item.revised_prompt
+  }
 
   const handle = (event: string, data: string) => {
     let parsed: any
@@ -263,15 +316,10 @@ async function readImageFromSSE(body: ReadableStream<Uint8Array>): Promise<Buffe
     } catch {
       return
     }
-    if (
-      event === "response.output_item.done" &&
-      parsed.item?.type === "image_generation_call" &&
-      typeof parsed.item.result === "string"
-    ) {
-      result ??= parsed.item.result
+    if (event === "response.output_item.done") {
+      capture(parsed.item)
     } else if (event === "response.completed" && Array.isArray(parsed.response?.output)) {
-      for (const item of parsed.response.output)
-        if (item.type === "image_generation_call" && typeof item.result === "string") result ??= item.result
+      for (const item of parsed.response.output) capture(item)
     } else if (event === "response.failed" || event === "error") {
       failure =
         parsed.response?.error?.message ??
@@ -296,10 +344,10 @@ async function readImageFromSSE(body: ReadableStream<Uint8Array>): Promise<Buffe
         else if (line.startsWith("data:")) data += line.slice(5).trim()
       }
       if (data && data !== "[DONE]") handle(event, data)
-      if (result) return Buffer.from(result, "base64")
+      if (result) return { png: Buffer.from(result, "base64"), revisedPrompt }
     }
   }
-  if (result) return Buffer.from(result, "base64")
+  if (result) return { png: Buffer.from(result, "base64"), revisedPrompt }
   throw new Error(failure ?? "image generation produced no image")
 }
 
