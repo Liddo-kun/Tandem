@@ -47,8 +47,8 @@ export function openSessionContext(input: OpenSessionContextInput) {
   input.tabs.setActive("context")
 }
 
-export function shouldShowFileTree(input: { desktopV2: boolean; showFileTree: boolean; opened: boolean }) {
-  return input.opened && (!input.desktopV2 || input.showFileTree)
+export function shouldShowFileTree(input: { visible: boolean; opened: boolean }) {
+  return input.opened && input.visible
 }
 
 export const createSessionTabs = (input: TabsInput) => {
