@@ -15,8 +15,8 @@ import {
   type JSX,
 } from "solid-js"
 import { Popover as KobaltePopover } from "@kobalte/core/popover"
-import { createStore } from "solid-js/store"
-import { useLocal } from "@/context/local"
+import { createStore, type SetStoreFunction, type Store } from "solid-js/store"
+import type { useLocal } from "@/context/local"
 import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/file"
 import {
   ContentPart,
@@ -29,10 +29,7 @@ import {
   FileAttachmentPart,
 } from "@/context/prompt"
 import { useLayout } from "@/context/layout"
-import { useNavigate, useSearchParams } from "@solidjs/router"
 import { useSDK } from "@/context/sdk"
-import { useServer } from "@/context/server"
-import { useTabs } from "@/context/tabs"
 import { useSync } from "@/context/sync"
 import { useComments } from "@/context/comments"
 import { Button } from "@opencode-ai/ui/button"
@@ -51,8 +48,6 @@ import { Persist, persisted } from "@/utils/persist"
 import { usePermission } from "@/context/permission"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
-import { useSettings } from "@/context/settings"
-import { useSessionLayout } from "@/pages/session/session-layout"
 import { createSessionTabs, openSessionContext } from "@/pages/session/helpers"
 import {
   createTextFragment,
@@ -81,18 +76,106 @@ import { PromptContextItems } from "./prompt-input/context-items"
 import { PromptImageAttachments } from "./prompt-input/image-attachments"
 import { PromptDragOverlay } from "./prompt-input/drag-overlay"
 import { promptPlaceholder } from "./prompt-input/placeholder"
-import { useDirectoryPicker } from "./directory-picker"
 import { showToast } from "@/utils/toast"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
-import { useQueries } from "@tanstack/solid-query"
-import { useQueryOptions } from "@/context/server-sync"
 import { pathKey } from "@/utils/path-key"
-import { base64Encode } from "@opencode-ai/core/util/encode"
 import { displayName } from "@/pages/layout/helpers"
 
-interface PromptInputProps {
+export type PromptInputState = ReturnType<typeof usePrompt>
+
+export type PromptInputHistory = {
+  entries: (mode: "normal" | "shell") => PromptHistoryStoredEntry[]
+  add: (prompt: Prompt, mode: "normal" | "shell", comments: PromptHistoryComment[]) => void
+}
+
+export type PromptInputSubmission = {
+  abort: () => Promise<void> | void
+  handleSubmit: (event: Event) => Promise<void> | void
+}
+
+export type PromptInputControls = {
+  agents: {
+    available: { name: string; hidden?: boolean; mode: string }[]
+    options: string[]
+    current: string
+    loading: boolean
+    visible: boolean
+    select: (name: string | undefined) => void
+  }
+  model: {
+    selection: ReturnType<typeof useLocal>["model"]
+    paid: boolean
+    loading: boolean
+  }
+  projects: {
+    available: { name?: string; worktree: string; sandboxes?: string[] }[]
+    directory: string
+    select: (worktree: string) => void
+    add: (title: string) => void
+  }
+  session: {
+    id?: string
+    tabs: {
+      active: () => string | undefined
+      all: () => string[]
+      open: (tab: string) => void | Promise<void>
+      setActive: (tab: string | undefined) => void
+      // UPSTREAM-DIVERGENCE: Tandem context-token button toggles the context tab closed.
+      close: (tab: string) => void
+    }
+    reviewPanel: {
+      opened: () => boolean
+      open: () => void
+    }
+  }
+  newLayoutDesigns: boolean
+}
+
+export function createPromptInputHistory(): PromptInputHistory {
+  const [normal, setNormal] = createStore<PromptHistoryState>({ entries: [] })
+  const [shell, setShell] = createStore<PromptHistoryState>({ entries: [] })
+  return createPromptInputHistoryStore(normal, setNormal, shell, setShell)
+}
+
+type PromptHistoryState = { entries: PromptHistoryStoredEntry[] }
+
+function createPromptInputHistoryStore(
+  normal: Store<PromptHistoryState>,
+  setNormal: SetStoreFunction<PromptHistoryState>,
+  shell: Store<PromptHistoryState>,
+  setShell: SetStoreFunction<PromptHistoryState>,
+): PromptInputHistory {
+  return {
+    entries: (mode) => (mode === "shell" ? shell.entries : normal.entries),
+    add(prompt, mode, comments) {
+      const current = mode === "shell" ? shell : normal
+      const setCurrent = mode === "shell" ? setShell : setNormal
+      const next = prependHistoryEntry(current.entries, prompt, comments)
+      if (next === current.entries) return
+      setCurrent("entries", next)
+    },
+  }
+}
+
+function createPersistedPromptInputHistory() {
+  const [normal, setNormal] = persisted(
+    Persist.global("prompt-history", ["prompt-history.v1"]),
+    createStore<PromptHistoryState>({ entries: [] }),
+  )
+  const [shell, setShell] = persisted(
+    Persist.global("prompt-history-shell", ["prompt-history-shell.v1"]),
+    createStore<PromptHistoryState>({ entries: [] }),
+  )
+  return createPromptInputHistoryStore(normal, setNormal, shell, setShell)
+}
+
+export interface PromptInputProps {
   class?: string
   variant?: "dock" | "new-session"
+  state?: PromptInputState
+  history?: PromptInputHistory
+  submission?: PromptInputSubmission
+  controls: PromptInputControls
   ref?: (el: HTMLDivElement) => void
   newSessionWorktree?: string
   onNewSessionWorktreeReset?: () => void
@@ -134,29 +217,23 @@ const EXAMPLES = [
 
 export const PromptInput: Component<PromptInputProps> = (props) => {
   const sdk = useSDK()
-  const navigate = useNavigate()
-  const queryOptions = useQueryOptions()
 
   const sync = useSync()
-  const local = useLocal()
   const files = useFile()
-  const prompt = usePrompt()
+  const prompt = props.state ?? usePrompt()
   const layout = useLayout()
-  const server = useServer()
   const comments = useComments()
   const dialog = useDialog()
-  const providers = useProviders()
   const command = useCommand()
   const permission = usePermission()
   const language = useLanguage()
   const platform = usePlatform()
-  const pickDirectory = useDirectoryPicker()
-  const settings = useSettings()
+  const providers = useProviders()
+  // UPSTREAM-DIVERGENCE: Tandem v2-only/new-layout gate. Android APK forces v2 via build flag;
+  // otherwise follow upstream's newLayoutDesigns (now on props.controls).
   const useV2Input = () =>
-    import.meta.env.VITE_TANDEM_ANDROID_V2_ONLY === "true" || settings.general.newLayoutDesigns()
-  const tabsStore = useTabs()
-  const [search] = useSearchParams<{ draftId?: string }>()
-  const { params, tabs, view } = useSessionLayout()
+    import.meta.env.VITE_TANDEM_ANDROID_V2_ONLY === "true" || props.controls.newLayoutDesigns
+  const tabs = () => props.controls.session.tabs
   let editorRef!: HTMLDivElement
   let fileInputRef: HTMLInputElement | undefined
   let scrollRef!: HTMLDivElement
@@ -216,16 +293,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const activeFileTab = sessionTabs.activeFileTab
 
   const openContext = () => {
-    if (!params.id) return
+    if (!props.controls.session.id) return
     if (sessionTabs.activeTab() === "context") {
-      tabs().close("context")
+      props.controls.session.tabs.close("context")
       return
     }
-    openSessionContext({ view: view(), layout, tabs: tabs() })
+    openSessionContext({ view: { reviewPanel: props.controls.session.reviewPanel }, layout, tabs: tabs() })
   }
 
   const commentInReview = (path: string) => {
-    const sessionID = params.id
+    const sessionID = props.controls.session.id
     if (!sessionID) return false
 
     const diffs = sync().data.session_diff[sessionID]
@@ -258,14 +335,14 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
     const wantsReview = item.commentOrigin === "review" || (item.commentOrigin !== "file" && commentInReview(item.path))
     if (wantsReview) {
-      if (!view().reviewPanel.opened()) view().reviewPanel.open()
+      if (!props.controls.session.reviewPanel.opened()) props.controls.session.reviewPanel.open()
       layout.fileTree.setTab("changes")
       tabs().setActive("review")
       queueCommentFocus()
       return
     }
 
-    if (!view().reviewPanel.opened()) view().reviewPanel.open()
+    if (!props.controls.session.reviewPanel.opened()) props.controls.session.reviewPanel.open()
     layout.fileTree.setTab("all")
     const tab = files.tab(item.path)
     void tabs().open(tab)
@@ -290,8 +367,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
     return paths
   })
-  const info = createMemo(() => (params.id ? sync().session.get(params.id) : undefined))
-  const working = createMemo(() => sync().data.session_working(params.id ?? ""))
+  const info = createMemo(() => (props.controls.session.id ? sync().session.get(props.controls.session.id) : undefined))
+  const working = createMemo(() => sync().data.session_working(props.controls.session.id ?? ""))
   const imageAttachments = createMemo(() =>
     prompt.current().filter((part): part is ImageAttachmentPart => part.type === "image"),
   )
@@ -370,29 +447,14 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   })
 
   const hasUserPrompt = createMemo(() => {
-    const sessionID = params.id
+    const sessionID = props.controls.session.id
     if (!sessionID) return false
     const messages = sync().data.message[sessionID]
     if (!messages) return false
     return messages.some((m) => m.role === "user")
   })
 
-  const [history, setHistory] = persisted(
-    Persist.global("prompt-history", ["prompt-history.v1"]),
-    createStore<{
-      entries: PromptHistoryStoredEntry[]
-    }>({
-      entries: [],
-    }),
-  )
-  const [shellHistory, setShellHistory] = persisted(
-    Persist.global("prompt-history-shell", ["prompt-history-shell.v1"]),
-    createStore<{
-      entries: PromptHistoryStoredEntry[]
-    }>({
-      entries: [],
-    }),
-  )
+  const history = props.history ?? createPersistedPromptInputHistory()
 
   const suggest = createMemo(() => !hasUserPrompt())
 
@@ -596,8 +658,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }
 
   createEffect(() => {
-    params.id
-    if (params.id) return
+    props.controls.session.id
+    if (props.controls.session.id) return
     if (!suggest()) return
     const interval = setInterval(() => {
       setStore("placeholder", (prev) => (prev + 1) % EXAMPLES.length)
@@ -663,11 +725,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   })
 
   const agentList = createMemo(() =>
-    sync()
-      .data.agent.filter((agent) => !agent.hidden && agent.mode !== "primary")
+    props.controls.agents.available
+      .filter((agent) => !agent.hidden && agent.mode !== "primary")
       .map((agent): AtOption => ({ type: "agent", name: agent.name, display: agent.name })),
   )
-  const agentNames = createMemo(() => local.agent.list().map((agent) => agent.name))
 
   const handleAtSelect = (option: AtOption | undefined) => {
     if (!option) return
@@ -1094,11 +1155,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }
 
   const addToHistory = (prompt: Prompt, mode: "normal" | "shell") => {
-    const currentHistory = mode === "shell" ? shellHistory : history
-    const setCurrentHistory = mode === "shell" ? setShellHistory : setHistory
-    const next = prependHistoryEntry(currentHistory.entries, prompt, mode === "shell" ? [] : historyComments())
-    if (next === currentHistory.entries) return
-    setCurrentHistory("entries", next)
+    history.add(prompt, mode, mode === "shell" ? [] : historyComments())
   }
 
   createEffect(
@@ -1143,7 +1200,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const navigateHistory = (direction: "up" | "down") => {
     const result = navigatePromptHistory({
       direction,
-      entries: store.mode === "shell" ? shellHistory.entries : history.entries,
+      entries: history.entries(store.mode),
       historyIndex: store.historyIndex,
       currentPrompt: prompt.current(),
       currentComments: historyComments(),
@@ -1157,6 +1214,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }
 
   const { addAttachment, addAttachments, removeAttachment, handlePaste } = createPromptAttachments({
+    prompt,
     editor: () => editorRef,
     isDialogActive: () => !!dialog.active,
     setDraggingType: (type) => setStore("draggingType", type),
@@ -1183,39 +1241,44 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     />
   )
 
-  const variants = createMemo(() => ["default", ...local.model.variant.list()])
-  const sessionMessages = createMemo(() => (params.id ? (sync().data.message[params.id] ?? []) : []))
+  const variants = createMemo(() => ["default", ...props.controls.model.selection.variant.list()])
+  const sessionMessages = createMemo(() =>
+    props.controls.session.id ? (sync().data.message[props.controls.session.id] ?? []) : [],
+  )
   // Check provider variants directly: `variants` also includes the UI-only default option.
-  const showVariantControl = createMemo(() => local.model.variant.list().length > 0)
+  const showVariantControl = createMemo(() => props.controls.model.selection.variant.list().length > 0)
   const accepting = createMemo(() => {
-    const id = params.id
+    const id = props.controls.session.id
     if (!id) return permission.isAutoAcceptingDirectory(sdk().directory)
     return permission.isAutoAccepting(id, sdk().directory)
   })
 
-  const { abort, handleSubmit } = createPromptSubmit({
-    info,
-    imageAttachments,
-    commentCount,
-    autoAccept: () => accepting(),
-    mode: () => store.mode,
-    working,
-    editor: () => editorRef,
-    queueScroll,
-    promptLength,
-    addToHistory,
-    resetHistoryNavigation: () => {
-      resetHistoryNavigation(true)
-    },
-    setMode: (mode) => setStore("mode", mode),
-    setPopover: (popover) => setStore("popover", popover),
-    newSessionWorktree: () => props.newSessionWorktree,
-    onNewSessionWorktreeReset: props.onNewSessionWorktreeReset,
-    shouldQueue: props.shouldQueue,
-    onQueue: props.onQueue,
-    onAbort: props.onAbort,
-    onSubmit: props.onSubmit,
-  })
+  const { abort, handleSubmit } =
+    props.submission ??
+    createPromptSubmit({
+      prompt,
+      info,
+      imageAttachments,
+      commentCount,
+      autoAccept: () => accepting(),
+      mode: () => store.mode,
+      working,
+      editor: () => editorRef,
+      queueScroll,
+      promptLength,
+      addToHistory,
+      resetHistoryNavigation: () => {
+        resetHistoryNavigation(true)
+      },
+      setMode: (mode) => setStore("mode", mode),
+      setPopover: (popover) => setStore("popover", popover),
+      newSessionWorktree: () => props.newSessionWorktree,
+      onNewSessionWorktreeReset: props.onNewSessionWorktreeReset,
+      shouldQueue: props.shouldQueue,
+      onQueue: props.onQueue,
+      onAbort: props.onAbort,
+      onSubmit: props.onSubmit,
+    })
 
   const handleKeyDown = (event: KeyboardEvent) => {
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "u") {
@@ -1385,17 +1448,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     }
   }
 
-  const [agentsQuery, globalProvidersQuery, providersQuery] = useQueries(() => ({
-    queries: [
-      queryOptions().agents(pathKey(sdk().directory)),
-      queryOptions().providers(null),
-      queryOptions().providers(pathKey(sdk().directory)),
-    ],
-  }))
-
-  const agentsLoading = () => agentsQuery.isLoading
+  const agentsLoading = () => props.controls.agents.loading
   const agentsShouldFadeIn = createMemo((prev) => prev ?? agentsLoading())
-  const providersLoading = () => agentsLoading() || providersQuery.isLoading || globalProvidersQuery.isLoading
+  const providersLoading = () => props.controls.model.loading
   const providersShouldFadeIn = createMemo((prev) => prev ?? providersLoading())
 
   const [promptReady] = createResource(
@@ -1409,28 +1464,28 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }
 
   const composerModelName = createMemo(() =>
-    promptComposerModelName(local.model.current()?.name ?? language.t("dialog.model.select.title")),
+    promptComposerModelName(props.controls.model.selection.current()?.name ?? language.t("dialog.model.select.title")),
   )
 
   const modelControlState = createMemo<ComposerModelControlState>(() => ({
     loading: providersLoading(),
-    paid: providers.paid().length > 0,
+    paid: props.controls.model.paid,
     title: language.t("command.model.choose"),
     keybind: command.keybind("model.choose"),
-    model: local.model,
-    providerID: local.model.current()?.provider?.id,
+    model: props.controls.model.selection,
+    providerID: props.controls.model.selection.current()?.provider?.id,
     modelName: composerModelName(),
     style: control(),
     onClose: restoreFocus,
     onUnpaidClick: () => {
       void import("@/components/dialog-select-model-unpaid").then((x) => {
-        dialog.show(() => <x.DialogSelectModelUnpaid model={local.model} />)
+        dialog.show(() => <x.DialogSelectModelUnpaid model={props.controls.model.selection} />)
       })
     },
   }))
 
   const newSession = () => props.variant === "new-session"
-  const projects = createMemo(() => layout.projects.list())
+  const projects = createMemo(() => props.controls.projects.available)
   const projectForDirectory = (directory: string | undefined) => {
     if (!directory) return
     const key = pathKey(directory)
@@ -1438,13 +1493,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       (project) => pathKey(project.worktree) === key || project.sandboxes?.some((sandbox) => pathKey(sandbox) === key),
     )
   }
-  const selectedProject = createMemo(() => projectForDirectory(sdk().directory))
+  const selectedProject = createMemo(() => projectForDirectory(props.controls.projects.directory))
   const projectResults = createMemo(() => {
     const search = picker.projectSearch.trim().toLowerCase()
     if (!search) return projects()
     return projects().filter((project) => displayName(project).toLowerCase().includes(search))
   })
-  const showAgentControl = createMemo(() => settings.visibility.customAgents() && agentNames().length > 0)
+  const showAgentControl = createMemo(() => props.controls.agents.visible && props.controls.agents.options.length > 0)
   const selectProject = (worktree: string) => {
     setPicker({
       projectOpen: false,
@@ -1454,33 +1509,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       restoreFocus()
       return
     }
-    layout.projects.open(worktree)
-    server.projects.touch(worktree)
-
-    // On the draft route, retarget the existing draft in place so we keep the same
-    // draft id (and its tab/prompt) instead of spawning a new draft for the new directory.
-    const draftID = search.draftId
-    if (draftID) {
-      tabsStore.updateDraft(draftID, { server: server.key, directory: worktree })
-      restoreFocus()
-      return
-    }
-
-    navigate(`/${base64Encode(worktree)}/session`)
+    props.controls.projects.select(worktree)
+    restoreFocus()
   }
   const addProject = () => {
-    const conn = server.current
-    if (!conn) return
-    const select = (result: string | string[] | null) => {
-      const directory = Array.isArray(result) ? result[0] : result
-      if (!directory) return
-      selectProject(directory)
-    }
-    pickDirectory({
-      server: conn,
-      title: language.t("command.project.open"),
-      onSelect: select,
-    })
+    props.controls.projects.add(language.t("command.project.open"))
   }
 
   const projectPickerState = createMemo<ComposerPickerState>(() => ({
@@ -1521,11 +1554,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const agentControlState = createMemo<ComposerAgentControlState>(() => ({
     title: language.t("command.agent.cycle"),
     keybind: command.keybind("agent.cycle"),
-    options: agentNames(),
-    current: local.agent.current()?.name ?? "",
+    options: props.controls.agents.options,
+    current: props.controls.agents.current,
     style: control(),
     onSelect: (value) => {
-      local.agent.set(value)
+      props.controls.agents.select(value)
       restoreFocus()
     },
   }))
@@ -1702,7 +1735,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       data-component="prompt-variant-control"
                       classList={{
                         "hidden group-hover/prompt-input:block group-focus-within/prompt-input:block":
-                          !local.model.variant.current() && !store.variantOpen,
+                          !props.controls.model.selection.variant.current() && !store.variantOpen,
                       }}
                     >
                       <TooltipKeybind
@@ -1714,11 +1747,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                         <Select
                           size="normal"
                           options={variants()}
-                          current={local.model.variant.current() ?? "default"}
+                          current={props.controls.model.selection.variant.current() ?? "default"}
                           label={(x) => (x === "default" ? language.t("common.default") : x)}
                           onOpenChange={(open) => setStore("variantOpen", open)}
                           onSelect={(value) => {
-                            local.model.variant.set(value === "default" ? undefined : value)
+                            props.controls.model.selection.variant.set(value === "default" ? undefined : value)
                             restoreFocus()
                           }}
                           class="capitalize max-w-[160px] justify-start text-v2-text-text-faint"
@@ -1730,7 +1763,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       </TooltipKeybind>
                     </div>
                   </Show>
-                  <Show when={params.id}>
+                  <Show when={props.controls.session.id}>
                     {/* UPSTREAM-DIVERGENCE: Tandem cache-health context button (context-token-button.tsx) */}
                     <ContextTokenButton
                       messages={sessionMessages()}
@@ -1970,11 +2003,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                           keybind={command.keybind("agent.cycle")}
                         >
                           <Select
-                            size="small"
-                            options={agentNames()}
-                            current={local.agent.current()?.name ?? ""}
+                            size="normal"
+                            options={props.controls.agents.options}
+                            current={props.controls.agents.current}
                             onSelect={(value) => {
-                              local.agent.set(value)
+                              props.controls.agents.select(value)
                               restoreFocus()
                             }}
                             class="capitalize max-w-[160px] text-text-base"
@@ -1993,7 +2026,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                           style={providersShouldFadeIn() ? { animation: "fade-in 0.3s" } : undefined}
                         >
                           <Show
-                            when={providers.paid().length > 0}
+                            when={props.controls.model.paid}
                             fallback={
                               <TooltipKeybind
                                 placement="top"
@@ -2010,20 +2043,25 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                                   style={control()}
                                   onClick={() => {
                                     void import("@/components/dialog-select-model-unpaid").then((x) => {
-                                      dialog.show(() => <x.DialogSelectModelUnpaid model={local.model} />)
+                                      dialog.show(() => (
+                                        <x.DialogSelectModelUnpaid model={props.controls.model.selection} />
+                                      ))
                                     })
                                   }}
                                 >
-                                  <Show when={local.model.current()?.provider?.id}>
+                                  <Show when={props.controls.model.selection.current()?.provider?.id}>
                                     <ProviderIcon
-                                      id={local.model.current()?.provider?.id ?? ""}
+                                      id={props.controls.model.selection.current()?.provider?.id ?? ""}
                                       class="size-4 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity duration-150"
                                       style={{ "will-change": "opacity", transform: "translateZ(0)" }}
                                     />
                                   </Show>
                                   <span
                                     class="block min-w-0 max-w-[8ch] truncate"
-                                    title={local.model.current()?.name ?? language.t("dialog.model.select.title")}
+                                    title={
+                                      props.controls.model.selection.current()?.name ??
+                                      language.t("dialog.model.select.title")
+                                    }
                                   >
                                     {composerModelName()}
                                   </span>
@@ -2039,7 +2077,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                               keybind={command.keybind("model.choose")}
                             >
                               <ModelSelectorPopover
-                                model={local.model}
+                                model={props.controls.model.selection}
                                 triggerAs={Button}
                                 triggerProps={{
                                   variant: "ghost",
@@ -2050,16 +2088,19 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                                 }}
                                 onClose={restoreFocus}
                               >
-                                <Show when={local.model.current()?.provider?.id}>
+                                <Show when={props.controls.model.selection.current()?.provider?.id}>
                                   <ProviderIcon
-                                    id={local.model.current()?.provider?.id ?? ""}
+                                    id={props.controls.model.selection.current()?.provider?.id ?? ""}
                                     class="size-4 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity duration-150"
                                     style={{ "will-change": "opacity", transform: "translateZ(0)" }}
                                     />
                                   </Show>
                                   <span
                                     class="block min-w-0 max-w-[8ch] truncate"
-                                    title={local.model.current()?.name ?? language.t("dialog.model.select.title")}
+                                    title={
+                                      props.controls.model.selection.current()?.name ??
+                                      language.t("dialog.model.select.title")
+                                    }
                                   >
                                     {composerModelName()}
                                   </span>
@@ -2082,10 +2123,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                               <Select
                                 size="small"
                                 options={variants()}
-                                current={local.model.variant.current() ?? "default"}
+                                current={props.controls.model.selection.variant.current() ?? "default"}
                                 label={(x) => (x === "default" ? language.t("common.default") : x)}
                                 onSelect={(value) => {
-                                  local.model.variant.set(value === "default" ? undefined : value)
+                                  props.controls.model.selection.variant.set(value === "default" ? undefined : value)
                                   restoreFocus()
                                 }}
                                 class="capitalize max-w-[160px] text-text-base"
@@ -2097,7 +2138,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                             </TooltipKeybind>
                           </div>
                         </Show>
-                        <Show when={params.id}>
+                        <Show when={props.controls.session.id}>
                           {/* UPSTREAM-DIVERGENCE: Tandem cache-health context button (context-token-button.tsx) */}
                           <ContextTokenButton
                             messages={sessionMessages()}
