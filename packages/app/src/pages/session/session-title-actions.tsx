@@ -32,9 +32,9 @@ export function SessionTitleActions(props: { sessionID?: string; parentID?: stri
 
   const shareUrl = createMemo(() => {
     if (!props.sessionID) return
-    return sync.session.get(props.sessionID)?.share?.url
+    return sync().session.get(props.sessionID)?.share?.url
   })
-  const shareEnabled = createMemo(() => sync.data.config.share !== "disabled")
+  const shareEnabled = createMemo(() => sync().data.config.share !== "disabled")
   const [title, setTitle] = createStore({
     menuOpen: false,
     pendingRename: false,
@@ -70,14 +70,14 @@ export function SessionTitleActions(props: { sessionID?: string; parentID?: stri
   }
 
   const shareMutation = useMutation(() => ({
-    mutationFn: (id: string) => serverSDK.client.session.share({ sessionID: id, directory: sdk.directory }),
+    mutationFn: (id: string) => serverSDK().client.session.share({ sessionID: id, directory: sdk().directory }),
     onError: (err) => {
       console.error("Failed to share session", err)
     },
   }))
 
   const unshareMutation = useMutation(() => ({
-    mutationFn: (id: string) => serverSDK.client.session.unshare({ sessionID: id, directory: sdk.directory }),
+    mutationFn: (id: string) => serverSDK().client.session.unshare({ sessionID: id, directory: sdk().directory }),
     onError: (err) => {
       console.error("Failed to unshare session", err)
     },
@@ -104,25 +104,25 @@ export function SessionTitleActions(props: { sessionID?: string; parentID?: stri
   }
 
   const archiveSession = async (sessionID: string) => {
-    const session = sync.session.get(sessionID)
+    const session = sync().session.get(sessionID)
     if (!session) return
 
-    const sessions = sync.data.session ?? []
+    const sessions = sync().data.session ?? []
     const index = sessions.findIndex((s) => s.id === sessionID)
     const nextSession = index === -1 ? undefined : (sessions[index + 1] ?? sessions[index - 1])
 
-    await sdk.client.session
+    await sdk().client.session
       .update({ sessionID, time: { archived: Date.now() } })
       .then(() => {
-        sync.set(
+        sync().set(
           produce((draft) => {
             const index = draft.session.findIndex((s) => s.id === sessionID)
             if (index !== -1) draft.session.splice(index, 1)
           }),
         )
-        sync.session.evict(sessionID)
+        sync().session.evict(sessionID)
         navigateAfterSessionRemoval(sessionID, session.parentID, nextSession?.id)
-        notifySessionTabsRemoved({ directory: sdk.directory, sessionIDs: [sessionID] })
+        notifySessionTabsRemoved({ directory: sdk().directory, sessionIDs: [sessionID] })
       })
       .catch((err) => {
         showToast({
@@ -133,14 +133,14 @@ export function SessionTitleActions(props: { sessionID?: string; parentID?: stri
   }
 
   const deleteSession = async (sessionID: string) => {
-    const session = sync.session.get(sessionID)
+    const session = sync().session.get(sessionID)
     if (!session) return false
 
-    const sessions = (sync.data.session ?? []).filter((s) => !s.parentID && !s.time?.archived)
+    const sessions = (sync().data.session ?? []).filter((s) => !s.parentID && !s.time?.archived)
     const index = sessions.findIndex((s) => s.id === sessionID)
     const nextSession = index === -1 ? undefined : (sessions[index + 1] ?? sessions[index - 1])
 
-    const result = await sdk.client.session
+    const result = await sdk().client.session
       .delete({ sessionID })
       .then((x) => x.data)
       .catch((err) => {
@@ -155,7 +155,7 @@ export function SessionTitleActions(props: { sessionID?: string; parentID?: stri
 
     const removed = new Set<string>([sessionID])
     const byParent = new Map<string, string[]>()
-    for (const item of sync.data.session) {
+    for (const item of sync().data.session) {
       const parentID = item.parentID
       if (!parentID) continue
       const existing = byParent.get(parentID)
@@ -183,16 +183,16 @@ export function SessionTitleActions(props: { sessionID?: string; parentID?: stri
 
     navigateAfterSessionRemoval(sessionID, session.parentID, nextSession?.id)
 
-    sync.set(
+    sync().set(
       produce((draft) => {
         draft.session = draft.session.filter((s) => !removed.has(s.id))
       }),
     )
 
     for (const id of removed) {
-      sync.session.evict(id)
+      sync().session.evict(id)
     }
-    notifySessionTabsRemoved({ directory: sdk.directory, sessionIDs: [...removed] })
+    notifySessionTabsRemoved({ directory: sdk().directory, sessionIDs: [...removed] })
     return true
   }
 
@@ -398,7 +398,7 @@ function DialogDeleteSession(props: { sessionID: string; onDelete: (sessionID: s
   const dialog = useDialog()
   const language = useLanguage()
   const name = createMemo(
-    () => sessionTitle(sync.session.get(props.sessionID)?.title) ?? language.t("command.session.new"),
+    () => sessionTitle(sync().session.get(props.sessionID)?.title) ?? language.t("command.session.new"),
   )
   const handleDelete = async () => {
     await props.onDelete(props.sessionID)
