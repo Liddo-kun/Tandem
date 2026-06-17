@@ -46,7 +46,7 @@ export async function ImagegenPlugin(input: PluginInput): Promise<Hooks> {
             .enum(["auto", "1024x1024", "1536x1024", "1024x1536"])
             .optional()
             .describe(
-              "Output size (default auto): auto, 1024x1024 (square), 1536x1024 (landscape), or 1024x1536 (portrait).",
+              "Output size (default auto): auto, 1024x1024 (square), 1536x1024 (landscape), or 1024x1536 (portrait). Exact size is honored only with an OpenAI API key; with ChatGPT (OAuth) sign-in the backend ignores this and auto-sizes from the prompt, so steer aspect ratio via the prompt instead.",
             ),
           n: tool.schema
             .number()
@@ -99,26 +99,49 @@ export async function ImagegenPlugin(input: PluginInput): Promise<Hooks> {
           const images = await ImageGen.run(request, live)
           const pngs = images.map((image) => image.png)
           const callID = ctx.callID ?? ctx.messageID
-          const saved = await ImageGen.saveImages(pngs, ctx.sessionID, callID)
-          const sizeLabel = request.size === "auto" ? "auto size" : request.size
+          const saved = await ImageGen.saveImages(pngs, ctx.directory, callID)
+          // Report the real pixel size read from each PNG, not the requested size: on the
+          // ChatGPT/OAuth backend the image_generation tool IGNORES `size` and the host
+          // model auto-sizes from the prompt (verified — a landscape prompt yields 1536x1024
+          // regardless of the `size` sent). Exact size is honored only on the API-key path.
+          const actualSizes = pngs.map((png) => ImageGen.pngDimensions(png))
+          const uniqueSizes = [...new Set(actualSizes.filter((size): size is string => !!size))]
+          const fallbackLabel = request.size === "auto" ? "auto size" : request.size
+          const sizeLabel =
+            uniqueSizes.length === 1 ? uniqueSizes[0] : uniqueSizes.length > 1 ? uniqueSizes.join(", ") : fallbackLabel
+          // Tell the caller when a requested size was dropped so the agent does not retry the
+          // same size expecting a different result. Only the OAuth backend silently auto-sizes.
+          const sizeIgnored =
+            live.mode === "oauth" &&
+            request.size !== "auto" &&
+            uniqueSizes.length > 0 &&
+            !uniqueSizes.includes(request.size)
+          const sizeNote = sizeIgnored
+            ? `\n\nNote: requested size ${request.size} was not applied — the ChatGPT (OAuth) image backend auto-sizes from the prompt. Sign in with an OpenAI API key for exact sizes.`
+            : ""
           // The prompt the image model reports it actually used (per image). On OAuth
           // the host model can still adjust wording despite the verbatim instruction,
           // so surface this so the caller sees what was rendered. Aligned with `saved`.
           const revisedPrompts = images.map((image) => image.revisedPrompt ?? null)
           // Return only the saved path(s) as text — the image is NOT attached, so it is
           // not fed into the model's context (a full PNG would balloon context and be
-          // re-sent every turn).
+          // re-sent every turn). The web UI fetches these relative paths via file.read to
+          // render click-to-zoom thumbnails, which never touches the model's context.
           const fileList =
             saved.length === 1
               ? `Saved 1 image (${sizeLabel}):\n${saved[0]}`
               : `Saved ${saved.length} images (${sizeLabel}):\n${saved.join("\n")}`
-          const output = `${fileList}${revisedPromptOutput(revisedPrompts, request.prompt)}`
+          const output = `${fileList}${sizeNote}${revisedPromptOutput(revisedPrompts, request.prompt)}`
           return {
             title: request.prompt.length > 60 ? `${request.prompt.slice(0, 57)}...` : request.prompt,
             output,
             metadata: {
               paths: saved,
-              size: request.size,
+              // Actual rendered size when uniform; per-image actual sizes in `sizes`. The
+              // requested size is kept separately so a mismatch (OAuth) is inspectable.
+              size: uniqueSizes.length === 1 ? uniqueSizes[0] : fallbackLabel,
+              requestedSize: request.size,
+              sizes: actualSizes,
               quality: request.quality,
               count: saved.length,
               mode: live.mode,

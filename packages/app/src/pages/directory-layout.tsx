@@ -5,7 +5,7 @@ import { useLocation, useNavigate, useParams } from "@solidjs/router"
 import { createEffect, createMemo, createResource, type ParentProps, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { LocalProvider } from "@/context/local"
-import { SDKProvider } from "@/context/sdk"
+import { SDKProvider, useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import { decode64 } from "@/utils/base64"
 import { Schema } from "effect"
@@ -15,7 +15,17 @@ export function DirectoryDataProvider(props: ParentProps<{ directory: string; dr
   const navigate = useNavigate()
   const params = useParams()
   const sync = useSync()
+  const sdk = useSDK()
   const slug = createMemo(() => base64Encode(props.directory))
+
+  // UPSTREAM-DIVERGENCE: expose worktree-scoped file reads to UI tool renderers (imagegen
+  // thumbnails) via the Data context, so generated images can be shown without entering the
+  // model's context. Resolves relative paths against the session directory (file.read).
+  const readFile = (path: string) =>
+    sdk()
+      .client.file.read({ path })
+      .then((x) => x.data)
+      .catch(() => undefined)
 
   createEffect(() => {
     // A draft lives at /new-session?draftId=… and has no directory segment to normalize.
@@ -38,6 +48,7 @@ export function DirectoryDataProvider(props: ParentProps<{ directory: string; dr
     <DataProvider
       data={sync().data}
       directory={props.directory}
+      readFile={readFile}
       onNavigateToSession={(sessionID: string) => navigate(`/${slug()}/session/${sessionID}`)}
       onSessionHref={(sessionID: string) => `/${slug()}/session/${sessionID}`}
     >

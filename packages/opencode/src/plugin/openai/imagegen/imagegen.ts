@@ -353,13 +353,20 @@ async function readImageFromSSE(body: ReadableStream<Uint8Array>): Promise<Gener
 
 // ---- output ----
 
-export async function saveImages(pngs: Buffer[], sessionID: string, baseName: string): Promise<string[]> {
-  const dir = path.join(Global.Path.data, "imagegen", sessionID)
+export async function saveImages(pngs: Buffer[], directory: string, baseName: string): Promise<string[]> {
+  // Save under the working directory (<cwd>/imagegen) rather than the XDG data dir, so the web
+  // UI can fetch each PNG by relative path through the existing worktree-scoped file.read endpoint
+  // and show a thumbnail — without the image ever entering the model's context. Returns paths
+  // relative to `directory` (posix separators) so they work for both file.read in the UI and the
+  // `read` tool for the model. `baseName` (the tool call id) keeps names unique across sessions;
+  // writeNonDestructive resolves any remaining collisions. Users can gitignore imagegen/.
+  const dir = path.join(directory, "imagegen")
   await fs.mkdir(dir, { recursive: true })
   const saved: string[] = []
   for (let i = 0; i < pngs.length; i++) {
     const stem = pngs.length === 1 ? baseName : `${baseName}-${i + 1}`
-    saved.push(await writeNonDestructive(dir, stem, pngs[i]))
+    const file = await writeNonDestructive(dir, stem, pngs[i])
+    saved.push(path.relative(directory, file).split(path.sep).join("/"))
   }
   return saved
 }
@@ -405,6 +412,19 @@ function mimeFromPath(file: string): string {
   if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg"
   if (ext === ".webp") return "image/webp"
   return "image/png"
+}
+
+// Real pixel size read straight from a PNG's IHDR header: width and height are the two
+// big-endian uint32s at byte offsets 16 and 20 (after the 8-byte signature and the IHDR
+// length+type). This is the only reliable size readout on the OAuth path — there the
+// image_generation tool ignores the requested `size` and the host model auto-sizes from
+// the prompt, so the returned dimensions can differ from what was asked for.
+export function pngDimensions(png: Buffer): string | undefined {
+  if (png.length < 24 || png.readUInt32BE(0) !== 0x89504e47) return undefined
+  const width = png.readUInt32BE(16)
+  const height = png.readUInt32BE(20)
+  if (!width || !height) return undefined
+  return `${width}x${height}`
 }
 
 async function httpError(res: Response, operation: string): Promise<Error> {

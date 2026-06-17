@@ -294,6 +294,46 @@ UI consequence (`message-part.tsx`): with no attachment, the `imagegen` renderer
 
 - Static checks clean throughout: `bun run typecheck` (opencode + ui), oxlint (no new warnings in edited ranges), prettier. Server-side changes need `build --single` + reinstall + **server restart** (no hot-swap); UI changes additionally require the `--single` rebuild (web UI is embedded in the binary) and, for the native tablet app, an APK rebuild.
 
+### Thumbnails restored — UI fetches the artifact, model context untouched (2026-06-17)
+
+Goal: bring generated images back to the web UI as click-to-zoom thumbnails **without** re-entering the model's context (the reason the attachment was removed above). Key realization: there are two independent channels — the tool *result* (which is serialized to the model: attachments → vision input at `message-v2.ts:307-322`, `metadata` → `callProviderMetadata` via `providerMeta` at `~136`) and the UI's persisted tool part (which already syncs `metadata.paths` to browsers). The image bytes never need to ride the result channel; the **browser** can fetch them itself at render time, which never touches the model loop.
+
+Chosen transport (user decision: keep artifacts in the working folder, gitignorable): reuse the existing worktree-scoped `file.read` endpoint (`GET /file/content`, `handlers/file.ts` — resolves `path.resolve(directory, q.path)` and rejects anything outside the dir via `FSUtil.contains`). So `saveImages(pngs, directory, sessionID, baseName)` now writes under `<directory>/imagegen/<sessionID>/` (was `Global.Path.data/imagegen/...`) and returns paths **relative** to `directory` with posix separators — the same string is valid for `file.read` in the UI and the `read` tool for the model. `plugin.ts` passes `ctx.directory` (ToolContext, the per-session project dir the file endpoint also resolves against). The tool result is otherwise unchanged: no attachment, no image in `metadata`, output is path-only — so **zero** model-context cost.
+
+UI side (all `UPSTREAM-DIVERGENCE`): the renderer lives in `@opencode-ai/ui` and has no SDK, so a worktree-scoped reader is injected through the Data context — `useData().readFile?: (path) => Promise<FileContent|undefined>` (`packages/ui/src/context/data.tsx`), supplied by the app from `sdk().client.file.read(...).then(x => x.data)` in `DirectoryDataProvider` (which sits inside `SDKProvider`; `packages/app/src/pages/directory-layout.tsx`). The `imagegen` `ToolRegistry` renderer (`message-part.tsx`) gained an `ImagegenThumb` child that `createResource`-fetches each `metadata.paths[i]` via `readFile`, builds a data URL with the existing `dataUrlFromMediaValue(result, "image")` (its `MediaValue` param is `unknown`, so no `as any`), and renders an `<img loading="lazy">` that opens the existing `ImagePreview` lightbox on click. Path + differ-only "Prompt used:" caption stay beneath. Thumbnail styling added to `message-part.css` (`imagegen-files`/`imagegen-file`/`imagegen-thumb`).
+
+Why not a new server route: a dedicated `/global/imagegen` artifact route (keeping images in the XDG data dir) was the other candidate and is cleaner about repo pollution, but costs an endpoint + handler + SDK regen; reusing `file.read` is zero server/SDK divergence at the cost of putting PNGs in the working tree (gitignorable). Auth is handled for free because the fetch goes through the authenticated SDK, not a bare `<img src>` (which can't send the server's auth header).
+
+Verified: `bun typecheck` clean for opencode + ui + app; oxlint clean in edited ranges; prettier applied; `build --single` smoke test passed with the web UI embedded (`0.0.0-dev-202606171700`). Not yet runtime-exercised end-to-end in a live session/browser (needs reinstall + server restart, and an APK rebuild for the native app). Caveat: `ctx.directory` must equal the directory the UI's `file.read` resolves against (true for single-root sessions); high-quality PNGs can be multiple MB — a downscaled `.thumb.webp` sibling is a possible later optimization (browser CSS-caps the `<img>` for now).
+
+### OAuth ignores `size` — honest actual-size reporting (2026-06-17)
+
+User-reported bug: called `imagegen` with `size:"1024x1024"`, `n:3`, `quality:"medium"` and got three **1536x1024** PNGs. This account is **OAuth** (no API key), so it runs the `image_generation` tool over `…/codex/responses` hosted by gpt-5.5.
+
+Live probes against `https://chatgpt.com/backend-api/codex/responses` (the actual transport, same headers/body the tool sends, reading `item.size` off the SSE):
+
+| Probe | Sent tool-config `size` | Returned |
+|---|---|---|
+| current code, landscape prompt | `1024x1024` | **1536x1024** |
+| + forceful "generate at EXACTLY 1024x1024" in `instructions` | `1024x1024` | **1536x1024** |
+| **portrait** config, landscape prompt | `1024x1536` | **1536x1024** |
+| square config + "Square 1:1 composition." appended to prompt | `1024x1024` | **1254x1254** |
+| end-to-end `ImageGen.run()` (separate run) | `1024x1024` | **1402x1122** |
+
+Conclusions (ground truth, supersede the optimistic "size maps 1:1" line in the LOCKED OAuth contract above — that earlier test must have used a size-neutral prompt that auto-sized square by luck):
+
+- The OAuth/codex `image_generation` tool **ignores `size` completely**. The host model auto-sizes from the **prompt content** (a "landscape" prompt → landscape) and can emit **non-enum** dimensions (1254², 1402×1122). This matches Codex itself, which hardcodes `size:"auto"` on this backend — fixed sizing appears unimplemented there.
+- Forceful `instructions` do **not** override it (the verbatim-prompt trick does not transfer to size). Prompt aspect cues steer the *ratio* only, not exact pixels.
+- Exact size is therefore an **API-key-only** capability; OAuth is best-effort.
+
+Fix (honest reporting, the chosen direction — no client-side resize/crop, no aspect steering):
+
+- New `ImageGen.pngDimensions(buf)` reads width/height from the PNG IHDR header (big-endian uint32s at byte offsets 16/20) — the only reliable size readout regardless of transport or `auto`.
+- `plugin.ts` now labels the output and sets `metadata.size` from the **actual** decoded dimensions, adds `metadata.requestedSize` and per-image `metadata.sizes`, and appends a one-line note when an OAuth request's size was dropped (`live.mode==="oauth"` + non-auto requested + actual differs) so the agent doesn't retry the same size expecting a change. The previous code mislabeled the result with the requested size (the source of the bug report).
+- Model-facing `size` field description + `imagegen-skill.md` now state: exact with an API key, best-effort on OAuth (steer aspect via the prompt).
+- The UI renderer reads only `metadata.paths`/`revisedPrompts`, so changing `metadata.size` is safe.
+- Tests: `test/plugin/imagegen.test.ts` covers `pngDimensions` (square/landscape/non-standard/short-buffer/bad-signature/zero). Verified live end-to-end via `ImageGen.run` on the OAuth account (returned 1402×1122, label + note now correct). typecheck + oxlint + prettier clean.
+
 ### Built-in imagegen skill, gated like the tool (2026-06-15)
 
 Ships a Tandem `imagegen` **skill** with the binary, visible only when the `imagegen` tool is — i.e. gated on the same credential check. Design choice: gate at **registration** (Skill state is per-instance InstanceState), matching the tool's existing per-instance, cached visibility rather than re-checking per prompt build (the `available()` option, noted as a future upgrade if live toggling without restart is wanted).

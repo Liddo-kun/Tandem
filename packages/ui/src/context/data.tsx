@@ -1,4 +1,12 @@
-import type { Message, Session, Part, SnapshotFileDiff, SessionStatus, Provider } from "@opencode-ai/sdk/v2"
+import type {
+  Message,
+  Session,
+  Part,
+  SnapshotFileDiff,
+  SessionStatus,
+  Provider,
+  FileContent,
+} from "@opencode-ai/sdk/v2"
 import { createSimpleContext } from "./helper"
 import { PreloadMultiFileDiffResult } from "@pierre/diffs/ssr"
 
@@ -46,6 +54,10 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
   init: (props: {
     data: Data
     directory: string
+    // UPSTREAM-DIVERGENCE: optional file reader injected by the app (SDK file.read). Tool
+    // renderers (e.g. imagegen) use it to fetch an image by path for a thumbnail without
+    // routing the bytes through the model's context. Omitted in contexts without an SDK.
+    readFile?: (path: string) => Promise<FileContent | undefined>
     onNavigateToSession?: NavigateToSessionFn
     onSessionHref?: SessionHrefFn
   }) => {
@@ -55,6 +67,9 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
       },
       get directory() {
         return props.directory
+      },
+      get readFile() {
+        return props.readFile
       },
       navigateToSession: props.onNavigateToSession,
       sessionHref: props.onSessionHref,

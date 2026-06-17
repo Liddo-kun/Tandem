@@ -40,3 +40,7 @@ packages/android/keystore.properties
 packages/android/release.keystore
 script/deploy-relay
 packages/opencode/system-prompts/
+
+# imagegen tool artifacts (saved under <session dir>/imagegen/). Anchored to the repo
+# root so it does not match the source dir packages/opencode/src/plugin/openai/imagegen/.
+/imagegen/

@@ -126,6 +126,7 @@ Call: `imagegen({ prompt: "<the spec above>", image_paths: ["/abs/path/mug.png"]
 - **Report the saved path(s)** to the user. Do not invent a description of contents you haven't viewed, and don't claim success on details you can't confirm.
 - If the asset is meant for the current project, move/copy it from the returned path into the workspace (the tool controls where it's saved) and wire up any references. Don't leave a project-bound asset only at the tool's default path.
 - On OAuth, the model may report a slightly adjusted "prompt used"; the tool surfaces it only when it differs from yours — treat that as the source of truth for what was rendered, not the prose.
+- **Size is best-effort on OAuth.** With an OpenAI API key the requested `size` is exact. With ChatGPT (OAuth) sign-in the image backend ignores `size` and auto-sizes from the prompt, so the tool reports the **actual** pixel size and flags when it differs from what you asked for — don't re-call with the same `size` expecting a different result; steer aspect ratio through the prompt (e.g. "wide landscape", "tall portrait", "square") instead.
 
 ## Errors
 

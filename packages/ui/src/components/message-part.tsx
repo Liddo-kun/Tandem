@@ -2,6 +2,7 @@ import {
   Component,
   createEffect,
   createMemo,
+  createResource,
   createSignal,
   For,
   Match,
@@ -44,6 +45,7 @@ import { Checkbox } from "./checkbox"
 import { DiffChanges } from "./diff-changes"
 import { Markdown } from "./markdown"
 import { ImagePreview } from "./image-preview"
+import { dataUrlFromMediaValue } from "../pierre/media"
 import { getDirectory as _getDirectory, getFilename } from "@opencode-ai/core/util/path"
 import { checksum } from "@opencode-ai/core/util/encode"
 import { Tooltip } from "./tooltip"
@@ -1831,12 +1833,43 @@ ToolRegistry.register({
   },
 })
 
+// UPSTREAM-DIVERGENCE: Tandem-only thumbnail for an imagegen artifact. The PNG is fetched
+// browser-side via the Data context's worktree-scoped readFile (SDK file.read), so it shows
+// the image WITHOUT the bytes ever entering the model's context. Click opens a lightbox.
+function ImagegenThumb(props: { path: string; alt?: string; onOpen: (src: string) => void }) {
+  const data = useData()
+  const [src] = createResource(
+    () => (data.readFile ? props.path : undefined),
+    async (path) => {
+      const result = await data.readFile!(path)
+      return result ? dataUrlFromMediaValue(result, "image") : undefined
+    },
+  )
+  return (
+    <Show when={src()}>
+      {(url) => (
+        <button
+          type="button"
+          data-slot="imagegen-thumb"
+          data-clickable="true"
+          title={props.alt}
+          onClick={() => props.onOpen(url())}
+        >
+          <img src={url()} alt={props.alt} loading="lazy" />
+        </button>
+      )}
+    </Show>
+  )
+}
+
 // UPSTREAM-DIVERGENCE: Tandem-only renderer for the imagegen plugin tool. The image is
-// deliberately NOT loaded into model context (no attachment), so the card shows the saved
-// file path(s) instead. See packages/opencode/src/plugin/openai/imagegen/.
+// deliberately NOT loaded into model context (no attachment); the card fetches each saved
+// path on its own to show a click-to-zoom thumbnail, and still lists the path + revised
+// prompt. See packages/opencode/src/plugin/openai/imagegen/.
 ToolRegistry.register({
   name: "imagegen",
   render(props) {
+    const dialog = useDialog()
     const prompt = createMemo(() => (typeof props.input.prompt === "string" ? props.input.prompt : undefined))
     const paths = createMemo(() =>
       Array.isArray(props.metadata.paths) ? props.metadata.paths.filter((p): p is string => typeof p === "string") : [],
@@ -1854,6 +1887,7 @@ ToolRegistry.register({
       if (!trimmed || trimmed === (prompt() ?? "").trim()) return undefined
       return trimmed
     }
+    const openPreview = (src: string) => dialog.show(() => <ImagePreview src={src} alt={prompt()} />)
     return (
       <>
         <BasicTool
@@ -1869,6 +1903,7 @@ ToolRegistry.register({
             <For each={paths()}>
               {(filePath, index) => (
                 <div data-component="imagegen-file">
+                  <ImagegenThumb path={filePath} alt={revisedFor(index()) ?? prompt()} onOpen={openPreview} />
                   <div data-slot="imagegen-path" class="break-all text-12-regular text-text-weak">
                     {filePath}
                   </div>
