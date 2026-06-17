@@ -27,7 +27,7 @@ let variant: string | undefined
 
 const promptValue: Prompt = [{ type: "text", content: "ls", start: 0, end: 2 }]
 const prompt = {
-  ready: () => Object.assign(() => true, { promise: Promise.resolve(true) }),
+  ready: () => true,
   current: () => promptValue,
   cursor: () => 0,
   dirty: () => true,

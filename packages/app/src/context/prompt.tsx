@@ -246,7 +246,7 @@ export function createPromptState() {
   const [store, setStore] = createStore<PromptStore>(promptStore())
   const ready = Object.assign(() => true, { promise: Promise.resolve(true) })
   return {
-    ready: () => ready,
+    ready: () => ready(),
     ...createPromptStateValue(store, setStore),
   }
 }
@@ -308,7 +308,7 @@ export const { use: usePrompt, provider: PromptProvider } = createSimpleContext(
     const pick = (scope?: Scope) => (scope ? load(scope) : session())
 
     return {
-      ready: () => session().ready,
+      ready: () => session().ready(),
       current: () => session().current(),
       cursor: () => session().cursor(),
       dirty: () => session().dirty(),

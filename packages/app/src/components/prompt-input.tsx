@@ -10,7 +10,6 @@ import {
   onCleanup,
   createMemo,
   createSignal,
-  createResource,
   type ComponentProps,
   type JSX,
 } from "solid-js"
@@ -1454,11 +1453,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const providersLoading = () => props.controls.model.loading
   const providersShouldFadeIn = createMemo((prev) => prev ?? providersLoading())
 
-  const [promptReady] = createResource(
-    () => prompt.ready().promise,
-    (p) => p,
-  )
-
   const designPlaceholder = () => {
     if (store.mode === "shell") return placeholder()
     return "Ask anything, / for commands, @ for context..."
@@ -1599,7 +1593,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   return (
     <div class="relative size-full flex flex-col gap-0">
-      {(promptReady(), null)}
+      {(prompt.ready(), null)}
       <PromptPopover
         popover={store.popover}
         setSlashPopoverRef={(el) => (slashPopoverRef = el)}
