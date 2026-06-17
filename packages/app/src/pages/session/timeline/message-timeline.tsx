@@ -54,7 +54,6 @@ import { Popover as KobaltePopover } from "@kobalte/core/popover"
 import { normalize } from "@opencode-ai/ui/session-diff"
 import { useFileComponent } from "@opencode-ai/ui/context/file"
 import { shouldMarkBoundaryGesture, normalizeWheelDelta } from "@/pages/session/message-gesture"
-import { SessionContextUsage } from "@/components/session-context-usage"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { useLanguage } from "@/context/language"
@@ -268,6 +267,10 @@ export function MessageTimeline(props: {
   const initialMeasurements = cached?.measurements
   const coldBottomMount = !initialMeasurements?.length && props.shouldAnchorBottom()
   const platform = usePlatform()
+  const nativeMobile = platform.platform === "ios" || platform.platform === "android"
+  // UPSTREAM-DIVERGENCE: narrow the Android chat side gutters (px-2 = 8px) so messages sit closer to the
+  // screen edge on phone/tablet; web/desktop/iOS keep upstream's px-4 md:px-5 (16/20px).
+  const rowPadX = platform.platform === "android" ? "px-2" : "px-4 md:px-5"
 
   const [listRoot, setListRoot] = createSignal<HTMLDivElement>()
   const sessionID = createMemo(() => params.id)
@@ -553,6 +556,9 @@ export function MessageTimeline(props: {
     menuOpen: false,
     pendingRename: false,
     pendingShare: false,
+    // UPSTREAM-DIVERGENCE: defer the delete dialog until the menu closes (see onCloseAutoFocus below)
+    // so the WebView-safe non-modal mobile menu does not swallow the confirmation dialog (context.md mobile contract).
+    pendingDelete: undefined as string | undefined,
   })
   let titleRef: HTMLInputElement | undefined
 
@@ -1034,7 +1040,7 @@ export function MessageTimeline(props: {
         )
         return (
           <TimelineRowFrame row={commentStripRow}>
-            <div class="w-full px-4 md:px-5 pb-2">
+            <div class={`w-full ${rowPadX} pb-2`}>
               <div class="ml-auto max-w-[82%] overflow-x-auto no-scrollbar">
                 <div class="flex w-max min-w-full justify-end gap-2">
                   <Index each={comments()}>
@@ -1075,7 +1081,7 @@ export function MessageTimeline(props: {
           <TimelineRowFrame row={userMessageRow}>
             <Show when={message()}>
               {(message) => (
-                <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
+                <div data-slot="session-turn-message-container" class={`w-full ${rowPadX}`}>
                   <div data-slot="session-turn-message-content" aria-live="off">
                     <Message
                       message={message()}
@@ -1093,7 +1099,7 @@ export function MessageTimeline(props: {
         const turnDividerRow = row as Accessor<TimelineRowByTag<"TurnDivider">>
         return (
           <TimelineRowFrame row={turnDividerRow}>
-            <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
+            <div data-slot="session-turn-message-container" class={`w-full ${rowPadX}`}>
               <div data-slot="session-turn-compaction">
                 <MessageDivider
                   label={language.t(
@@ -1109,7 +1115,7 @@ export function MessageTimeline(props: {
         const assistantPartRow = row as Accessor<TimelineRowByTag<"AssistantPart">>
         return (
           <TimelineRowFrame row={assistantPartRow}>
-            <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
+            <div data-slot="session-turn-message-container" class={`w-full ${rowPadX}`}>
               <div
                 data-slot="session-turn-assistant-content"
                 aria-hidden={workingTurn(assistantPartRow().userMessageID)}
@@ -1124,7 +1130,7 @@ export function MessageTimeline(props: {
         const thinkingRow = row as Accessor<TimelineRowByTag<"Thinking">>
         return (
           <TimelineRowFrame row={thinkingRow}>
-            <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
+            <div data-slot="session-turn-message-container" class={`w-full ${rowPadX}`}>
               <TimelineThinkingRow
                 reasoningHeading={thinkingRow().reasoningHeading}
                 showReasoningSummaries={settings.general.showReasoningSummaries()}
@@ -1137,7 +1143,7 @@ export function MessageTimeline(props: {
         const retryRow = row as Accessor<TimelineRowByTag<"Retry">>
         return (
           <TimelineRowFrame row={retryRow}>
-            <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
+            <div data-slot="session-turn-message-container" class={`w-full ${rowPadX}`}>
               <SessionRetry status={sessionStatus()} show={activeMessageID() === retryRow().userMessageID} />
             </div>
           </TimelineRowFrame>
@@ -1147,7 +1153,7 @@ export function MessageTimeline(props: {
         const diffSummaryRow = row as Accessor<TimelineRowByTag<"DiffSummary">>
         return (
           <TimelineRowFrame row={diffSummaryRow}>
-            <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
+            <div data-slot="session-turn-message-container" class={`w-full ${rowPadX}`}>
               <TimelineDiffSummaryRow diffs={diffSummaryRow().diffs} />
             </div>
           </TimelineRowFrame>
@@ -1157,7 +1163,7 @@ export function MessageTimeline(props: {
         const errorRow = row as Accessor<TimelineRowByTag<"Error">>
         return (
           <TimelineRowFrame row={errorRow}>
-            <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
+            <div data-slot="session-turn-message-container" class={`w-full ${rowPadX}`}>
               <Card variant="error" class="error-card">
                 {errorRow().text}
               </Card>
@@ -1282,7 +1288,8 @@ export function MessageTimeline(props: {
             }}
             data-session-title
             classList={{
-              "sticky top-0 z-30 bg-[linear-gradient(to_bottom,var(--background-stronger)_48px,transparent)]": true,
+              // UPSTREAM-DIVERGENCE: solid gradient extent reduced 48px -> 40px to match the shorter h-10 title row below.
+              "sticky top-0 z-30 bg-[linear-gradient(to_bottom,var(--background-stronger)_40px,transparent)]": true,
               "w-full": true,
               "pb-4": true,
               "pl-2 pr-3 md:pl-4 md:pr-3": true,
@@ -1300,7 +1307,8 @@ export function MessageTimeline(props: {
                 />
               </div>
             </Show>
-            <div class="h-12 w-full flex items-center justify-between gap-2">
+            {/* UPSTREAM-DIVERGENCE: title row height reduced 48px (h-12) -> 40px (h-10) per Tandem preference. */}
+            <div class="h-10 w-full flex items-center justify-between gap-2">
               <div class="flex items-center gap-1 min-w-0 flex-1 pr-3">
                 <div class="flex items-center min-w-0 grow-1">
                   <Show when={parentID()}>
@@ -1381,10 +1389,27 @@ export function MessageTimeline(props: {
               <Show when={sessionID()} keyed>
                 {(id) => (
                   <div class="shrink-0 flex items-center gap-3">
-                    <SessionContextUsage placement="bottom" />
+                    {/* UPSTREAM-DIVERGENCE: Tandem moves context usage to the composer, so the title bar
+                        carries the native-mobile refresh action here instead of the context-usage ring. */}
+                    <Show when={nativeMobile}>
+                      <IconButton
+                        icon="refresh"
+                        variant="ghost"
+                        class="size-6 rounded-md"
+                        onClick={() => {
+                          platform.haptic?.("light")
+                          void platform.restart()
+                        }}
+                        aria-label={language.t("session.header.refresh")}
+                        data-action="session-refresh"
+                      />
+                    </Show>
                     <Show when={!parentID()}>
                       <DropdownMenu
                         gutter={4}
+                        // UPSTREAM-DIVERGENCE: non-modal on native mobile so the WebView does not suppress
+                        // the menu/confirmation popups (context.md mobile overflow/delete contract).
+                        modal={!nativeMobile}
                         placement="bottom-end"
                         open={title.menuOpen}
                         onOpenChange={(open) => {
@@ -1422,6 +1447,17 @@ export function MessageTimeline(props: {
                                   setShare({ open: true, dismiss: null })
                                   setTitle("pendingShare", false)
                                 })
+                                return
+                              }
+                              // UPSTREAM-DIVERGENCE: open the delete dialog only after the menu has closed,
+                              // mirroring the rename/share deferral above so mobile WebViews keep the dialog.
+                              if (title.pendingDelete) {
+                                const pendingID = title.pendingDelete
+                                event.preventDefault()
+                                requestAnimationFrame(() => {
+                                  dialog.show(() => <DialogDeleteSession sessionID={pendingID} />)
+                                  setTitle("pendingDelete", undefined)
+                                })
                               }
                             }}
                           >
@@ -1449,7 +1485,7 @@ export function MessageTimeline(props: {
                             </DropdownMenu.Item>
                             <DropdownMenu.Separator />
                             <DropdownMenu.Item
-                              onSelect={() => dialog.show(() => <DialogDeleteSession sessionID={id} />)}
+                              onSelect={() => setTitle({ pendingDelete: id, menuOpen: false })}
                             >
                               <DropdownMenu.ItemLabel>{language.t("common.delete")}</DropdownMenu.ItemLabel>
                             </DropdownMenu.Item>

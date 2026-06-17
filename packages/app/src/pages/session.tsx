@@ -262,7 +262,6 @@ export default function Page() {
 
   const [store, setStore] = createStore({
     messageId: undefined as string | undefined,
-    mobileTab: "session" as "session" | "changes",
     changes: "git" as ChangeMode,
     newSessionWorktree: "main",
     deferRender: false,
@@ -353,11 +352,14 @@ export default function Page() {
     list.push("turn")
     return list
   })
-  const mobileChanges = createMemo(() => !isDesktop() && store.mobileTab === "changes")
+  // UPSTREAM-DIVERGENCE: in portrait/mobile there is no room for the desktop side panel, so the review
+  // ("Changes") button drives a full-screen overlay instead. Both desktop and mobile read the same
+  // view().reviewPanel state that the titlebar review button toggles.
+  const mobileChanges = createMemo(() => !isDesktop() && view().reviewPanel.opened())
   const wantsReview = createMemo(() =>
     isDesktop()
       ? desktopFileTreeOpen() || (desktopReviewOpen() && activeTab() === "review")
-      : store.mobileTab === "changes",
+      : view().reviewPanel.opened(),
   )
   const vcsMode = createMemo<VcsMode | undefined>(() => {
     if (store.changes === "git" || store.changes === "branch") return store.changes
@@ -1766,7 +1768,7 @@ export default function Page() {
               "shadow-[var(--v2-elevation-raised)]": settings.general.newLayoutDesigns() && !!params.id,
             }}
           >
-            <div class="flex-1 min-h-0 overflow-hidden">
+            <div class="flex-1 min-h-0 overflow-hidden relative">
               <Switch>
                 <Match when={params.id}>
                   <Show when={messagesReady() ? params.id : undefined} keyed>
@@ -1814,6 +1816,11 @@ export default function Page() {
                   <NewSessionView worktree={newSessionWorktree()} />
                 </Match>
               </Switch>
+              {/* UPSTREAM-DIVERGENCE: portrait/mobile full-screen "Changes" overlay, toggled by the
+                  titlebar review button. The timeline stays mounted underneath to preserve scroll. */}
+              <Show when={params.id && mobileChanges()}>
+                <div class="absolute inset-0 z-20 bg-background-stronger">{reviewPanel()}</div>
+              </Show>
             </div>
 
             <Show when={params.id || !newSessionDesign()}>{composerRegion("dock")}</Show>
