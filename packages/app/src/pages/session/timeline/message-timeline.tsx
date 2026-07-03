@@ -277,6 +277,9 @@ export function MessageTimeline(props: {
   // UPSTREAM-DIVERGENCE: narrow the Android chat side gutters (px-2 = 8px) so messages sit closer to the
   // screen edge on phone/tablet; web/desktop/iOS keep upstream's px-4 md:px-5 (16/20px).
   const rowPadX = platform.platform === "android" ? "px-2" : "px-4 md:px-5"
+  // UPSTREAM-DIVERGENCE: native mobile WebViews suppress modal menu focus traps/popups; keep the
+  // session overflow menu non-modal there (contextL.md mobile overflow/delete contract).
+  const nativeMobile = platform.platform === "ios" || platform.platform === "android"
 
   const [listRoot, setListRoot] = createSignal<HTMLDivElement>()
   const sessionID = createMemo(() => params.id)
@@ -330,6 +333,9 @@ export function MessageTimeline(props: {
     menuOpen: false,
     pendingRename: false,
     pendingShare: false,
+    // UPSTREAM-DIVERGENCE: defer the delete dialog until the menu closes (see onCloseAutoFocus below)
+    // so the WebView-safe non-modal mobile menu does not swallow the confirmation dialog.
+    pendingDelete: undefined as string | undefined,
   })
   let titleRef: HTMLInputElement | undefined
 
@@ -1332,6 +1338,7 @@ export function MessageTimeline(props: {
               fallback={
                 <DropdownMenu
                   gutter={4}
+                  modal={!nativeMobile}
                   placement="bottom-end"
                   open={title.menuOpen}
                   onOpenChange={(open) => {
@@ -1369,6 +1376,17 @@ export function MessageTimeline(props: {
                             setShare({ open: true, dismiss: null })
                             setTitle("pendingShare", false)
                           })
+                          return
+                        }
+                        // UPSTREAM-DIVERGENCE: open the delete dialog only after the menu has closed,
+                        // mirroring the rename/share deferral above so mobile WebViews keep the dialog.
+                        if (title.pendingDelete) {
+                          const pendingID = title.pendingDelete
+                          event.preventDefault()
+                          requestAnimationFrame(() => {
+                            dialog.show(() => <DialogDeleteSession sessionID={pendingID} />)
+                            setTitle("pendingDelete", undefined)
+                          })
                         }
                       }}
                     >
@@ -1396,7 +1414,7 @@ export function MessageTimeline(props: {
                       </DropdownMenu.Item>
                       <DropdownMenu.Separator />
                       <DropdownMenu.Item
-                        onSelect={() => dialog.show(() => <DialogDeleteSession sessionID={id} />)}
+                        onSelect={() => setTitle({ pendingDelete: id, menuOpen: false })}
                       >
                         <DropdownMenu.ItemLabel>{language.t("common.delete")}</DropdownMenu.ItemLabel>
                       </DropdownMenu.Item>
@@ -1407,6 +1425,7 @@ export function MessageTimeline(props: {
             >
               <MenuV2
                 gutter={6}
+                modal={!nativeMobile}
                 placement="bottom-end"
                 open={title.menuOpen}
                 onOpenChange={(open) => {
@@ -1442,6 +1461,17 @@ export function MessageTimeline(props: {
                           setShare({ open: true, dismiss: null })
                           setTitle("pendingShare", false)
                         })
+                        return
+                      }
+                      // UPSTREAM-DIVERGENCE: open the delete dialog only after the menu has closed,
+                      // mirroring the rename/share deferral above so mobile WebViews keep the dialog.
+                      if (title.pendingDelete) {
+                        const pendingID = title.pendingDelete
+                        event.preventDefault()
+                        requestAnimationFrame(() => {
+                          dialog.show(() => <DialogDeleteSession sessionID={pendingID} />)
+                          setTitle("pendingDelete", undefined)
+                        })
                       }
                     }}
                   >
@@ -1466,7 +1496,7 @@ export function MessageTimeline(props: {
                       {language.t("common.archive")}
                     </MenuV2.Item>
                     <MenuV2.Separator />
-                    <MenuV2.Item onSelect={() => dialog.show(() => <DialogDeleteSession sessionID={id} />)}>
+                    <MenuV2.Item onSelect={() => setTitle({ pendingDelete: id, menuOpen: false })}>
                       {language.t("common.delete")}...
                     </MenuV2.Item>
                   </MenuV2.Content>
