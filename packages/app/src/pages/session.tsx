@@ -11,6 +11,7 @@ import {
   createMemo,
   createEffect,
   createComputed,
+  createSignal,
   on,
   onMount,
   type ParentProps,
@@ -87,6 +88,7 @@ import { useComposerCommands } from "@/pages/session/use-composer-commands"
 import { useSessionCommands } from "@/pages/session/use-session-commands"
 import { useSessionHashScroll } from "@/pages/session/use-session-hash-scroll"
 import { Identifier } from "@/utils/id"
+import { sessionTitle } from "@/utils/session-title"
 import { diffs as list } from "@/utils/diffs"
 import { diffCount, MOBILE_REVIEW_FILE_LIMIT, mobileReviewLimit } from "@/utils/mobile-review-limit"
 import { Persist, persisted } from "@/utils/persist"
@@ -2136,6 +2138,11 @@ export default function Page() {
     )
   }
 
+  // UPSTREAM-DIVERGENCE: the mobile Session tab hosts the session title and (via this mount,
+  // filled by MessageTimeline through a Portal) the overflow actions, replacing the inline title
+  // bar to save vertical space; the tab split widens to 75/25 to make room for the title.
+  const [mobileActionsMount, setMobileActionsMount] = createSignal<HTMLElement>()
+  const sessionTabTitle = createMemo(() => sessionTitle(info()?.title))
   const mobileTabs = (compact = false, bottom = false) => (
     <Tabs value={store.mobileTab} class="h-auto">
       <Tabs.List
@@ -2147,26 +2154,33 @@ export default function Page() {
         <Tabs.Trigger
           value="session"
           classList={{
-            "!w-1/2 !max-w-none": true,
+            "!max-w-none": true,
+            "!w-3/4": compact,
+            "!w-1/2": !compact,
             "!border-b-0 !border-t !border-border-weak-base [&:has([data-selected])]:!border-t-transparent": bottom,
           }}
-          classes={{ button: compact ? "w-full !py-2" : "w-full" }}
+          classes={{ button: compact ? "flex-1 min-w-0 !py-2" : "w-full" }}
           onClick={() => setStore("mobileTab", "session")}
+          closeButton={compact ? <div class="flex items-center" ref={setMobileActionsMount} /> : undefined}
         >
-          {language.t("session.tab.session")}
+          <span class="truncate">{(compact && sessionTabTitle()) || language.t("session.tab.session")}</span>
         </Tabs.Trigger>
         <Tabs.Trigger
           value="changes"
           classList={{
-            "!w-1/2 !max-w-none !border-r-0": true,
+            "!max-w-none !border-r-0": true,
+            "!w-1/4": compact,
+            "!w-1/2": !compact,
             "!border-b-0 !border-t !border-border-weak-base [&:has([data-selected])]:!border-t-transparent": bottom,
           }}
-          classes={{ button: compact ? "w-full !py-2" : "w-full" }}
+          classes={{ button: compact ? "w-full min-w-0 !py-2" : "w-full" }}
           onClick={() => setStore("mobileTab", "changes")}
         >
-          {hasReview()
-            ? language.t("session.review.filesChanged", { count: reviewCount() })
-            : language.t("session.review.change.other")}
+          <span class="truncate">
+            {hasReview()
+              ? language.t("session.review.filesChanged", { count: reviewCount() })
+              : language.t("session.review.change.other")}
+          </span>
         </Tabs.Trigger>
       </Tabs.List>
     </Tabs>
@@ -2207,6 +2221,9 @@ export default function Page() {
               {(_id) => (
                 <MessageTimeline
                   actions={actions}
+                  mobileActionsMount={() =>
+                    !isDesktop() && settings.general.newLayoutDesigns() ? mobileActionsMount() : undefined
+                  }
                   scroll={ui.scroll}
                   onResumeScroll={resumeScroll}
                   setScrollRef={setScrollRef}
