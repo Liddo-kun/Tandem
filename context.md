@@ -8,7 +8,7 @@ Build and maintain one personal repo, `Tandem`, based on current official OpenCo
 
 Use `log.md` as the exhaustive final-state inventory of Tandem changes relative to official OpenCode. `context.md` explains how to work in this repo; it should not become a skipped-commit ledger or merge-history log.
 
-Always read and update log.md when making a change to opencode, the web ui or the mobile apps.
+`log.md` is a final-state inventory of Tandem's *divergence from upstream*, not a per-change changelog. Update it only when a change alters that divergence surface: it modifies an upstream-shared file, or adds/removes/retargets a fork-owned file a future merge must account for. When it applies, revise the existing entry to describe the new current state — do not append changelog-style "also changed X" bullets. A change confined to already fork-owned code that leaves the divergence surface unchanged (e.g. tuning an existing Tandem-only plugin or tool) is documented in that feature's own doc (e.g. `PromptEnhance.md`), not `log.md`. Always read `log.md` before changing opencode, the web UI, or the mobile apps.
 
 See `PromptEnhance.md` for the built-in prompt-corrector/RePrompt plugin (a Tandem personal enhancement): what it corrects, how it works, and its env-var configuration.
 
