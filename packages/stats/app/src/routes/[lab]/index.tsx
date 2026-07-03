@@ -144,7 +144,11 @@ export default function StatsLab() {
                   <LabOverview lab={data()} data={stats() ?? null} />
                   <LabUsageSection lab={data()} data={stats() ?? null} />
                   <LabModelsSection lab={data()} usage={stats()?.models ?? []} />
-                  <LabRelatedSection lab={data()} labs={catalog()?.labs ?? []} market={homeStats()?.market["2M"] ?? []} />
+                  <LabRelatedSection
+                    lab={data()}
+                    labs={catalog()?.labs ?? []}
+                    market={homeStats()?.market["2M"] ?? []}
+                  />
                 </>
               )}
             </Show>
@@ -338,11 +342,7 @@ function LabUsageSection(props: { lab: ModelCatalogLab; data: StatsLabData | nul
 
   return (
     <section id="usage" data-section="model-panel">
-      <SectionHeading
-        href="#usage"
-        title={i18n.t("nav.usage")}
-        description={i18n.t("lab.usageDescription")}
-      />
+      <SectionHeading href="#usage" title={i18n.t("nav.usage")} description={i18n.t("lab.usageDescription")} />
       <Show
         when={usage().some((item) => item.tokens > 0)}
         fallback={<LabEmptyState title={i18n.t("lab.noUsageTitle")} description={i18n.t("lab.noUsageDescription")} />}
@@ -370,10 +370,7 @@ function LabUsageSection(props: { lab: ModelCatalogLab; data: StatsLabData | nul
                     preserveAspectRatio="none"
                     aria-hidden="true"
                   >
-                    <Show
-                      when={activeLineBreak()}
-                      fallback={<path data-slot="lab-usage-line-base" d={path()} />}
-                    >
+                    <Show when={activeLineBreak()} fallback={<path data-slot="lab-usage-line-base" d={path()} />}>
                       {(lineBreak) => (
                         <>
                           <defs>
@@ -472,6 +469,12 @@ function LabUsageSection(props: { lab: ModelCatalogLab; data: StatsLabData | nul
                       </span>
                       <b>{formatTokens(active.point.tokens)}</b>
                     </p>
+                    <p>
+                      <span data-slot="tooltip-label">
+                        <i data-kind="users" /> {i18n.t("model.uniqueUsers")}
+                      </span>
+                      <b>{formatUsers(active.point.users)}</b>
+                    </p>
                   </div>
                 )
               }}
@@ -509,7 +512,11 @@ function LabModelsSection(props: { lab: ModelCatalogLab; usage: LabUsageModelEnt
         </button>
       </div>
       <div data-slot="lab-model-pattern" aria-hidden="true" />
-      <div data-component="lab-model-table" role="table" aria-label={i18n.t("lab.modelsTitle", { lab: props.lab.name })}>
+      <div
+        data-component="lab-model-table"
+        role="table"
+        aria-label={i18n.t("lab.modelsTitle", { lab: props.lab.name })}
+      >
         <div data-slot="lab-model-table-track">
           <div data-slot="lab-model-table-head" role="row">
             <span data-column="model" role="columnheader">
@@ -533,11 +540,7 @@ function LabModelsSection(props: { lab: ModelCatalogLab; usage: LabUsageModelEnt
           </div>
           <For each={props.lab.models}>
             {(model) => (
-              <LabModelRow
-                model={model}
-                usage={usageBySlug().get(model.slug)}
-                onTooltipChange={setActiveTooltip}
-              />
+              <LabModelRow model={model} usage={usageBySlug().get(model.slug)} onTooltipChange={setActiveTooltip} />
             )}
           </For>
         </div>
@@ -556,24 +559,28 @@ function LabModelRow(props: {
 }) {
   const i18n = useI18n()
   const language = useLanguage()
-  const showTooltip = (x: number, y: number) => {
+  const showTooltip = (target: HTMLAnchorElement) => {
+    const rect = target.getBoundingClientRect()
     const viewportWidth = typeof window === "undefined" ? 0 : window.innerWidth
     const viewportHeight = typeof window === "undefined" ? 0 : window.innerHeight
+    const anchorX = viewportWidth > 0 ? Math.min(Math.max(rect.left + 320, 24), viewportWidth - 24) : rect.left + 320
     props.onTooltipChange({
       model: props.model,
-      placement: viewportWidth > 0 && x > viewportWidth - 280 ? "left" : "right",
+      placement: viewportWidth > 0 && anchorX > viewportWidth - 280 ? "left" : "right",
       usage: props.usage,
-      x,
-      y: viewportHeight > 0 ? Math.min(Math.max(y, 96), viewportHeight - 128) : y,
+      x: anchorX,
+      y:
+        viewportHeight > 0
+          ? Math.min(Math.max(rect.top + rect.height / 2, 96), viewportHeight - 128)
+          : rect.top + rect.height / 2,
     })
   }
   const showPointerTooltip: JSX.EventHandler<HTMLAnchorElement, PointerEvent> = (event) => {
     if (event.pointerType === "touch") return
-    showTooltip(event.clientX, event.clientY)
+    showTooltip(event.currentTarget)
   }
   const showFocusTooltip: JSX.EventHandler<HTMLAnchorElement, FocusEvent> = (event) => {
-    const rect = event.currentTarget.getBoundingClientRect()
-    showTooltip(rect.left + rect.width * 0.58, rect.top + rect.height / 2)
+    showTooltip(event.currentTarget)
   }
   return (
     <a
@@ -584,11 +591,12 @@ function LabModelRow(props: {
       onBlur={() => props.onTooltipChange(undefined)}
       onFocus={showFocusTooltip}
       onPointerEnter={showPointerTooltip}
+      onPointerDown={() => props.onTooltipChange(undefined)}
       onPointerLeave={(event) => {
         if (event.pointerType === "touch") return
         props.onTooltipChange(undefined)
       }}
-      onPointerMove={showPointerTooltip}
+      onClick={() => props.onTooltipChange(undefined)}
     >
       <span data-slot="lab-model-cell" data-column="model" role="cell">
         <span data-slot="lab-model-avatar" aria-hidden="true">
@@ -635,9 +643,7 @@ function LabModelTooltip(props: { state: LabModelTooltipState }) {
           </span>
           <strong>{props.state.model.name}</strong>
         </div>
-        <p>
-          {props.state.model.description ?? "Recent OpenCode Go usage, share, context, and output limits."}
-        </p>
+        <p>{props.state.model.description ?? "Recent OpenCode Go usage, share, context, and output limits."}</p>
       </div>
       <div data-slot="tooltip-divider" />
       <div data-slot="lab-model-tooltip-metrics">
@@ -668,9 +674,7 @@ function LabRelatedSection(props: { lab: ModelCatalogLab; labs: ModelCatalogLab[
     <section id="related-labs" data-section="model-panel" data-variant="lab-related">
       <SectionHeading href="#related-labs" title="Related labs" description="Explore more." />
       <div data-component="lab-related-list">
-        <For each={related()}>
-          {(entry) => <LabRelatedCard entry={entry} />}
-        </For>
+        <For each={related()}>{(entry) => <LabRelatedCard entry={entry} />}</For>
       </div>
     </section>
   )
@@ -766,7 +770,7 @@ function relatedLabStats(labs: ModelCatalogLab[], market: MarketDay[]) {
 }
 
 function labRelatedDescription(lab: ModelCatalogLab) {
-  return lab.description ?? `OpenCode Go usage across ${lab.name} models, recent token volume, and model limits.`
+  return lab.description ?? ""
 }
 
 function relatedTone(share: number) {
@@ -852,7 +856,7 @@ function trimNumber(value: number, digits: number) {
 
 function usageStripHeight(value: number, max: number) {
   if (value <= 0 || max <= 0) return 0
-  return Math.max(1, (value / max) * 40)
+  return Math.max(2, (value / max) * 76)
 }
 
 function usageLineY(value: number, max: number) {
