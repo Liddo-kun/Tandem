@@ -23,6 +23,7 @@ import { selectionFromLines, useFile, type FileSelection, type SelectedLineRange
 import { createStore } from "solid-js/store"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { Select } from "@opencode-ai/ui/select"
+import { Tabs } from "@opencode-ai/ui/tabs"
 import { createAutoScroll } from "@opencode-ai/ui/hooks"
 import { previewSelectedLines } from "@opencode-ai/ui/pierre/selection-bridge"
 import { Button } from "@opencode-ai/ui/button"
@@ -260,6 +261,7 @@ export default function Page() {
 
   const [store, setStore] = createStore({
     messageId: undefined as string | undefined,
+    mobileTab: "session" as "session" | "changes",
     changes: "git" as ChangeMode,
     newSessionWorktree: "main",
     deferRender: false,
@@ -350,14 +352,11 @@ export default function Page() {
     list.push("turn")
     return list
   })
-  // UPSTREAM-DIVERGENCE: in portrait/mobile there is no room for the desktop side panel, so the review
-  // ("Changes") button drives a full-screen overlay instead. Both desktop and mobile read the same
-  // view().reviewPanel state that the titlebar review button toggles.
-  const mobileChanges = createMemo(() => !isDesktop() && view().reviewPanel.opened())
+  const mobileChanges = createMemo(() => !isDesktop() && store.mobileTab === "changes")
   const wantsReview = createMemo(() =>
     isDesktop()
       ? desktopFileTreeOpen() || (desktopReviewOpen() && activeTab() === "review")
-      : view().reviewPanel.opened(),
+      : store.mobileTab === "changes",
   )
   const vcsMode = createMemo<VcsMode | undefined>(() => {
     if (store.changes === "git" || store.changes === "branch") return store.changes
@@ -1736,10 +1735,44 @@ export default function Page() {
     />
   )
 
-  // UPSTREAM-DIVERGENCE: upstream's mobile bottom-nav tabs (store.mobileTab-driven session/changes
-  // switch) are intentionally omitted. Tandem drives the mobile Changes view from the titlebar review
-  // button (view().reviewPanel) and renders it as a full-screen overlay that keeps the timeline mounted
-  // (see the mobileChanges overlay below and log.md), which protects iOS/Android WebViews on large reviews.
+  const mobileTabs = (compact = false, bottom = false) => (
+    <Tabs value={store.mobileTab} class="h-auto">
+      <Tabs.List
+        classList={{
+          "!h-9": compact,
+          "[&::after]:!border-b-0 [&::after]:!border-t [&::after]:!border-border-weak-base": bottom,
+        }}
+      >
+        <Tabs.Trigger
+          value="session"
+          classList={{
+            "!w-1/2 !max-w-none": true,
+            "!border-b-0 !border-t !border-border-weak-base [&:has([data-selected])]:!border-t-transparent": bottom,
+          }}
+          classes={{ button: compact ? "w-full !py-2" : "w-full" }}
+          onClick={() => setStore("mobileTab", "session")}
+        >
+          {language.t("session.tab.session")}
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="changes"
+          classList={{
+            "!w-1/2 !max-w-none !border-r-0": true,
+            "!border-b-0 !border-t !border-border-weak-base [&:has([data-selected])]:!border-t-transparent": bottom,
+          }}
+          classes={{ button: compact ? "w-full !py-2" : "w-full" }}
+          onClick={() => setStore("mobileTab", "changes")}
+        >
+          {hasReview()
+            ? language.t("session.review.filesChanged", { count: reviewCount() })
+            : language.t("session.review.change.other")}
+        </Tabs.Trigger>
+      </Tabs.List>
+    </Tabs>
+  )
+  const mobileTabsBottom = createMemo(
+    () => !isDesktop() && settings.general.newLayoutDesigns() && settings.general.mobileTitlebarPosition() === "bottom",
+  )
 
   return (
     <div class="relative size-full overflow-hidden flex flex-col">
@@ -1754,6 +1787,7 @@ export default function Page() {
         }}
       >
         {/* Session panel */}
+        <Show when={!isDesktop() && !!params.id && !settings.general.newLayoutDesigns()}>{mobileTabs()}</Show>
 
         <div
           classList={{
@@ -1772,10 +1806,25 @@ export default function Page() {
               "shadow-[var(--v2-elevation-raised)]": settings.general.newLayoutDesigns() && !!params.id,
             }}
           >
-            {/* UPSTREAM-DIVERGENCE: keep `relative` for the full-screen Changes overlay below; the mobile
-                review is rendered as an overlay (timeline stays mounted), not as an inline Switch Match. */}
-            <div class="flex-1 min-h-0 overflow-hidden relative">
+            <Show when={!isDesktop() && !!params.id && settings.general.newLayoutDesigns() && !mobileTabsBottom()}>
+              {mobileTabs(true)}
+            </Show>
+            <div class="flex-1 min-h-0 overflow-hidden">
               <Switch>
+                <Match when={params.id && mobileChanges()}>
+                  <div class="relative h-full overflow-hidden">
+                    {reviewContent({
+                      diffStyle: "unified",
+                      classes: {
+                        root: "pb-8 [&_[data-slot=session-review-list]]:pb-0",
+                        header: "px-4 !h-16 !pb-4",
+                        container: "px-4",
+                      },
+                      loadingClass: "px-4 py-4 text-text-weak",
+                      emptyClass: "h-full pb-64 -mt-4 flex flex-col items-center justify-center text-center gap-6",
+                    })}
+                  </div>
+                </Match>
                 <Match when={params.id}>
                   <Show when={messagesReady() ? params.id : undefined} keyed>
                     {(_id) => (
@@ -1822,14 +1871,10 @@ export default function Page() {
                   <NewSessionView worktree={newSessionWorktree()} />
                 </Match>
               </Switch>
-              {/* UPSTREAM-DIVERGENCE: portrait/mobile full-screen "Changes" overlay, toggled by the
-                  titlebar review button. The timeline stays mounted underneath to preserve scroll. */}
-              <Show when={params.id && mobileChanges()}>
-                <div class="absolute inset-0 z-20 bg-background-stronger">{reviewPanel()}</div>
-              </Show>
             </div>
 
             <Show when={(params.id || !newSessionDesign()) && !mobileChanges()}>{composerRegion("dock")}</Show>
+            <Show when={!!params.id && mobileTabsBottom()}>{mobileTabs(true, true)}</Show>
           </div>
 
           <Show when={desktopReviewOpen()}>
