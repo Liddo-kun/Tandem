@@ -11,6 +11,7 @@ import {
   onCleanup,
   Index,
   type JSX,
+  type ComponentProps,
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import stripAnsi from "strip-ansi"
@@ -50,6 +51,8 @@ import { getDirectory as _getDirectory, getFilename } from "@opencode-ai/core/ut
 import { checksum } from "@opencode-ai/core/util/encode"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { IconButton } from "@opencode-ai/ui/icon-button"
+import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
+import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { Spinner } from "@opencode-ai/ui/spinner"
 import { TextShimmer } from "@opencode-ai/ui/text-shimmer"
 import { AnimatedCountList } from "./tool-count-summary"
@@ -128,6 +131,7 @@ export interface MessageProps {
   actions?: UserActions
   showAssistantCopyPartID?: string | null
   showReasoningSummaries?: boolean
+  useV2Actions?: boolean
 }
 
 export type SessionAction = (input: { sessionID: string; messageID: string }) => Promise<void> | void
@@ -149,6 +153,46 @@ export interface MessagePartProps {
   onContentRendered?: () => void
   showAssistantCopyPartID?: string | null
   turnDurationMs?: number
+  useV2Actions?: boolean
+}
+
+function MessageActionButton(
+  props: Pick<ComponentProps<"button">, "disabled" | "onMouseDown" | "onClick" | "aria-label"> & {
+    icon: "check" | "copy" | "reset"
+    label: JSX.Element
+    useV2?: boolean
+  },
+) {
+  return (
+    <Show
+      when={props.useV2}
+      fallback={
+        <Tooltip value={props.label} placement="top" gutter={4}>
+          <IconButton
+            icon={props.icon}
+            size="normal"
+            variant="ghost"
+            disabled={props.disabled}
+            onMouseDown={props.onMouseDown}
+            onClick={props.onClick}
+            aria-label={props["aria-label"]}
+          />
+        </Tooltip>
+      }
+    >
+      <TooltipV2 value={props.label} placement="top" gutter={4}>
+        <IconButtonV2
+          icon={<Icon name={props.icon} size="small" />}
+          size="normal"
+          variant="ghost-muted"
+          disabled={props.disabled}
+          onMouseDown={props.onMouseDown}
+          onClick={props.onClick}
+          aria-label={props["aria-label"]}
+        />
+      </TooltipV2>
+    </Show>
+  )
 }
 
 export type PartComponent = Component<MessagePartProps>
@@ -674,6 +718,7 @@ export function AssistantParts(props: {
   messages: AssistantMessage[]
   showAssistantCopyPartID?: string | null
   turnDurationMs?: number
+  useV2Actions?: boolean
   working?: boolean
   showReasoningSummaries?: boolean
   shellToolDefaultOpen?: boolean
@@ -758,6 +803,7 @@ export function AssistantParts(props: {
                         message={message()!}
                         showAssistantCopyPartID={props.showAssistantCopyPartID}
                         turnDurationMs={props.turnDurationMs}
+                        useV2Actions={props.useV2Actions}
                         defaultOpen={partDefaultOpen(item()!, props.shellToolDefaultOpen, props.editToolDefaultOpen)}
                       />
                     </Show>
@@ -885,7 +931,12 @@ export function Message(props: MessageProps) {
     <Switch>
       <Match when={props.message.role === "user" && props.message}>
         {(userMessage) => (
-          <UserMessageDisplay message={userMessage() as UserMessage} parts={props.parts} actions={props.actions} />
+          <UserMessageDisplay
+            message={userMessage() as UserMessage}
+            parts={props.parts}
+            actions={props.actions}
+            useV2Actions={props.useV2Actions}
+          />
         )}
       </Match>
       <Match when={props.message.role === "assistant" && props.message}>
@@ -895,6 +946,7 @@ export function Message(props: MessageProps) {
             parts={props.parts}
             showAssistantCopyPartID={props.showAssistantCopyPartID}
             showReasoningSummaries={props.showReasoningSummaries}
+            useV2Actions={props.useV2Actions}
           />
         )}
       </Match>
@@ -907,6 +959,7 @@ export function AssistantMessageDisplay(props: {
   parts: PartType[]
   showAssistantCopyPartID?: string | null
   showReasoningSummaries?: boolean
+  useV2Actions?: boolean
 }) {
   const emptyTools: ToolPart[] = []
   const part = createMemo(() => index(props.parts))
@@ -966,6 +1019,7 @@ export function AssistantMessageDisplay(props: {
                       part={item()!}
                       message={props.message}
                       showAssistantCopyPartID={props.showAssistantCopyPartID}
+                      useV2Actions={props.useV2Actions}
                     />
                   </Show>
                 )
@@ -1086,7 +1140,12 @@ export function ContextToolGroup(props: { parts: ToolPart[]; busy?: boolean; onS
   )
 }
 
-export function UserMessageDisplay(props: { message: UserMessage; parts: PartType[]; actions?: UserActions }) {
+export function UserMessageDisplay(props: {
+  message: UserMessage
+  parts: PartType[]
+  actions?: UserActions
+  useV2Actions?: boolean
+}) {
   const data = useData()
   const dialog = useDialog()
   const i18n = useI18n()
@@ -1225,38 +1284,30 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
               </span>
             </Show>
             <Show when={props.actions?.revert}>
-              <Tooltip value={i18n.t("ui.message.revertMessage")} placement="top" gutter={4}>
-                <IconButton
-                  icon="reset"
-                  size="normal"
-                  variant="ghost"
-                  disabled={!!busy()}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    revert()
-                  }}
-                  aria-label={i18n.t("ui.message.revertMessage")}
-                />
-              </Tooltip>
-            </Show>
-            <Tooltip
-              value={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyMessage")}
-              placement="top"
-              gutter={4}
-            >
-              <IconButton
-                icon={copied() ? "check" : "copy"}
-                size="normal"
-                variant="ghost"
-                onMouseDown={(e) => e.preventDefault()}
+              <MessageActionButton
+                icon="reset"
+                label={i18n.t("ui.message.revertMessage")}
+                useV2={props.useV2Actions}
+                disabled={!!busy()}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={(event) => {
                   event.stopPropagation()
-                  void handleCopy()
+                  revert()
                 }}
-                aria-label={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyMessage")}
+                aria-label={i18n.t("ui.message.revertMessage")}
               />
-            </Tooltip>
+            </Show>
+            <MessageActionButton
+              icon={copied() ? "check" : "copy"}
+              label={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyMessage")}
+              useV2={props.useV2Actions}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={(event) => {
+                event.stopPropagation()
+                void handleCopy()
+              }}
+              aria-label={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyMessage")}
+            />
           </div>
         </>
       </Show>
@@ -1320,6 +1371,7 @@ export function Part(props: MessagePartProps) {
         onContentRendered={props.onContentRendered}
         showAssistantCopyPartID={props.showAssistantCopyPartID}
         turnDurationMs={props.turnDurationMs}
+        useV2Actions={props.useV2Actions}
       />
     </Show>
   )
@@ -1605,20 +1657,14 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
         </div>
         <Show when={showCopy()}>
           <div data-slot="text-part-copy-wrapper" data-interrupted={interrupted() ? "" : undefined}>
-            <Tooltip
-              value={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyResponse")}
-              placement="top"
-              gutter={4}
-            >
-              <IconButton
-                icon={copied() ? "check" : "copy"}
-                size="normal"
-                variant="ghost"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={handleCopy}
-                aria-label={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyResponse")}
-              />
-            </Tooltip>
+            <MessageActionButton
+              icon={copied() ? "check" : "copy"}
+              label={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyResponse")}
+              useV2={props.useV2Actions}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={handleCopy}
+              aria-label={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyResponse")}
+            />
             <Show when={meta()}>
               <span data-slot="text-part-meta" class="text-12-regular text-text-weak cursor-default">
                 {meta()}

@@ -861,8 +861,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     }
   }
 
-  // Auto-scroll active command into view when navigating with keyboard
-  createEffect(() => {
+  const scrollSlashActiveIntoView = () => {
     const activeId = slashActive()
     if (!activeId || !slashPopoverRef) return
 
@@ -870,7 +869,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       const element = slashPopoverRef.querySelector(`[data-slash-id="${activeId}"]`)
       element?.scrollIntoView({ block: "nearest", behavior: "smooth" })
     })
-  })
+  }
   const selectPopoverActive = () => {
     if (store.popover === "at") {
       const items = atFlat()
@@ -1360,6 +1359,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         }
         if (store.popover === "slash") {
           slashOnKeyDown(event)
+          if (event.key === "ArrowUp" || event.key === "ArrowDown" || ctrlNav) {
+            scrollSlashActiveIntoView()
+          }
         }
         event.preventDefault()
         return
@@ -1509,6 +1511,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         setSlashActive={setSlashActive}
         onSlashSelect={handleSlashSelect}
         commandKeybind={command.keybind}
+        commandKeybindParts={command.keybindParts}
+        newLayoutDesigns={props.controls.newLayoutDesigns}
         t={(key) => language.t(key as Parameters<typeof language.t>[0])}
       />
       {useV2Input() ? (
