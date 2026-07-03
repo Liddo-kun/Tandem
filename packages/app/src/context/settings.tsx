@@ -34,6 +34,7 @@ export interface Settings {
     editToolPartsExpanded: boolean
     showSessionProgressBar: boolean
     showCustomAgents: boolean
+    mobileTitlebarPosition: "top" | "bottom"
     newLayoutDesigns?: boolean
   }
   appearance: {
@@ -129,6 +130,7 @@ const defaultSettings: Settings = {
     editToolPartsExpanded: false,
     showSessionProgressBar: true,
     showCustomAgents: false,
+    mobileTitlebarPosition: "top",
   },
   appearance: {
     fontSize: 14,
@@ -302,6 +304,13 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         showCustomAgents,
         setShowCustomAgents(value: boolean) {
           setStore("general", "showCustomAgents", value)
+        },
+        mobileTitlebarPosition: withFallback(
+          () => store.general?.mobileTitlebarPosition,
+          defaultSettings.general.mobileTitlebarPosition,
+        ),
+        setMobileTitlebarPosition(value: "top" | "bottom") {
+          setStore("general", "mobileTitlebarPosition", value)
         },
         newLayoutDesigns,
         setNewLayoutDesigns(value: boolean) {

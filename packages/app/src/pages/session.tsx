@@ -27,7 +27,7 @@ import { createAutoScroll } from "@opencode-ai/ui/hooks"
 import { previewSelectedLines } from "@opencode-ai/ui/pierre/selection-bridge"
 import { Button } from "@opencode-ai/ui/button"
 import { showToast } from "@/utils/toast"
-import { checksum } from "@opencode-ai/core/util/encode"
+import { base64Encode, checksum } from "@opencode-ai/core/util/encode"
 import { useLocation, useSearchParams } from "@solidjs/router"
 import { NewSessionView, SessionHeader } from "@/components/session"
 import { useComments } from "@/context/comments"
@@ -55,7 +55,6 @@ import { MessageTimeline } from "@/pages/session/timeline/message-timeline"
 import { createTimelineModel } from "@/pages/session/timeline/model"
 import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/pages/session/review-tab"
 import { useSessionLayout } from "@/pages/session/session-layout"
-import { useServer } from "@/context/server"
 import { syncSessionModel } from "@/pages/session/session-model-helpers"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
 import { TerminalPanel } from "@/pages/session/terminal-panel"
@@ -95,7 +94,6 @@ export default function Page() {
   const prompt = usePrompt()
   const comments = useComments()
   const terminal = useTerminal()
-  const server = useServer()
   const [searchParams, setSearchParams] = useSearchParams<{ prompt?: string }>()
   const location = useLocation()
   const { params, sessionKey, workspaceKey, tabs, view } = useSessionLayout()
@@ -140,11 +138,11 @@ export default function Page() {
           layout.handoff.clearTabs()
           return
         }
-        if (pending.scope !== server.scope()) return
+        if (pending.scope !== serverSDK().scope) return
 
         if (pending.id !== id) return
         layout.handoff.clearTabs()
-        if (pending.dir !== (params.dir ?? "")) return
+        if (pending.dir !== base64Encode(sdk().directory)) return
 
         const from = workspaceTabs().tabs()
         if (from.all.length === 0 && !from.active) return
@@ -250,7 +248,7 @@ export default function Page() {
 
   createEffect(
     on(
-      () => ({ dir: params.dir, id: params.id }),
+      () => ({ dir: sdk().directory, id: params.id }),
       (next, prev) => {
         if (!prev) return
         if (next.dir === prev.dir && next.id === prev.id) return
@@ -704,7 +702,7 @@ export default function Page() {
 
   createEffect(
     on(
-      () => params.dir,
+      () => sdk().directory,
       (dir) => {
         if (!dir) return
         setStore("newSessionWorktree", "main")
@@ -1738,12 +1736,17 @@ export default function Page() {
     />
   )
 
+  // UPSTREAM-DIVERGENCE: upstream's mobile bottom-nav tabs (store.mobileTab-driven session/changes
+  // switch) are intentionally omitted. Tandem drives the mobile Changes view from the titlebar review
+  // button (view().reviewPanel) and renders it as a full-screen overlay that keeps the timeline mounted
+  // (see the mobileChanges overlay below and log.md), which protects iOS/Android WebViews on large reviews.
+
   return (
     <div class="relative size-full overflow-hidden flex flex-col">
       {sessionSync() ?? ""}
       <SessionHeader />
       <div
-        class="flex-1 min-h-0 flex flex-col md:flex-row "
+        class="flex-1 min-h-0 flex flex-col md:flex-row"
         classList={{
           "gap-2": settings.general.newLayoutDesigns(),
           "p-2": settings.general.newLayoutDesigns() && !isAndroid,
@@ -1751,6 +1754,7 @@ export default function Page() {
         }}
       >
         {/* Session panel */}
+
         <div
           classList={{
             "@container relative shrink-0 flex flex-col min-h-0 h-full flex-1 md:flex-none transition-[width]": true,
@@ -1768,6 +1772,8 @@ export default function Page() {
               "shadow-[var(--v2-elevation-raised)]": settings.general.newLayoutDesigns() && !!params.id,
             }}
           >
+            {/* UPSTREAM-DIVERGENCE: keep `relative` for the full-screen Changes overlay below; the mobile
+                review is rendered as an overlay (timeline stays mounted), not as an inline Switch Match. */}
             <div class="flex-1 min-h-0 overflow-hidden relative">
               <Switch>
                 <Match when={params.id}>
@@ -1823,7 +1829,7 @@ export default function Page() {
               </Show>
             </div>
 
-            <Show when={params.id || !newSessionDesign()}>{composerRegion("dock")}</Show>
+            <Show when={(params.id || !newSessionDesign()) && !mobileChanges()}>{composerRegion("dock")}</Show>
           </div>
 
           <Show when={desktopReviewOpen()}>

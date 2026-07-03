@@ -1,5 +1,4 @@
 import { type DiffLineAnnotation, type SelectedLineRange } from "@pierre/diffs"
-import { createMediaQuery } from "@solid-primitives/media"
 import { createEffect, createMemo, createSignal, onCleanup, Show, type Accessor, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { render as renderSolid } from "solid-js/web"
@@ -289,12 +288,6 @@ export function createLineCommentState<T>(props: LineCommentStateProps<T>) {
     setSelected(next)
   }
 
-  const finishSelection = (range: SelectedLineRange) => {
-    closeComment()
-    setSelected(range)
-    cancelDraft()
-  }
-
   return {
     draft,
     setDraft,
@@ -311,7 +304,6 @@ export function createLineCommentState<T>(props: LineCommentStateProps<T>) {
     openEditor,
     hoverComment,
     cancelDraft,
-    finishSelection,
     select: setSelected,
     reset,
   }
@@ -323,10 +315,9 @@ export function createLineCommentController<T extends LineCommentShape>(
   note: ReturnType<typeof createLineCommentState<string>>
   annotations: Accessor<DiffLineAnnotation<LineCommentAnnotationMeta<T>>[]>
   renderAnnotation: ReturnType<typeof createManagedLineCommentAnnotationRenderer<T>>["renderAnnotation"]
-  renderHoverUtility: ReturnType<typeof createLineCommentHoverRenderer>
+  renderGutterUtility: ReturnType<typeof createLineCommentGutterRenderer>
   onLineSelected: (range: SelectedLineRange | null) => void
   onLineSelectionEnd: (range: SelectedLineRange | null) => void
-  onLineNumberSelectionEnd: (range: SelectedLineRange | null) => void
 }
 export function createLineCommentController<T extends LineCommentShape>(
   props: LineCommentControllerProps<T>,
@@ -334,16 +325,14 @@ export function createLineCommentController<T extends LineCommentShape>(
   note: ReturnType<typeof createLineCommentState<string>>
   annotations: Accessor<LineCommentAnnotation<T>[]>
   renderAnnotation: ReturnType<typeof createManagedLineCommentAnnotationRenderer<T>>["renderAnnotation"]
-  renderHoverUtility: ReturnType<typeof createLineCommentHoverRenderer>
+  renderGutterUtility: ReturnType<typeof createLineCommentGutterRenderer>
   onLineSelected: (range: SelectedLineRange | null) => void
   onLineSelectionEnd: (range: SelectedLineRange | null) => void
-  onLineNumberSelectionEnd: (range: SelectedLineRange | null) => void
 }
 export function createLineCommentController<T extends LineCommentShape>(
   props: LineCommentControllerProps<T> | LineCommentControllerWithSideProps<T>,
 ) {
   const i18n = useI18n()
-  const touchDraft = createMediaQuery("(hover: none), (pointer: coarse)")
   const note = createLineCommentState<string>(props.state)
 
   const annotations =
@@ -428,7 +417,7 @@ export function createLineCommentController<T extends LineCommentShape>(
     }),
   })
 
-  const renderHoverUtility = createLineCommentHoverRenderer({
+  const renderGutterUtility = createLineCommentGutterRenderer({
     label: props.label,
     getSelectedRange: () => {
       if (note.opened()) return null
@@ -454,16 +443,6 @@ export function createLineCommentController<T extends LineCommentShape>(
       return
     }
 
-    if (touchDraft()) {
-      note.openDraft(range)
-      return
-    }
-
-    note.finishSelection(range)
-  }
-
-  const onLineNumberSelectionEnd = (range: SelectedLineRange | null) => {
-    if (!range) return
     note.openDraft(range)
   }
 
@@ -471,10 +450,9 @@ export function createLineCommentController<T extends LineCommentShape>(
     note,
     annotations,
     renderAnnotation,
-    renderHoverUtility,
+    renderGutterUtility,
     onLineSelected,
     onLineSelectionEnd,
-    onLineNumberSelectionEnd,
   }
 }
 
@@ -576,7 +554,7 @@ export function createManagedLineCommentAnnotationRenderer<T>(props: {
   }
 }
 
-export function createLineCommentHoverRenderer(props: {
+export function createLineCommentGutterRenderer(props: {
   label: string
   getSelectedRange: Accessor<SelectedLineRange | null>
   onOpenDraft: (range: SelectedLineRange) => void
