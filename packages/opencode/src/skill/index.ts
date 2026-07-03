@@ -247,7 +247,7 @@ const loadSkills = Effect.fnUntraced(function* (
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Skill") {}
 
-export const layer = Layer.effect(
+const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const discovery = yield* Discovery.Service
@@ -328,15 +328,6 @@ export const layer = Layer.effect(
 
     return Service.of({ get, require, all, dirs, available })
   }),
-)
-
-export const defaultLayer = layer.pipe(
-  Layer.provide(Discovery.defaultLayer),
-  Layer.provide(Config.defaultLayer),
-  Layer.provide(EventV2Bridge.defaultLayer),
-  Layer.provide(FSUtil.defaultLayer),
-  Layer.provide(Global.layer),
-  Layer.provide(RuntimeFlags.defaultLayer),
 )
 
 // UPSTREAM-DIVERGENCE: Tandem presents skills the way real Claude Code does — a single

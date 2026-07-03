@@ -276,7 +276,10 @@ export const ErrorPage: Component<ErrorPageProps> = (props) => {
   }
 
   return (
-    <div class="relative flex-1 h-screen w-screen min-h-0 flex flex-col items-center justify-center bg-background-base font-sans">
+    <div
+      class="relative flex-1 h-screen w-screen min-h-0 flex flex-col items-center justify-center bg-background-base font-sans"
+      data-tauri-drag-region
+    >
       <div class="w-2/3 max-w-3xl flex flex-col items-center justify-center gap-8">
         {/* UPSTREAM-DIVERGENCE: Tandem brand */}
         <BrandWordmark class="text-4xl font-semibold tracking-[-0.04em] text-text-strong opacity-20 shrink-0" />
