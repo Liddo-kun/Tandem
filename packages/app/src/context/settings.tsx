@@ -32,7 +32,6 @@ export interface Settings {
     showReasoningSummaries: boolean
     shellToolPartsExpanded: boolean
     editToolPartsExpanded: boolean
-    showSessionProgressBar: boolean
     showCustomAgents: boolean
     mobileTitlebarPosition: "top" | "bottom"
     newLayoutDesigns?: boolean
@@ -128,7 +127,6 @@ const defaultSettings: Settings = {
     showReasoningSummaries: false,
     shellToolPartsExpanded: false,
     editToolPartsExpanded: false,
-    showSessionProgressBar: true,
     showCustomAgents: false,
     mobileTitlebarPosition: "top",
   },
@@ -293,13 +291,6 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         ),
         setEditToolPartsExpanded(value: boolean) {
           setStore("general", "editToolPartsExpanded", value)
-        },
-        showSessionProgressBar: withFallback(
-          () => store.general?.showSessionProgressBar,
-          defaultSettings.general.showSessionProgressBar,
-        ),
-        setShowSessionProgressBar(value: boolean) {
-          setStore("general", "showSessionProgressBar", value)
         },
         showCustomAgents,
         setShowCustomAgents(value: boolean) {

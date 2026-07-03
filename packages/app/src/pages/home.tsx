@@ -61,7 +61,7 @@ import { ServerHealthIndicator } from "@/components/server/server-row"
 import { type ServerHealth } from "@/utils/server-health"
 import { Persist, persisted } from "@/utils/persist"
 import { useMarked } from "@opencode-ai/ui/context/marked"
-import { preloadMarkdown } from "@opencode-ai/ui/markdown-cache"
+import { preloadMarkdown } from "@opencode-ai/session-ui/markdown-cache"
 
 const HOME_SESSION_LIMIT = 64
 const HOME_ROW_LAYOUT =
@@ -223,10 +223,9 @@ export function NewHome() {
             void directory.session
               .sync(record.session.id)
               .then(() => {
-                const store = ctx.sync.child(record.session.directory)[0]
                 return Promise.all(
-                  (store.message[record.session.id] ?? []).flatMap((message) =>
-                    (store.part[message.id] ?? []).flatMap((part) => {
+                  (ctx.sync.session.data.message[record.session.id] ?? []).flatMap((message) =>
+                    (ctx.sync.session.data.part[message.id] ?? []).flatMap((part) => {
                       if (part.type !== "text" || !part.text) return []
                       return preloadMarkdown(part.text, part.id, marked)
                     }),
@@ -346,12 +345,6 @@ export function NewHome() {
     if (!conn) return
     const directory = project?.worktree ?? session.directory
     const ctx = global.ensureServerCtx(conn)
-    global.sessionPlacement.set({
-      server: ServerConnection.key(conn),
-      leafID: session.id,
-      rootID: session.id,
-      directory: session.directory,
-    })
     ctx.projects.open(directory)
     ctx.projects.touch(directory)
     startTransition(() => {

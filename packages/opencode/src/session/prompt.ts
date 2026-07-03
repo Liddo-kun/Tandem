@@ -1356,10 +1356,11 @@ export const layer = Layer.effect(
 
             yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
-            const [skills, env, instructions] = yield* Effect.all([
+            const [skills, env, instructions, mcpInstructions] = yield* Effect.all([
               sys.skills(agent),
               sys.environment(model),
               instruction.system().pipe(Effect.orDie),
+              sys.mcp(agent, session.permission),
             ])
             const useInstructionReminder = model.api.id.includes("claude")
             // UPSTREAM-DIVERGENCE (Tandem): the prompt-corrector plugin spawns
@@ -1390,7 +1391,12 @@ export const layer = Layer.effect(
               }
             }
             const modelMsgs = yield* MessageV2.toModelMessagesEffect(msgs, model)
-            const system = [...env, ...(useInstructionReminder ? [] : instructions), ...(skills ? [skills] : [])]
+            const system = [
+              ...env,
+              ...(useInstructionReminder ? [] : instructions),
+              ...(mcpInstructions ? [mcpInstructions] : []),
+              ...(skills ? [skills] : []),
+            ]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
             const result = yield* handle.process({
