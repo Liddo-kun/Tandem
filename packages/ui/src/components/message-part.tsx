@@ -1871,22 +1871,17 @@ ToolRegistry.register({
   render(props) {
     const dialog = useDialog()
     const prompt = createMemo(() => (typeof props.input.prompt === "string" ? props.input.prompt : undefined))
-    const paths = createMemo(() =>
-      Array.isArray(props.metadata.paths) ? props.metadata.paths.filter((p): p is string => typeof p === "string") : [],
-    )
-    // Per-image prompt the model reports it used (`revisedPrompts` from the plugin,
-    // aligned with `paths`). Shown only when it differs from the typed prompt, i.e. the
-    // model revised it. See plugin.ts revisedPromptOutput.
-    const revised = createMemo(() =>
-      Array.isArray(props.metadata.revisedPrompts) ? props.metadata.revisedPrompts : [],
-    )
-    const revisedFor = (index: number) => {
-      const value = revised()[index]
+    const path = createMemo(() => (typeof props.metadata.path === "string" ? props.metadata.path : undefined))
+    // The prompt the model reports it used (`revisedPrompt` from the plugin). Shown only
+    // when it differs from the typed prompt, i.e. the model revised it. See plugin.ts
+    // revisedPromptOutput.
+    const revised = createMemo(() => {
+      const value = props.metadata.revisedPrompt
       if (typeof value !== "string") return undefined
       const trimmed = value.trim()
       if (!trimmed || trimmed === (prompt() ?? "").trim()) return undefined
       return trimmed
-    }
+    })
     const openPreview = (src: string) => dialog.show(() => <ImagePreview src={src} alt={prompt()} />)
     return (
       <>
@@ -1898,24 +1893,22 @@ ToolRegistry.register({
             subtitle: prompt(),
           }}
         />
-        <Show when={paths().length > 0}>
-          <div data-component="imagegen-files">
-            <For each={paths()}>
-              {(filePath, index) => (
-                <div data-component="imagegen-file">
-                  <ImagegenThumb path={filePath} alt={revisedFor(index()) ?? prompt()} onOpen={openPreview} />
-                  <div data-slot="imagegen-path" class="break-all text-12-regular text-text-weak">
-                    {filePath}
-                  </div>
-                  <Show when={revisedFor(index())}>
-                    <div data-component="imagegen-revised" class="mt-0.5 text-12-regular text-text-weak">
-                      <span class="text-text-muted">Prompt used:</span> {revisedFor(index())}
-                    </div>
-                  </Show>
+        <Show when={path()}>
+          {(filePath) => (
+            <div data-component="imagegen-files">
+              <div data-component="imagegen-file">
+                <ImagegenThumb path={filePath()} alt={revised() ?? prompt()} onOpen={openPreview} />
+                <div data-slot="imagegen-path" class="break-all text-12-regular text-text-weak">
+                  {filePath()}
                 </div>
-              )}
-            </For>
-          </div>
+                <Show when={revised()}>
+                  <div data-component="imagegen-revised" class="mt-0.5 text-12-regular text-text-weak">
+                    <span class="text-text-muted">Prompt used:</span> {revised()}
+                  </div>
+                </Show>
+              </div>
+            </div>
+          )}
         </Show>
       </>
     )

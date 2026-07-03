@@ -8,7 +8,7 @@
 
 Guidance for the Tandem `imagegen` tool, which **generates or edits raster images** via OpenAI's image models and **saves a PNG to disk, returning its file path**.
 
-**No transparency:** output is opaque PNG, so don't promise an alpha/transparent cutout. If the user needs one, generate the subject on a flat solid background they can key out in their own editor.
+**Transparent backgrounds:** set `transparent: true` for a cutout with no background (real alpha) — for logos, stickers, sprites, or a subject to drop onto another background. Clean for solid-edged subjects; wispy edges (hair, fur, glass, smoke) may keep a fringe. See "Transparent backgrounds" below.
 
 ## When to use
 
@@ -30,9 +30,9 @@ Guidance for the Tandem `imagegen` tool, which **generates or edits raster image
    - User wants to modify an existing image while preserving parts of it → **edit** (pass `image_paths`).
    - User provides images only as references for style/composition/mood, or provides none → **generate** (no `image_paths`).
 2. **Execution — one asset or many?**
-   - One image per concept → one call.
-   - Several **distinct** assets → one call **per asset** with its own prompt. Do **not** use `n` for distinct assets; `n` is only for variants of a single prompt.
-   - Many variants of the same concept → a single call with `n` > 1 (kept small).
+   - Each call produces exactly one image.
+   - Several **distinct** assets → one call **per asset**, each with its own prompt.
+   - Several **variants of the same generation** → call the tool several times in parallel with the same parameters.
 
 Assume the user wants a new image unless they clearly ask to change an existing one.
 
@@ -43,7 +43,7 @@ Turn the user's request into a complete, concrete image prompt — don't just pa
 **Specificity policy:**
 
 - If the user's prompt is already specific and detailed, **normalize** it into a clean spec without inventing new creative requirements.
-- If the user's prompt is generic, add **tasteful** detail only where it materially improves the result.
+- If the user's prompt is generic, add **appropriate** detail where it will materially improve the result.
 
 **Allowed augmentation** (for generic prompts): composition/framing cues, intended-use or polish-level hints, practical layout guidance, reasonable scene concreteness that supports the request.
 
@@ -55,6 +55,15 @@ Turn the user's request into a complete, concrete image prompt — don't just pa
 - Use `mask_path` (a PNG whose transparent areas mark the editable region) **only** when the change must be constrained to part of the image; it applies to the first image and is prompt-guided, not pixel-exact.
 - State invariants aggressively: `change only X; keep Y unchanged`, and repeat them on every iteration to reduce drift.
 - Saving is non-destructive (the tool writes a new file); don't overwrite a user asset unless asked.
+
+## Transparent backgrounds
+
+Set `transparent: true` when the user wants a **cutout with no background** — a logo, sticker, game sprite, icon, or a subject to composite onto another background. The image models can't output alpha directly, so the tool renders the subject on a flat key color and removes it to transparency locally, saving an image with a real alpha channel.
+
+- Best for **solid-edged subjects**: products, icons, characters, objects with crisp outlines.
+- **Wispy or translucent edges** — hair, fur, feathers, smoke, glass, liquids, soft shadows, motion blur — may keep a faint fringe or lose fine detail; warn the user the cutout may be imperfect for those.
+- Describe **only the subject** in the prompt; don't specify a background (the tool forces a flat key background and keys it out). Don't pick the key color or ask for "green screen" yourself — the tool handles it.
+- Works with edits too (`image_paths` + `transparent: true`) to cut the subject out of an existing image.
 
 ## Use-case taxonomy (pick one; keep wording consistent)
 
@@ -121,12 +130,12 @@ Call: `imagegen({ prompt: "<the spec above>", image_paths: ["/abs/path/mug.png"]
 
 ## After the call: output handling
 
-- The tool returns the **saved file path(s)** as text. The image is **deliberately not loaded into your context** (a full PNG would bloat context and be resent every turn), so you have not "seen" it.
-- If you genuinely need to inspect the result (verify text, composition, an invariant), use the `read` tool on the returned path — that loads the image.
+- The tool returns the **saved file path(s)** as text.
+- If you need to inspect the result, use the `read` tool on the returned path.
 - **Report the saved path(s)** to the user. Do not invent a description of contents you haven't viewed, and don't claim success on details you can't confirm.
 - If the asset is meant for the current project, move/copy it from the returned path into the workspace (the tool controls where it's saved) and wire up any references. Don't leave a project-bound asset only at the tool's default path.
 - On OAuth, the model may report a slightly adjusted "prompt used"; the tool surfaces it only when it differs from yours — treat that as the source of truth for what was rendered, not the prose.
-- **Size is best-effort on OAuth.** With an OpenAI API key the requested `size` is exact. With ChatGPT (OAuth) sign-in the image backend ignores `size` and auto-sizes from the prompt, so the tool reports the **actual** pixel size and flags when it differs from what you asked for — don't re-call with the same `size` expecting a different result; steer aspect ratio through the prompt (e.g. "wide landscape", "tall portrait", "square") instead.
+- **Size is best-effort on OAuth.** With an OpenAI API key the requested `size` is exact. With ChatGPT (OAuth) sign-in the image backend ignores `size` and auto-sizes from the prompt; steer aspect ratio through the prompt (e.g. "wide landscape", "tall portrait", "square") instead.
 
 ## Errors
 

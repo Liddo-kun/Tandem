@@ -2,6 +2,8 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { Global } from "@opencode-ai/core/global"
 import { extractAccountId } from "../codex"
+import { Chroma } from "./chroma"
+import { loadPhoton } from "./photon"
 import description from "./imagegen.txt"
 import skillContent from "./imagegen-skill.md" with { type: "text" }
 
@@ -50,16 +52,17 @@ export const SIZES = ["auto", "1024x1024", "1536x1024", "1024x1536"] as const
 export type Size = (typeof SIZES)[number]
 export const QUALITIES = ["low", "medium", "high", "auto"] as const
 export type Quality = (typeof QUALITIES)[number]
-export const MAX_N = 10
 export const MAX_EDIT_IMAGES = 10
 
 export interface Args {
   prompt: string
   quality: Quality
   size: Size
-  n: number
   image_paths?: string[]
   mask_path?: string
+  // Produce a transparent-background cutout. gpt-image-2 / the OAuth image tool cannot emit alpha
+  // natively, so this renders on a flat chroma-key background and removes it to alpha locally.
+  transparent?: boolean
 }
 
 // A produced image plus the prompt the image model reports it actually used
@@ -159,27 +162,39 @@ export async function refreshOAuth(creds: OauthCreds): Promise<OauthCreds> {
   }
 }
 
-export async function run(args: Args, creds: Creds): Promise<GeneratedImage[]> {
+export async function run(args: Args, creds: Creds): Promise<GeneratedImage> {
   validate(args)
   const editing = !!args.image_paths?.length
+  if (!args.transparent) return generateOrEdit(args, creds, editing)
+
+  // Transparent output: gpt-image-2 and the OAuth image_generation tool cannot emit a transparent
+  // background, so render the subject on a flat chroma-key background and key it out to alpha locally
+  // (matches the Codex imagegen skill's built-in transparent workflow). The key instruction is
+  // appended to the prompt — not the system message — so it survives the OAuth verbatim pass-through
+  // and reaches the image model on both transports. revisedPrompt is dropped because the altered
+  // prompt's revision would just echo the chroma directive, which is noise to the user.
+  const keyed: Args = { ...args, prompt: `${args.prompt.trim()}\n\n${Chroma.PROMPT}` }
+  const image = await generateOrEdit(keyed, creds, editing)
+  return { png: await Chroma.removeChromaKey(image.png) }
+}
+
+function generateOrEdit(args: Args, creds: Creds, editing: boolean): Promise<GeneratedImage> {
   if (creds.mode === "api") return editing ? editApiKey(args, creds) : generateApiKey(args, creds)
   return editing ? editOAuth(args, creds) : generateOAuth(args, creds)
 }
 
 function validate(args: Args): void {
   if (!args.prompt.trim()) throw new Error("prompt is required")
-  if (args.n < 1 || args.n > MAX_N) throw new Error(`n must be between 1 and ${MAX_N}`)
   if (args.image_paths && args.image_paths.length > MAX_EDIT_IMAGES)
     throw new Error(`image_paths supports at most ${MAX_EDIT_IMAGES} images`)
 }
 
 // ---- API-key transport: REST /v1/images/{generations,edits} ----
 
-async function generateApiKey(args: Args, creds: ApiCreds): Promise<GeneratedImage[]> {
+async function generateApiKey(args: Args, creds: ApiCreds): Promise<GeneratedImage> {
   const body: Record<string, unknown> = {
     model: IMAGE_MODEL,
     prompt: args.prompt,
-    n: args.n,
     size: args.size,
     quality: args.quality,
     output_format: "png",
@@ -191,14 +206,13 @@ async function generateApiKey(args: Args, creds: ApiCreds): Promise<GeneratedIma
     body: JSON.stringify(body),
   })
   if (!res.ok) throw await httpError(res, "image generation")
-  return decodeImagesResponse(await res.json())
+  return decodeImageResponse(await res.json())
 }
 
-async function editApiKey(args: Args, creds: ApiCreds): Promise<GeneratedImage[]> {
+async function editApiKey(args: Args, creds: ApiCreds): Promise<GeneratedImage> {
   const form = new FormData()
   form.append("model", IMAGE_MODEL)
   form.append("prompt", args.prompt)
-  form.append("n", String(args.n))
   if (args.size !== "auto") form.append("size", args.size)
   form.append("quality", args.quality)
   for (const file of args.image_paths!) {
@@ -216,27 +230,27 @@ async function editApiKey(args: Args, creds: ApiCreds): Promise<GeneratedImage[]
     body: form,
   })
   if (!res.ok) throw await httpError(res, "image edit")
-  return decodeImagesResponse(await res.json())
+  return decodeImageResponse(await res.json())
 }
 
-function decodeImagesResponse(json: { data?: { b64_json?: string; revised_prompt?: string }[] }): GeneratedImage[] {
-  const images = (json.data ?? []).filter(
-    (item): item is { b64_json: string; revised_prompt?: string } => typeof item.b64_json === "string",
+function decodeImageResponse(json: { data?: { b64_json?: string; revised_prompt?: string }[] }): GeneratedImage {
+  const item = (json.data ?? []).find(
+    (entry): entry is { b64_json: string; revised_prompt?: string } => typeof entry.b64_json === "string",
   )
-  if (!images.length) throw new Error("OpenAI returned no image data")
-  return images.map((item) => ({
+  if (!item) throw new Error("OpenAI returned no image data")
+  return {
     png: Buffer.from(item.b64_json, "base64"),
     revisedPrompt: typeof item.revised_prompt === "string" ? item.revised_prompt : undefined,
-  }))
+  }
 }
 
 // ---- OAuth transport: Responses API image_generation tool over /codex/responses ----
 
-async function generateOAuth(args: Args, creds: OauthCreds): Promise<GeneratedImage[]> {
-  return collectN(args.n, () => oauthOneImage(args, creds, undefined))
+async function generateOAuth(args: Args, creds: OauthCreds): Promise<GeneratedImage> {
+  return oauthOneImage(args, creds, undefined)
 }
 
-async function editOAuth(args: Args, creds: OauthCreds): Promise<GeneratedImage[]> {
+async function editOAuth(args: Args, creds: OauthCreds): Promise<GeneratedImage> {
   const inputImages = await Promise.all(
     args.image_paths!.map(
       async (file) => `data:${mimeFromPath(file)};base64,${(await readFile(file)).toString("base64")}`,
@@ -244,15 +258,7 @@ async function editOAuth(args: Args, creds: OauthCreds): Promise<GeneratedImage[
   )
   // The Responses image_generation tool has no separate mask parameter; mask_path
   // is honored only on the API-key path. Edits here are prompt + input images.
-  return collectN(args.n, () => oauthOneImage(args, creds, inputImages))
-}
-
-// The image_generation tool yields a single image per Responses call, so multiple
-// images are produced by issuing the request N times.
-async function collectN(n: number, once: () => Promise<GeneratedImage>): Promise<GeneratedImage[]> {
-  const out: GeneratedImage[] = []
-  for (let i = 0; i < n; i++) out.push(await once())
-  return out
+  return oauthOneImage(args, creds, inputImages)
 }
 
 async function oauthOneImage(
@@ -351,33 +357,99 @@ async function readImageFromSSE(body: ReadableStream<Uint8Array>): Promise<Gener
   throw new Error(failure ?? "image generation produced no image")
 }
 
-// ---- output ----
+// ---- chat copy (saved beside the original PNG; invisible to the model) ----
 
-export async function saveImages(pngs: Buffer[], directory: string, baseName: string): Promise<string[]> {
-  // Save under the working directory (<cwd>/imagegen) rather than the XDG data dir, so the web
-  // UI can fetch each PNG by relative path through the existing worktree-scoped file.read endpoint
-  // and show a thumbnail — without the image ever entering the model's context. Returns paths
-  // relative to `directory` (posix separators) so they work for both file.read in the UI and the
-  // `read` tool for the model. `baseName` (the tool call id) keeps names unique across sessions;
-  // writeNonDestructive resolves any remaining collisions. Users can gitignore imagegen/.
-  const dir = path.join(directory, "imagegen")
-  await fs.mkdir(dir, { recursive: true })
-  const saved: string[] = []
-  for (let i = 0; i < pngs.length; i++) {
-    const stem = pngs.length === 1 ? baseName : `${baseName}-${i + 1}`
-    const file = await writeNonDestructive(dir, stem, pngs[i])
-    saved.push(path.relative(directory, file).split(path.sep).join("/"))
-  }
-  return saved
+// The generated bytes are PNG and the full-quality PNG is always saved. Beside it we save a smaller
+// copy at the SAME pixel dimensions and return THAT path as the chat artifact: it is what the web UI
+// thumbnails and what the `read` tool later base64-encodes back into the prompt when the model
+// re-inspects an image. A multi-MB PNG would balloon session history and every re-read; the small
+// copy cuts that several-fold. Opaque images use JPEG; transparent ones use WebP, which preserves
+// alpha (JPEG cannot). Override JPEG quality (1–100) via TANDEM_IMAGEGEN_JPEG_QUALITY.
+const JPEG_QUALITY = clampQuality(process.env.TANDEM_IMAGEGEN_JPEG_QUALITY, 90)
+function clampQuality(raw: string | undefined, fallback: number): number {
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return fallback
+  return Math.min(100, Math.max(1, Math.round(n)))
 }
 
-async function writeNonDestructive(dir: string, stem: string, data: Buffer): Promise<string> {
-  for (let attempt = 0; ; attempt++) {
-    const file = path.join(dir, attempt === 0 ? `${stem}.png` : `${stem}-${attempt}.png`)
-    if (!(await exists(file))) {
-      await fs.writeFile(file, data)
-      return file
+// Recompress one generated PNG to JPEG bytes. Returns undefined if Photon can't decode the buffer
+// or if the JPEG somehow isn't smaller (tiny/flat images); the caller then keeps only the PNG, so
+// the chat copy is best-effort and never breaks saving. Same dimensions, so size reporting (read
+// from the PNG header) stays accurate.
+export async function encodeJpeg(png: Buffer, quality: number = JPEG_QUALITY): Promise<Buffer | undefined> {
+  try {
+    const photon = await loadPhoton()
+    const image = photon.PhotonImage.new_from_byteslice(png)
+    try {
+      const jpeg = Buffer.from(image.get_bytes_jpeg(quality))
+      return jpeg.length < png.length ? jpeg : undefined
+    } finally {
+      image.free()
     }
+  } catch {
+    return undefined
+  }
+}
+
+// Re-encode a transparent PNG to WebP bytes (alpha preserved). Same best-effort contract as
+// encodeJpeg: undefined when Photon can't decode it or the WebP isn't smaller, so the caller keeps
+// the PNG. Used as the chat copy for transparent images since JPEG cannot carry an alpha channel.
+export async function encodeWebp(png: Buffer): Promise<Buffer | undefined> {
+  try {
+    const photon = await loadPhoton()
+    const image = photon.PhotonImage.new_from_byteslice(png)
+    try {
+      const webp = Buffer.from(image.get_bytes_webp())
+      return webp.length < png.length ? webp : undefined
+    } finally {
+      image.free()
+    }
+  } catch {
+    return undefined
+  }
+}
+
+// ---- output ----
+
+export async function saveImage(
+  png: Buffer,
+  directory: string,
+  baseName: string,
+  transparent = false,
+): Promise<string> {
+  // Save under the working directory (<cwd>/imagegen) rather than the XDG data dir, so the web UI
+  // can fetch the file by relative path through the existing worktree-scoped file.read endpoint.
+  // The full-quality PNG is written AND a smaller copy beside it (same stem); the returned path is
+  // the small copy when one was produced, else the PNG, so the chat/model use the small copy while
+  // the PNG is retained. The copy is JPEG for opaque images, WebP for transparent ones (JPEG cannot
+  // hold alpha). The path is relative to `directory` (posix separators), valid for both file.read in
+  // the UI and the `read` tool for the model. `baseName` (the tool call id) keeps names unique;
+  // uniqueStem resolves any remaining collisions. Users can gitignore imagegen/.
+  const dir = path.join(directory, "imagegen")
+  await fs.mkdir(dir, { recursive: true })
+  const ext = transparent ? "webp" : "jpg"
+  const copy = transparent ? await encodeWebp(png) : await encodeJpeg(png)
+  const stem = await uniqueStem(dir, baseName)
+  await fs.writeFile(path.join(dir, `${stem}.png`), png)
+  let chat = `${stem}.png`
+  if (copy) {
+    await fs.writeFile(path.join(dir, `${stem}.${ext}`), copy)
+    chat = `${stem}.${ext}`
+  }
+  return path.relative(directory, path.join(dir, chat)).split(path.sep).join("/")
+}
+
+// Pick a stem for which none of <stem>.{png,jpg,webp} already exists, so the PNG and its small copy
+// stay together under one name and nothing is overwritten.
+async function uniqueStem(dir: string, stem: string): Promise<string> {
+  for (let attempt = 0; ; attempt++) {
+    const candidate = attempt === 0 ? stem : `${stem}-${attempt}`
+    if (
+      !(await exists(path.join(dir, `${candidate}.png`))) &&
+      !(await exists(path.join(dir, `${candidate}.jpg`))) &&
+      !(await exists(path.join(dir, `${candidate}.webp`)))
+    )
+      return candidate
   }
 }
 
