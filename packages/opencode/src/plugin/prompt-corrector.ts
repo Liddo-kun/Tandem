@@ -53,6 +53,23 @@ const REPROMPT_MIN_CHARS = envInt("TANDEM_PROMPT_CORRECTOR_REPROMPT_MIN", 10)
 // corrector LLM): long prompts are usually pasted/structured text where a copy-
 // edit pass adds cost and risk for little gain. 0 disables the cap (always run).
 const CORRECTOR_MAX_CHARS = envInt("TANDEM_PROMPT_CORRECTOR_MAX", 600)
+// Personal per-install override for the corrector's model, "providerID/modelID"
+// (e.g. "deepseek/deepseek-v4-pro"). When set it forces the corrector's model,
+// bypassing both the small_model config and the SMALL_MODEL_PRIORITY fallback,
+// and applies only to the corrector (other cheap-model tasks are untouched).
+// Unset by default so shipped Tandem behavior (Haiku-priority) is unchanged.
+const MODEL_OVERRIDE = ((): ModelRef | undefined => {
+  const raw = process.env.TANDEM_PROMPT_CORRECTOR_MODEL?.trim()
+  if (!raw || !raw.includes("/")) return undefined
+  const slash = raw.indexOf("/")
+  return { providerID: raw.slice(0, slash), modelID: raw.slice(slash + 1) }
+})()
+// Personal per-install model variant for the corrector, passed alongside the
+// model on every corrector prompt (e.g. a config-defined reasoning-disabled
+// variant so a "thinking" model does not waste latency reasoning about a copy
+// edit). Unset by default. Only meaningful with a variant that the resolved
+// model actually defines; unknown variants are rejected by model resolution.
+const VARIANT_OVERRIDE = process.env.TANDEM_PROMPT_CORRECTOR_VARIANT?.trim() || undefined
 
 // Metadata markers written onto text parts.
 // - ORIGINAL_KEY: the pre-correction text, preserved for transparency/debug.
@@ -207,6 +224,8 @@ export async function PromptCorrectorPlugin(input: PluginInput): Promise<Hooks> 
   const { client } = input
 
   async function pickModel(current: ModelRef): Promise<ModelRef> {
+    // Personal per-install override wins over config and priority fallback.
+    if (MODEL_OVERRIDE) return MODEL_OVERRIDE
     const cached = smallModelCache.get(current.providerID)
     if (cached) return cached
 
@@ -263,6 +282,7 @@ export async function PromptCorrectorPlugin(input: PluginInput): Promise<Hooks> 
           path: { id: sessionID },
           body: {
             model,
+            ...(VARIANT_OVERRIDE ? { variant: VARIANT_OVERRIDE } : {}),
             // The system prompt is fully replaced for this session by the
             // experimental.chat.system.transform hook below.
             system: CORRECTOR_SYSTEM,

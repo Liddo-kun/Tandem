@@ -93,7 +93,34 @@ would recurse and/or run as the real agent.
 The corrector uses a small/cheap model, mirroring opencode's `getSmallModel`
 priority (Claude Haiku / Gemini Flash / GPT-5-nano, GPT-5-mini for Copilot),
 honoring a `small_model` config override when present, and falling back to the
-session's model.
+session's model. A per-install `TANDEM_PROMPT_CORRECTOR_MODEL` env var
+(`providerID/modelID`) overrides all of the above but affects only the corrector,
+leaving other cheap-model tasks (e.g. session titles) on the normal priority.
+
+Copy-editing needs no chain-of-thought, so a reasoning model wastes latency and
+tokens thinking about each prompt. Point the corrector at a non-reasoning model,
+or disable reasoning with `TANDEM_PROMPT_CORRECTOR_VARIANT` plus a config variant
+that turns thinking off. For example, `deepseek-v4-pro` reasons by default and
+its `reasoning_effort` levels (`low`/`medium`/`high`) never disable it — the off
+switch is the raw body param `thinking: {type: "disabled"}`. Because the
+openai-compatible option lowerer passes variant options straight into the request
+body, this config variant yields zero reasoning tokens:
+
+```jsonc
+// ~/.config/<app>/opencode.jsonc
+"provider": {
+  "deepseek": {
+    "models": {
+      "deepseek-v4-pro": {
+        "variants": { "nothink": { "thinking": { "type": "disabled" } } }
+      }
+    }
+  }
+}
+```
+
+with `TANDEM_PROMPT_CORRECTOR_VARIANT=nothink`. Verified via the `tokens_reasoning`
+column on the spawned corrector session dropping from ~2000 to 0.
 
 ### RePrompt gating
 
@@ -119,6 +146,8 @@ queued followups keep the toggle state they were written with.
 |---|---|---|
 | `TANDEM_PROMPT_CORRECTOR` | on | Master switch; `0`/`false`/`off`/`no` disables the whole feature. Always off for the `tandem run` CLI command (see Notes). |
 | `TANDEM_PROMPT_CORRECTOR_MAX` | 600 | Max characters to send to the corrector; longer prompts skip correction entirely. `0` = no cap. |
+| `TANDEM_PROMPT_CORRECTOR_MODEL` | unset | Personal per-install model override for the corrector only, as `providerID/modelID` (e.g. `deepseek/deepseek-v4-pro`). Bypasses `small_model` and the priority fallback; other cheap-model tasks are unaffected. |
+| `TANDEM_PROMPT_CORRECTOR_VARIANT` | unset | Model variant name passed with every corrector prompt (e.g. a config-defined reasoning-disabled variant). Must be a variant the resolved model actually defines. Useful to stop a "thinking" model from reasoning about a copy edit — see below. |
 | `TANDEM_PROMPT_CORRECTOR_DEBUG` | off | Keeps the throwaway corrector sessions (visible in the session list) for inspection. |
 | `TANDEM_PROMPT_CORRECTOR_DEBUG_KEEP` | 2 | In debug mode, retain only this many newest corrector sessions (older ones pruned). `0` = keep all. |
 | `TANDEM_PROMPT_CORRECTOR_REPROMPT_MAX` | 300 | Max characters for RePrompt; `0` disables RePrompt (server-wide; see also the per-client live toggle above). |
