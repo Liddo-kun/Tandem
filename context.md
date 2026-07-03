@@ -54,6 +54,7 @@ whisper  = Whispercode
 - `packages/app` is the shared Solid web UI used by standalone web, embedded CLI web UI, desktop renderer, Android, and iOS. Start at `src/entry.tsx`, `src/app.tsx`, `src/context/platform.tsx`, `src/context/server.tsx`, and `src/pages/session.tsx`.
 - `packages/ui` is shared chat/component/CSS infrastructure. Message rendering lives in `src/components/session-turn.tsx`, `src/components/message-part.tsx`, `src/components/basic-tool.tsx`, and their CSS; changes affect web, desktop, Android, iOS, and embedded web UI.
 - `packages/sdk/js` is generated from the HTTP API. Generated v2 client code lives under `src/v2/gen`.
+- Keep runtime dependencies directed from Schema to Core and Protocol, then from Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk-next` composes Client, Core, and Server.
 - `packages/desktop` is the Electron wrapper. Main process code is `src/main/*`, preload IPC is `src/preload/index.ts`, and renderer code mounts `@opencode-ai/app` from `src/renderer/index.tsx`.
 - `packages/android` is the Tauri Android wrapper around `@opencode-ai/app`. Platform wiring is `src/entry-android.tsx`, bridge code is `src/bridge.ts`, native storage is `src/storage.ts`, and the native plugin is under `src-tauri/mobile-bridge`.
 - `packages/ios` is the Swift WebView wrapper around `@opencode-ai/app`. Platform wiring is `src/entry-ios.tsx`, JS bridge/storage are `src/bridge.ts` and `src/ios-storage.ts`, and native code is under `OpenCode/Bridge`, `OpenCode/WebView`, and `OpenCode/Whisper`.
@@ -72,7 +73,8 @@ whisper  = Whispercode
 
 ## Cross-Package Flows
 
-- OpenAPI/SDK generation: after API schema changes, run `bun ./script/generate.ts` from repo root; SDK-only regeneration is `bun ./packages/sdk/js/script/build.ts`.
+- OpenAPI/SDK generation: after API schema changes, run `bun ./script/generate.ts` from repo root; legacy JavaScript SDK regeneration is `bun ./packages/sdk/js/script/build.ts`.
+- After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`; do not hand-edit `packages/client/src/generated` or `src/generated-effect`.
 - `packages/opencode/script/generate.ts` fetches `https://models.dev/api.json` unless `MODELS_DEV_API_JSON` points to a local snapshot, then writes `packages/core/src/models-snapshot.*`.
 - CLI binary builds run `packages/opencode/script/build.ts`; full builds embed a freshly built `packages/app` bundle unless `--skip-embed-web-ui` is passed.
 - Desktop prebuild runs `packages/opencode/script/build-node.ts`; `packages/desktop/src/main/sidecar.ts` imports that node bundle through `virtual:opencode-server`, sets Basic auth/CORS, runs migrations, and starts `Server.listen`.

@@ -22,24 +22,26 @@ export function captureTabDragLayout(list: HTMLElement, order: string[]) {
   for (const slot of slots) {
     const id = slot.dataset.tabKey
     if (!id) continue
-    const tab = slot.querySelector<HTMLElement>("[data-titlebar-tab]")
+    const tab = slot.matches("[data-titlebar-tab]") ? slot : slot.querySelector<HTMLElement>("[data-titlebar-tab]")
     if (!tab) continue
     tabWidthById.set(id, tab.getBoundingClientRect().width)
   }
 
   let dividerWidth = 0
   if (order.length >= 2) {
+    const gap = Number.parseFloat(getComputedStyle(list).columnGap) || 0
     const secondId = order[1]
     for (const slot of slots) {
       if (slot.dataset.tabKey !== secondId) continue
-      const tab = slot.querySelector<HTMLElement>("[data-titlebar-tab]")
+      const tab = slot.matches("[data-titlebar-tab]") ? slot : slot.querySelector<HTMLElement>("[data-titlebar-tab]")
       if (!tab) break
       const style = getComputedStyle(slot)
       dividerWidth =
+        gap ||
         slot.getBoundingClientRect().width -
-        tab.getBoundingClientRect().width +
-        (Number.parseFloat(style.marginLeft) || 0) +
-        (Number.parseFloat(style.marginRight) || 0)
+          tab.getBoundingClientRect().width +
+          (Number.parseFloat(style.marginLeft) || 0) +
+          (Number.parseFloat(style.marginRight) || 0)
       break
     }
   }
