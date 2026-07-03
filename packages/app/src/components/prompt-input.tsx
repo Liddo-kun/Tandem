@@ -36,12 +36,14 @@ import { DockShellForm, DockTray } from "@opencode-ai/ui/dock-surface"
 import { Icon } from "@opencode-ai/ui/icon"
 import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
+import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
+import { MenuV2 } from "@opencode-ai/ui/v2/menu-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Select } from "@opencode-ai/ui/select"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { ModelSelectorPopover } from "@/components/dialog-select-model"
+import { ModelSelectorPopover, ModelSelectorPopoverV2 } from "@/components/dialog-select-model"
 import { useProviders } from "@/hooks/use-providers"
 import { ContextTokenButton } from "@/components/session/context-token-button"
 import { useCommand } from "@/context/command"
@@ -1558,7 +1560,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     keybind: command.keybindParts("model.choose"),
     model: props.controls.model.selection,
     providerID: props.controls.model.selection.current()?.provider?.id,
+    // UPSTREAM-DIVERGENCE: Tandem shortens the composer model label (drops leading "Claude ").
     modelName: composerModelName(),
+    newLayoutDesigns: props.controls.newLayoutDesigns,
     style: control(),
     onClose: restoreFocus,
     onUnpaidClick: () => {
@@ -1750,6 +1754,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   <Show when={!providersLoading() && store.mode !== "shell" && showVariantControl()}>
                     <div
                       data-component="prompt-variant-control"
+                      class="[&_[data-action=prompt-model-variant]]:![font-weight:440]"
                       classList={{
                         "animate-in fade-in": providersShouldFadeIn(),
                         "hidden group-hover/prompt-input:block group-focus-within/prompt-input:block":
@@ -1766,22 +1771,45 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                           </>
                         }
                       >
-                        <Select
-                          size="normal"
-                          options={variants()}
-                          current={props.controls.model.selection.variant.current() ?? "default"}
-                          label={(x) => (x === "default" ? language.t("common.default") : x)}
+                        <MenuV2
+                          gutter={6}
+                          modal={false}
+                          placement="top-start"
                           onOpenChange={(open) => setStore("variantOpen", open)}
-                          onSelect={(value) => {
-                            props.controls.model.selection.variant.set(value === "default" ? undefined : value)
-                            restoreFocus()
-                          }}
-                          class="capitalize max-w-[160px] justify-start text-v2-text-text-faint"
-                          valueClass="truncate text-[13px] font-[440] leading-5 text-v2-text-text-faint"
-                          triggerStyle={control()}
-                          triggerProps={{ "data-action": "prompt-model-variant" }}
-                          variant="ghost"
-                        />
+                        >
+                          <MenuV2.Trigger
+                            as={ButtonV2}
+                            data-action="prompt-model-variant"
+                            variant="ghost-muted"
+                            size="normal"
+                            class="max-w-[160px] justify-start capitalize"
+                            style={control()}
+                          >
+                            <span class="truncate">
+                              {props.controls.model.selection.variant.current() ?? language.t("common.default")}
+                            </span>
+                            <span class="-ml-0.5 -mr-1 flex shrink-0">
+                              <Icon name="chevron-down" size="small" />
+                            </span>
+                          </MenuV2.Trigger>
+                          <MenuV2.Portal>
+                            <MenuV2.Content>
+                              <MenuV2.RadioGroup
+                                value={props.controls.model.selection.variant.current() ?? "default"}
+                                onChange={(value) => {
+                                  props.controls.model.selection.variant.set(value === "default" ? undefined : value)
+                                  restoreFocus()
+                                }}
+                              >
+                                {variants().map((value) => (
+                                  <MenuV2.RadioItem value={value} class="capitalize">
+                                    {value === "default" ? language.t("common.default") : value}
+                                  </MenuV2.RadioItem>
+                                ))}
+                              </MenuV2.RadioGroup>
+                            </MenuV2.Content>
+                          </MenuV2.Portal>
+                        </MenuV2>
                       </TooltipV2>
                     </div>
                   </Show>
@@ -2198,6 +2226,7 @@ type ComposerModelControlState = {
   model: ReturnType<typeof useLocal>["model"]
   providerID?: string
   modelName: string
+  newLayoutDesigns: boolean
   style: JSX.CSSProperties | undefined
   onClose: () => void
   onUnpaidClick: () => void
@@ -2288,36 +2317,65 @@ function ComposerModelControl(props: { state: ComposerModelControlState }) {
             </>
           }
         >
-          <ModelSelectorPopover
-            model={props.state.model}
-            triggerAs={Button}
-            triggerProps={{
-              variant: "ghost",
-              size: "normal",
-              style: props.state.style,
-              class:
-                "min-w-0 max-w-[220px] justify-start text-[13px] font-[440] leading-5 text-v2-text-text-faint group",
-              classList: { "animate-in fade-in": props.state.shouldAnimate },
-              "data-action": "prompt-model",
-            }}
-            onClose={props.state.onClose}
+          <Show
+            when={props.state.newLayoutDesigns}
+            fallback={
+              <ModelSelectorPopover
+                model={props.state.model}
+                triggerAs={Button}
+                triggerProps={{
+                  variant: "ghost",
+                  size: "normal",
+                  style: props.state.style,
+                  class:
+                    "min-w-0 max-w-[220px] justify-start text-[13px] font-[440] leading-5 text-v2-text-text-faint group",
+                  classList: { "animate-in fade-in": props.state.shouldAnimate },
+                  "data-action": "prompt-model",
+                }}
+                onClose={props.state.onClose}
+              >
+                <ModelControlContent state={props.state} />
+              </ModelSelectorPopover>
+            }
           >
-            <Show when={props.state.providerID}>
-              {(providerID) => (
-                <ProviderIcon
-                  id={providerID()}
-                  class="size-4 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity duration-150"
-                  style={{ "will-change": "opacity", transform: "translateZ(0)" }}
-                />
-              )}
-            </Show>
-            <span class="truncate">{props.state.modelName}</span>
-            <span class="-ml-1 shrink-0 flex size-fit">
-              <Icon name="chevron-down" size="small" class="text-v2-icon-icon-muted" />
-            </span>
-          </ModelSelectorPopover>
+            <ModelSelectorPopoverV2
+              model={props.state.model}
+              triggerAs={ButtonV2}
+              triggerProps={{
+                variant: "ghost-muted",
+                size: "normal",
+                style: props.state.style,
+                class: "min-w-0 max-w-[220px] justify-start ![font-weight:440] group",
+                classList: { "animate-in fade-in": props.state.shouldAnimate },
+                "data-action": "prompt-model",
+              }}
+              onClose={props.state.onClose}
+            >
+              <ModelControlContent state={props.state} v2 />
+            </ModelSelectorPopoverV2>
+          </Show>
         </TooltipV2>
       </Show>
     </Show>
+  )
+}
+
+function ModelControlContent(props: { state: ComposerModelControlState; v2?: boolean }) {
+  return (
+    <>
+      <Show when={props.state.providerID}>
+        {(providerID) => (
+          <ProviderIcon
+            id={providerID()}
+            class="size-4 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity duration-150"
+            style={{ "will-change": "opacity", transform: "translateZ(0)" }}
+          />
+        )}
+      </Show>
+      <span class="truncate">{props.state.modelName}</span>
+      <span class={props.v2 ? "-ml-0.5 -mr-1 flex shrink-0" : "-ml-1 shrink-0 flex size-fit"}>
+        <Icon name="chevron-down" size="small" class="text-v2-icon-icon-muted" />
+      </span>
+    </>
   )
 }
