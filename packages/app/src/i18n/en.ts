@@ -284,6 +284,7 @@ export const dict = {
   "prompt.attachment.remove": "Remove attachment",
   "prompt.action.send": "Send",
   "prompt.action.stop": "Stop",
+  "session.action.refresh": "Refresh session",
   "prompt.reprompt.enable": "Enable RePrompt (prompt reinforcement)",
   "prompt.reprompt.disable": "Disable RePrompt (prompt reinforcement)",
 

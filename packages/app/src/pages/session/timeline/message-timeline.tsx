@@ -1313,6 +1313,25 @@ export function MessageTimeline(props: {
     )
   }
 
+  // UPSTREAM-DIVERGENCE: manual session refresh. Force-resyncs messages/todos/status from the
+  // server (same as the mobile resume path), recovering the client store after missed events —
+  // e.g. rewind-then-send ghosts or SSE gaps around a server restart.
+  const [refreshing, setRefreshing] = createSignal(false)
+  const refreshSession = async () => {
+    const id = sessionID()
+    if (!id || refreshing()) return
+    setRefreshing(true)
+    try {
+      await Promise.all([
+        sync().session.sync(id, { force: true }),
+        sync().session.todo(id, { force: true }),
+        sync().session.status(),
+      ])
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   // UPSTREAM-DIVERGENCE: shared session actions cluster (context ring + overflow menu + share
   // popover). Rendered inline in the title bar on desktop and portaled into the mobile Session
   // tab (mobile hides the context ring; the composer context button covers it).
@@ -1330,6 +1349,30 @@ export function MessageTimeline(props: {
             <SessionContextUsage
               placement="bottom"
               buttonAppearance={settings.general.newLayoutDesigns() ? "v2" : "default"}
+            />
+          </Show>
+          {/* UPSTREAM-DIVERGENCE: manual session refresh button (see refreshSession above). */}
+          <Show
+            when={settings.general.newLayoutDesigns()}
+            fallback={
+              <IconButton
+                icon="refresh"
+                variant="ghost"
+                class="size-6 rounded-md"
+                classList={{ "animate-spin": refreshing() }}
+                disabled={refreshing()}
+                onClick={() => void refreshSession()}
+                aria-label={language.t("session.action.refresh")}
+              />
+            }
+          >
+            <IconButtonV2
+              icon={<IconV2 name="refresh" classList={{ "animate-spin": refreshing() }} />}
+              variant="ghost-muted"
+              size="large"
+              disabled={refreshing()}
+              onClick={() => void refreshSession()}
+              aria-label={language.t("session.action.refresh")}
             />
           </Show>
           <Show when={!parentID()}>
