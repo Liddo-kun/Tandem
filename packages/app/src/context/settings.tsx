@@ -35,6 +35,8 @@ export interface Settings {
     showCustomAgents: boolean
     mobileTitlebarPosition: "top" | "bottom"
     newLayoutDesigns?: boolean
+    // UPSTREAM-DIVERGENCE: Tandem RePrompt (prompt-corrector plugin) composer toggle.
+    reprompt: boolean
   }
   appearance: {
     fontSize: number
@@ -129,6 +131,7 @@ const defaultSettings: Settings = {
     editToolPartsExpanded: false,
     showCustomAgents: false,
     mobileTitlebarPosition: "top",
+    reprompt: true,
   },
   appearance: {
     fontSize: 14,
@@ -306,6 +309,11 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         newLayoutDesigns,
         setNewLayoutDesigns(value: boolean) {
           setStore("general", "newLayoutDesigns", value)
+        },
+        // UPSTREAM-DIVERGENCE: Tandem RePrompt composer toggle.
+        reprompt: withFallback(() => store.general?.reprompt, defaultSettings.general.reprompt),
+        setReprompt(value: boolean) {
+          setStore("general", "reprompt", value)
         },
       },
       visibility: {

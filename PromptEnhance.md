@@ -102,6 +102,17 @@ least 3 words, and contains no backtick (so code is skipped). Newlines are
 allowed — multiline prose gets the standalone-marker form; one-/two-word answers
 are skipped by the word-count rule.
 
+### Live RePrompt toggle (app composer)
+
+The web/mobile app has a "RePrompt" button in the composer tray (next to the
+context-token button) that disables RePrompt **without restarting the server**.
+It flips a persisted app setting (`general.reprompt`, default on); when off, the
+app stamps `tandemRepromptDisabled: true` metadata onto the outgoing text part,
+and the plugin skips the duplication for that message. The toggle is per-client
+(each browser/device keeps its own state) and only affects RePrompt — the
+correction pass still runs. The state is captured when a prompt is submitted, so
+queued followups keep the toggle state they were written with.
+
 ## Configuration (environment variables)
 
 | Variable | Default | Effect |
@@ -110,12 +121,16 @@ are skipped by the word-count rule.
 | `TANDEM_PROMPT_CORRECTOR_MAX` | 600 | Max characters to send to the corrector; longer prompts skip correction entirely. `0` = no cap. |
 | `TANDEM_PROMPT_CORRECTOR_DEBUG` | off | Keeps the throwaway corrector sessions (visible in the session list) for inspection. |
 | `TANDEM_PROMPT_CORRECTOR_DEBUG_KEEP` | 2 | In debug mode, retain only this many newest corrector sessions (older ones pruned). `0` = keep all. |
-| `TANDEM_PROMPT_CORRECTOR_REPROMPT_MAX` | 300 | Max characters for RePrompt; `0` disables RePrompt. |
+| `TANDEM_PROMPT_CORRECTOR_REPROMPT_MAX` | 300 | Max characters for RePrompt; `0` disables RePrompt (server-wide; see also the per-client live toggle above). |
 | `TANDEM_PROMPT_CORRECTOR_REPROMPT_MIN` | 10 | Min characters for RePrompt. |
 
 ## Files / divergence
 
 - `packages/opencode/src/plugin/prompt-corrector.ts` — the whole feature (new file).
+- Live RePrompt toggle (app side): `packages/app/src/components/session/reprompt-toggle-button.tsx`
+  (new), plus small marked insertions in `prompt-input.tsx`,
+  `prompt-input/build-request-parts.ts`, `prompt-input/submit.ts`,
+  `context/settings.tsx`, and `i18n/en.ts`.
 - `packages/opencode/src/plugin/index.ts` — one import + one `internalPlugins()`
   entry (marked `UPSTREAM-DIVERGENCE`).
 - `packages/opencode/src/session/prompt.ts` — a small gate (marked

@@ -27,6 +27,9 @@ type BuildRequestPartsInput = {
   messageID: string
   sessionID: string
   sessionDirectory: string
+  // UPSTREAM-DIVERGENCE: Tandem RePrompt opt-out; stamps a metadata marker the
+  // prompt-corrector plugin reads to skip its RePrompt duplication.
+  repromptDisabled?: boolean
 }
 
 const absolute = (directory: string, path: string) => {
@@ -94,6 +97,7 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
       id: Identifier.ascending("part"),
       type: "text",
       text: input.text,
+      ...(input.repromptDisabled ? { metadata: { tandemRepromptDisabled: true } } : {}),
     },
   ]
 

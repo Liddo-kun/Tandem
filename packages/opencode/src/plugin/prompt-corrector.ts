@@ -61,6 +61,9 @@ const CORRECTOR_MAX_CHARS = envInt("TANDEM_PROMPT_CORRECTOR_MAX", 600)
 //   sessionID, so it relies on this marker to skip corrector traffic).
 const ORIGINAL_KEY = "tandemPromptCorrectorOriginal"
 const CORRECTOR_PART_KEY = "tandemPromptCorrector"
+// Set by the app's composer toggle on the outgoing text part to opt a single
+// prompt out of the RePrompt duplication without restarting the server.
+const REPROMPT_DISABLED_KEY = "tandemRepromptDisabled"
 // Title given to every spawned corrector session; also used to find & prune them.
 const CORRECTOR_TITLE = "Prompt corrector (Tandem)"
 
@@ -380,6 +383,9 @@ export async function PromptCorrectorPlugin(input: PluginInput): Promise<Hooks> 
         (part) => part.type === "text" && !part.synthetic && part.text.trim().length > 0,
       )
       if (!textPart || textPart.type !== "text") return
+
+      // Live opt-out: the app's composer toggle stamps this marker per prompt.
+      if ((textPart.metadata as Record<string, unknown> | undefined)?.[REPROMPT_DISABLED_KEY]) return
 
       const text = textPart.text.trim()
       // Only reinforce short-but-substantive prose. Skip: too long, too short,

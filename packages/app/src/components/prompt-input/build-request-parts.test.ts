@@ -49,6 +49,27 @@ describe("buildRequestParts", () => {
     expect(result.optimisticParts.every((part) => part.sessionID === "ses_1" && part.messageID === "msg_1")).toBe(true)
   })
 
+  // UPSTREAM-DIVERGENCE: Tandem RePrompt opt-out marker.
+  test("stamps the RePrompt opt-out marker only when disabled", () => {
+    const prompt: Prompt = [{ type: "text", content: "hello", start: 0, end: 5 }]
+    const base = {
+      prompt,
+      context: [],
+      images: [],
+      text: "hello",
+      messageID: "msg_1",
+      sessionID: "ses_1",
+      sessionDirectory: "/repo",
+    }
+
+    const disabled = buildRequestParts({ ...base, repromptDisabled: true })
+    expect(disabled.requestParts[0]).toMatchObject({ type: "text", metadata: { tandemRepromptDisabled: true } })
+
+    const enabled = buildRequestParts(base)
+    expect(enabled.requestParts[0]?.type).toBe("text")
+    expect((enabled.requestParts[0] as { metadata?: unknown }).metadata).toBeUndefined()
+  })
+
   test("keeps multiple uploaded attachments in order", () => {
     const result = buildRequestParts({
       prompt: [{ type: "text", content: "check these", start: 0, end: 11 }],

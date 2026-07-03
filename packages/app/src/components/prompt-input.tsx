@@ -46,6 +46,7 @@ import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ModelSelectorPopover, ModelSelectorPopoverV2 } from "@/components/dialog-select-model"
 import { useProviders } from "@/hooks/use-providers"
 import { ContextTokenButton } from "@/components/session/context-token-button"
+import { RepromptToggleButton } from "@/components/session/reprompt-toggle-button"
 import { useCommand } from "@/context/command"
 import { Persist, persisted } from "@/utils/persist"
 import { usePermission } from "@/context/permission"
@@ -1821,6 +1822,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       onClick={openContext}
                     />
                   </Show>
+                  {/* UPSTREAM-DIVERGENCE: Tandem RePrompt toggle (reprompt-toggle-button.tsx) */}
+                  <RepromptToggleButton />
                 </div>
                 <TooltipV2 placement="top" inactive={!working() && blank()} value={tip()}>
                   <IconButton
@@ -2190,6 +2193,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                             legacy
                           />
                         </Show>
+                        {/* UPSTREAM-DIVERGENCE: Tandem RePrompt toggle (reprompt-toggle-button.tsx) */}
+                        <RepromptToggleButton legacy />
                       </Show>
                     </Show>
                   </div>

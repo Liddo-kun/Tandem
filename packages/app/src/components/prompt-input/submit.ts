@@ -12,6 +12,7 @@ import { useLocal } from "@/context/local"
 import { usePermission } from "@/context/permission"
 import { type ContextItem, type ImageAttachmentPart, type Prompt, type usePrompt } from "@/context/prompt"
 import { useSDK, type DirectorySDK } from "@/context/sdk"
+import { useSettings } from "@/context/settings"
 import { useSync, type DirectorySync } from "@/context/sync"
 import { Identifier } from "@/utils/id"
 import { Worktree as WorktreeState } from "@/utils/worktree"
@@ -36,6 +37,9 @@ export type FollowupDraft = {
   agent: string
   model: { providerID: string; modelID: string }
   variant?: string
+  // UPSTREAM-DIVERGENCE: Tandem RePrompt opt-out, captured at draft creation so
+  // queued followups keep the toggle state they were written with.
+  repromptDisabled?: boolean
 }
 
 type FollowupSendInput = {
@@ -112,6 +116,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
     sessionID: input.draft.sessionID,
     messageID,
     sessionDirectory: input.draft.sessionDirectory,
+    repromptDisabled: input.draft.repromptDisabled,
   })
 
   const message: Message = {
@@ -200,6 +205,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
   const serverSync = useServerSync()
   const local = useLocal()
   const permission = usePermission()
+  const settings = useSettings()
   const prompt = input.prompt
   const layout = useLayout()
   const language = useLanguage()
@@ -404,6 +410,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       agent,
       model,
       variant,
+      repromptDisabled: settings.general.reprompt() ? undefined : true,
     }
 
     const clearInput = () => {
