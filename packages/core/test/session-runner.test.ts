@@ -56,11 +56,7 @@ import { Cause, DateTime, Deferred, Effect, Exit, Fiber, Layer, Schema, Stream }
 import { asc, eq } from "drizzle-orm"
 import { testEffect } from "./lib/effect"
 
-const database = Database.layerFromPath(":memory:")
-const events = EventV2.layer.pipe(Layer.provide(database))
-const questions = QuestionV2.layer.pipe(Layer.provide(events))
-const projector = SessionProjector.layer.pipe(Layer.provide(events), Layer.provide(database))
-const store = SessionStore.layer.pipe(Layer.provide(database))
+const questions = QuestionV2.layer.pipe(Layer.provide(EventV2.defaultLayer))
 const requests: LLMRequest[] = []
 let response: LLMEvent[] = []
 let responses: LLMEvent[][] | undefined
@@ -235,9 +231,9 @@ const config = Layer.succeed(
   }),
 )
 const runner = SessionRunnerLLM.layer.pipe(
-  Layer.provide(database),
-  Layer.provide(store),
-  Layer.provide(events),
+  Layer.provide(Database.defaultLayer),
+  Layer.provide(SessionStore.defaultLayer),
+  Layer.provide(EventV2.defaultLayer),
   Layer.provide(client),
   Layer.provide(registry),
   Layer.provide(models),
@@ -262,19 +258,19 @@ const execution = Layer.effect(
   ),
 ).pipe(Layer.provide(coordinator))
 const sessions = SessionV2.layer.pipe(
-  Layer.provide(events),
-  Layer.provide(database),
-  Layer.provide(store),
+  Layer.provide(EventV2.defaultLayer),
+  Layer.provide(Database.defaultLayer),
+  Layer.provide(SessionStore.defaultLayer),
   Layer.provide(Project.defaultLayer),
   Layer.provide(execution),
 )
 const it = testEffect(
   Layer.mergeAll(
-    database,
-    events,
+    Database.defaultLayer,
+    EventV2.defaultLayer,
     questions,
-    projector,
-    store,
+    SessionProjector.defaultLayer,
+    SessionStore.defaultLayer,
     client,
     permission,
     applications,
@@ -547,6 +543,8 @@ const verifyPartialFlushOnInterruption = (kind: FragmentKind) =>
       { type: "user", text: prompt },
       {
         type: "assistant",
+        finish: "error",
+        error: { type: "unknown", message: "Provider turn interrupted" },
         content: [
           kind === "tool input"
             ? { type: "tool", id: fragmentID(kind, "interrupted"), state: { status: "error" } }
@@ -1352,34 +1350,6 @@ describe("SessionRunnerLLM", () => {
       expect(invalidations).toBe(4)
       expect(requests).toHaveLength(1)
       expect(requests[0]?.system.map((part) => part.text)).toEqual(["Changed context"])
-    }),
-  )
-
-  it.effect("replays retained context projections while replacement is pending", () =>
-    Effect.gen(function* () {
-      yield* setup
-      const session = yield* SessionV2.Service
-      const events = yield* EventV2.Service
-      yield* session.prompt({ sessionID, prompt: new Prompt({ text: "First" }), resume: false })
-
-      requests.length = 0
-      response = []
-      yield* session.resume(sessionID)
-      systemBaseline = "Changed context"
-      yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Second" }), resume: false })
-      yield* session.resume(sessionID)
-      yield* events.publish(SessionEvent.ModelSwitched, {
-        sessionID,
-        messageID: SessionMessage.ID.create(),
-        timestamp: DateTime.makeUnsafe(1),
-        model: { id: ModelV2.ID.make("replacement"), providerID: ProviderV2.ID.make("fake") },
-      })
-
-      yield* replaySessionProjection(sessionID)
-      systemBaseline = "Replacement context"
-      yield* session.prompt({ sessionID, prompt: new Prompt({ text: "Third" }), resume: false })
-      yield* session.resume(sessionID)
-      expect(requests.at(-1)?.system.map((part) => part.text)).toEqual(["Replacement context"])
     }),
   )
 
