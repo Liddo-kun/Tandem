@@ -54,6 +54,7 @@ import { Popover as KobaltePopover } from "@kobalte/core/popover"
 import { normalize } from "@opencode-ai/ui/session-diff"
 import { useFileComponent } from "@opencode-ai/ui/context/file"
 import { shouldMarkBoundaryGesture, normalizeWheelDelta } from "@/pages/session/message-gesture"
+import { SessionContextUsage } from "@/components/session-context-usage"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { useLanguage } from "@/context/language"
@@ -271,7 +272,6 @@ export function MessageTimeline(props: {
   const initialMeasurements = cached?.measurements
   const coldBottomMount = !initialMeasurements?.length && props.shouldAnchorBottom()
   const platform = usePlatform()
-  const nativeMobile = platform.platform === "ios" || platform.platform === "android"
   // UPSTREAM-DIVERGENCE: narrow the Android chat side gutters (px-2 = 8px) so messages sit closer to the
   // screen edge on phone/tablet; web/desktop/iOS keep upstream's px-4 md:px-5 (16/20px).
   const rowPadX = platform.platform === "android" ? "px-2" : "px-4 md:px-5"
@@ -563,9 +563,6 @@ export function MessageTimeline(props: {
     menuOpen: false,
     pendingRename: false,
     pendingShare: false,
-    // UPSTREAM-DIVERGENCE: defer the delete dialog until the menu closes (see onCloseAutoFocus below)
-    // so the WebView-safe non-modal mobile menu does not swallow the confirmation dialog (context.md mobile contract).
-    pendingDelete: undefined as string | undefined,
   })
   let titleRef: HTMLInputElement | undefined
 
@@ -1303,8 +1300,7 @@ export function MessageTimeline(props: {
             }}
             data-session-title
             classList={{
-              // UPSTREAM-DIVERGENCE: solid gradient extent reduced 48px -> 40px to match the shorter h-10 title row below.
-              "sticky top-0 z-30 bg-[linear-gradient(to_bottom,var(--background-stronger)_40px,transparent)]": true,
+              "sticky top-0 z-30 bg-[linear-gradient(to_bottom,var(--background-stronger)_48px,transparent)]": true,
               "w-full": true,
               "pb-4": true,
               "pr-3": true,
@@ -1324,8 +1320,7 @@ export function MessageTimeline(props: {
                 />
               </div>
             </Show>
-            {/* UPSTREAM-DIVERGENCE: title row height reduced 48px (h-12) -> 40px (h-10) per Tandem preference. */}
-            <div class="h-10 w-full flex items-center justify-between gap-2">
+            <div class="h-12 w-full flex items-center justify-between gap-2">
               <div class="flex items-center gap-1 min-w-0 flex-1 pr-3">
                 <div class="flex items-center min-w-0 grow-1">
                   <Show when={parentID()}>
@@ -1406,27 +1401,10 @@ export function MessageTimeline(props: {
               <Show when={sessionID()} keyed>
                 {(id) => (
                   <div class="shrink-0 flex items-center gap-3">
-                    {/* UPSTREAM-DIVERGENCE: Tandem moves context usage to the composer, so the title bar
-                        carries the native-mobile refresh action here instead of the context-usage ring. */}
-                    <Show when={nativeMobile}>
-                      <IconButton
-                        icon="refresh"
-                        variant="ghost"
-                        class="size-6 rounded-md"
-                        onClick={() => {
-                          platform.haptic?.("light")
-                          void platform.restart()
-                        }}
-                        aria-label={language.t("session.header.refresh")}
-                        data-action="session-refresh"
-                      />
-                    </Show>
+                    <SessionContextUsage placement="bottom" />
                     <Show when={!parentID()}>
                       <DropdownMenu
                         gutter={4}
-                        // UPSTREAM-DIVERGENCE: non-modal on native mobile so the WebView does not suppress
-                        // the menu/confirmation popups (context.md mobile overflow/delete contract).
-                        modal={!nativeMobile}
                         placement="bottom-end"
                         open={title.menuOpen}
                         onOpenChange={(open) => {
@@ -1464,17 +1442,6 @@ export function MessageTimeline(props: {
                                   setShare({ open: true, dismiss: null })
                                   setTitle("pendingShare", false)
                                 })
-                                return
-                              }
-                              // UPSTREAM-DIVERGENCE: open the delete dialog only after the menu has closed,
-                              // mirroring the rename/share deferral above so mobile WebViews keep the dialog.
-                              if (title.pendingDelete) {
-                                const pendingID = title.pendingDelete
-                                event.preventDefault()
-                                requestAnimationFrame(() => {
-                                  dialog.show(() => <DialogDeleteSession sessionID={pendingID} />)
-                                  setTitle("pendingDelete", undefined)
-                                })
                               }
                             }}
                           >
@@ -1502,7 +1469,7 @@ export function MessageTimeline(props: {
                             </DropdownMenu.Item>
                             <DropdownMenu.Separator />
                             <DropdownMenu.Item
-                              onSelect={() => setTitle({ pendingDelete: id, menuOpen: false })}
+                              onSelect={() => dialog.show(() => <DialogDeleteSession sessionID={id} />)}
                             >
                               <DropdownMenu.ItemLabel>{language.t("common.delete")}</DropdownMenu.ItemLabel>
                             </DropdownMenu.Item>

@@ -549,7 +549,6 @@ export const dict = {
 
   "session.header.search.placeholder": "Søg {{project}}",
   "session.header.searchFiles": "Søg efter filer",
-  "session.header.refresh": "Refresh",
   "session.header.openIn": "Åbn i",
   "session.header.open.action": "Åbn {{app}}",
   "session.header.open.ariaLabel": "Åbn i {{app}}",
