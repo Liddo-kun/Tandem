@@ -94,12 +94,17 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
   const electronWindows = createMemo(() => windows() && !tauriApi())
   const linux = createMemo(() => platform.platform === "desktop" && platform.os === "linux")
   const web = createMemo(() => platform.platform === "web")
+  // UPSTREAM-DIVERGENCE: the Android shell (packages/android/index.html + enableEdgeToEdge + the
+  // zoom-compensated --android-safe-area-* vars) already reserves the status-bar/nav-bar safe areas at
+  // the app root, so upstream's mobile titlebar safe-area-inset padding would double it (empty strip
+  // above the tab bar). Suppress the titlebar inset on Android; iOS and the mobile web PWA still use it.
+  const android = createMemo(() => platform.platform === "android")
   const zoom = () => platform.webviewZoom?.() ?? 1
   const titlebarZoom = () => (windows() ? Math.max(zoom(), minTitlebarZoom) : zoom())
   const counterZoom = () => (windows() && titlebarZoom() < 1 ? 1 / titlebarZoom() : 1)
   const minHeight = () => {
     const height = useV2Titlebar() ? v2TitlebarHeight : legacyTitlebarHeight
-    if (useV2Titlebar() && mobile()) {
+    if (useV2Titlebar() && mobile() && !android()) {
       const inset = bottom() ? "env(safe-area-inset-bottom, 0px)" : "env(safe-area-inset-top, 0px)"
       return `calc(${height}px + ${inset})`
     }
@@ -244,8 +249,9 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
       }}
       style={{
         "min-height": minHeight(),
-        "padding-top": useV2Titlebar() && mobile() && !bottom() ? "env(safe-area-inset-top, 0px)" : undefined,
-        "padding-bottom": bottom() ? "env(safe-area-inset-bottom, 0px)" : undefined,
+        "padding-top":
+          useV2Titlebar() && mobile() && !bottom() && !android() ? "env(safe-area-inset-top, 0px)" : undefined,
+        "padding-bottom": bottom() && !android() ? "env(safe-area-inset-bottom, 0px)" : undefined,
         "padding-left": mac() && !mobile() ? `${84 / zoom()}px` : 0,
         width: electronWindows() ? `env(titlebar-area-width, calc(100vw - ${windowsControlsWidth()}))` : undefined,
         "max-width": electronWindows()
