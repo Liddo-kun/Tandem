@@ -7,30 +7,22 @@ import { ShellID } from "./id"
 const PS = new Set(["powershell", "pwsh"])
 const CMD = new Set(["cmd"])
 
-const descriptions = {
-  bash: "Clear, concise description of what this command does in 5-10 words. Examples:\nInput: ls\nOutput: Lists files in current directory\n\nInput: git status\nOutput: Shows working tree status\n\nInput: npm install\nOutput: Installs package dependencies\n\nInput: mkdir foo\nOutput: Creates directory 'foo'",
-  powershell:
-    'Clear, concise description of what this command does in 5-10 words. Examples:\nInput: Get-ChildItem -LiteralPath "."\nOutput: Lists current directory\n\nInput: git status\nOutput: Shows working tree status\n\nInput: npm install\nOutput: Installs package dependencies\n\nInput: New-Item -ItemType Directory -Path "tmp"\nOutput: Creates directory tmp',
-  cmd: 'Clear, concise description of what this command does in 5-10 words. Examples:\nInput: dir\nOutput: Lists current directory\n\nInput: if exist "package.json" type "package.json"\nOutput: Prints package.json when it exists\n\nInput: mkdir tmp\nOutput: Creates directory tmp',
-}
-
 export type Limits = {
   maxLines: number
   maxBytes: number
 }
 
-export function parameterSchema(description: string) {
+export function parameterSchema() {
   return Schema.Struct({
     command: Schema.String.annotate({ description: "The command to execute" }),
     timeout: Schema.optional(PositiveInt).annotate({ description: "Optional timeout in milliseconds" }),
     workdir: Schema.optional(Schema.String).annotate({
       description: `The working directory to run the command in. Defaults to the current directory. Use this instead of 'cd' commands.`,
     }),
-    description: Schema.String.annotate({ description }),
   })
 }
 
-export const Parameters = parameterSchema(descriptions.bash)
+export const Parameters = parameterSchema()
 export type Parameters = Schema.Schema.Type<typeof Parameters>
 
 function renderPrompt(template: string, values: Record<string, string>) {
@@ -103,7 +95,6 @@ function bashCommandSection(chain: string, limits: Limits, defaultTimeoutMs: num
 Usage notes:
   - The command argument is required.
   - You can specify an optional timeout in milliseconds. If not specified, commands will time out after ${defaultTimeoutMs}ms.
-  - It is very helpful if you write a clear, concise description of what this command does in 5-10 words.
   - If output is expected to be very long, such as repetitive build logs, limit it with \`head\`, \`tail\`, or a focused filter like \`2>&1 | tee <tmp-log> | rg -i "error|fail|exception|warning"\` to avoid polluting context while keeping likely errors visible. When full output may be needed for diagnosis, pipe it to a temporary log file.
 
   - When issuing multiple commands:
@@ -148,7 +139,6 @@ Before executing the command, please follow these steps:
 Usage notes:
   - The command argument is required.
   - You can specify an optional timeout in milliseconds. If not specified, commands will time out after ${defaultTimeoutMs}ms.
-  - It is very helpful if you write a clear, concise description of what this command does in 5-10 words.
   - If output is expected to be very long, such as repetitive build logs, limit it with \`Select-Object -First\`, \`Select-Object -Last\`, or a focused filter like \`2>&1 | Tee-Object -FilePath <tmp-log> | rg -i "error|fail|exception|warning"\` to avoid polluting context while keeping likely errors visible. When full output may be needed for diagnosis, pipe it to a temporary log file.
 
   - When issuing multiple commands:
@@ -191,7 +181,6 @@ Before executing the command, please follow these steps:
 Usage notes:
   - The command argument is required.
   - You can specify an optional timeout in milliseconds. If not specified, commands will time out after ${defaultTimeoutMs}ms.
-  - It is very helpful if you write a clear, concise description of what this command does in 5-10 words.
   - If output is expected to be very long, such as repetitive build logs, limit it with \`more\` or a focused filter like \`2>&1 | rg -i "error|fail|exception|warning"\` to avoid polluting context while keeping likely errors visible. When full output may be needed for diagnosis, redirect it to a temporary log file.
 
   - When issuing multiple commands:
@@ -221,7 +210,6 @@ function profile(name: string, platform: NodeJS.Platform, limits: Limits, defaul
       gitCommandRestriction: "git commands",
       createPrInstruction: "Create PR using a temporary body file so cmd.exe quoting stays simple.",
       createPrExample: `(\n  echo ## Summary\n  echo - ^<1-3 bullet points^>\n) > pr-body.txt\ngh pr create --title "the pr title" --body-file pr-body.txt`,
-      parameterDescription: descriptions.cmd,
     }
   }
   if (isPowerShell) {
@@ -243,7 +231,6 @@ function profile(name: string, platform: NodeJS.Platform, limits: Limits, defaul
 ## Summary
 - <1-3 bullet points>
 '@`,
-      parameterDescription: descriptions.powershell,
     }
   }
   return {
@@ -259,7 +246,6 @@ function profile(name: string, platform: NodeJS.Platform, limits: Limits, defaul
     createPrExample: `gh pr create --title "the pr title" --body "$(cat <<'EOF'
 ## Summary
 <1-3 bullet points>`,
-    parameterDescription: descriptions.bash,
   }
 }
 
@@ -279,7 +265,7 @@ export function render(name: string, platform: NodeJS.Platform, limits: Limits, 
       createPrInstruction: selected.createPrInstruction,
       createPrExample: selected.createPrExample,
     }),
-    parameters: parameterSchema(selected.parameterDescription),
+    parameters: parameterSchema(),
   }
 }
 

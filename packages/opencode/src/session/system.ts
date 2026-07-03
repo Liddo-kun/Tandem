@@ -19,7 +19,6 @@ import { Skill } from "@/skill"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { Location } from "@opencode-ai/core/location"
 import { LocationServiceMap } from "@opencode-ai/core/location-layer"
-import { PluginBoot } from "@opencode-ai/core/plugin/boot"
 import { Reference } from "@opencode-ai/core/reference"
 
 export function provider(model: Provider.Model) {
@@ -60,7 +59,6 @@ export const layer = Layer.effect(
           ? "Environment context you are running in:"
           : "Here is some useful information about the environment you are running in:"
         const references = yield* Effect.gen(function* () {
-          yield* (yield* PluginBoot.Service).wait()
           return (yield* (yield* Reference.Service).list()).filter((reference) => reference.description !== undefined)
         }).pipe(Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(ctx.directory) }))))
         return [

@@ -388,8 +388,8 @@ export function getToolInfo(
     case "bash":
       return {
         icon: "console",
-        title: "Bash",
-        subtitle: input.description,
+        title: "Bash", // UPSTREAM-DIVERGENCE: Claude Code shaping (bash presented as Bash)
+        subtitle: input.command,
       }
     case "edit":
       return {
