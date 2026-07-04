@@ -10,19 +10,21 @@ From the repo root:
 
 ```sh
 bun run tandem:tablet -- --setup                # one-time: install the arm64 toolchain (idempotent)
-bun run tandem:tablet -- --release --install    # build the release APK and install it (preferred)
-bun run tandem:tablet -- --install              # same but debug APK (see below)
+bun run tandem:tablet -- --install              # build the release APK and install it (default)
+bun run tandem:tablet -- --debug --install      # same but debug APK (see below)
 ```
 
 `--setup` runs `script/setup-tablet-android.sh`; the build/install runs
 `script/build-tablet-android.ts`. Add `--overwrite` if the installed Tandem has a different
 signature (it erases that app's data). The rest of this file explains what those scripts do.
 
-Prefer `--release` for daily use: the debug APK is ~232MB with an unoptimized,
+Release is the default for a reason: the debug APK is ~232MB with an unoptimized,
 symbol-laden Rust library and a debuggable dex, while the release APK is ~15MB with
 optimized Rust (thin LTO, stripped) — faster startup, smaller mmap, less disk. Debug and
 release use different signing keys, so the first switch in either direction needs
-`--overwrite` (one-time app-data wipe: re-run onboarding after it).
+`--overwrite` (one-time app-data wipe: re-run onboarding after it). Release signing files
+(`packages/android/release.keystore` + `keystore.properties`, shared with `tandem:release`)
+are auto-created on first run.
 
 ## One-time setup (already done on this machine)
 
@@ -80,15 +82,16 @@ The working glibc `adb` is `/usr/bin/adb` (system `android-sdk` package).
 ```sh
 cd packages/android
 bun run tauri android init --ci          # first time / after gen/android is wiped
-bun run tauri android build --apk --debug --target aarch64
+bun run tauri android build --apk --target aarch64            # release (signed)
+bun run tauri android build --apk --debug --target aarch64    # debug
 ```
 
-Output: `src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`
+Output: `src-tauri/gen/android/app/build/outputs/apk/universal/<variant>/app-universal-<variant>.apk`
 
 Install (use the glibc adb; reconnect first if no device):
 
 ```sh
 adb connect 127.0.0.1:5555
-adb install -r <apk>     # debug-signed; collides with a release-signed install of the
-                         # same id (app.liddokun.tandem) -> uninstall first to overwrite
+adb install -r <apk>     # debug- and release-signed builds collide under the same id
+                         # (app.liddokun.tandem) -> uninstall first to switch signatures
 ```

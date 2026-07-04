@@ -1,12 +1,13 @@
 #!/usr/bin/env bun
-// Build (and optionally install) the Tandem Android debug APK natively on the tablet,
+// Build (and optionally install) the Tandem Android release APK natively on the tablet,
 // inside the aarch64 chroot. The tablet counterpart to `tandem:release`.
 //
-//   bun run tandem:tablet                 build the debug APK
+//   bun run tandem:tablet                 build the release APK (optimized Rust,
+//                                         non-debuggable dex; signed via keystore.properties,
+//                                         auto-created on first run)
 //   bun run tandem:tablet -- --install    build + adb install to the connected device
-//   bun run tandem:tablet -- --release    build a release APK instead (optimized Rust,
-//                                         non-debuggable dex; signed via keystore.properties).
-//                                         First install over a debug build needs --overwrite.
+//   bun run tandem:tablet -- --debug      build a debug APK instead. Switching between
+//                                         debug and release signatures needs --overwrite once.
 //   bun run tandem:tablet -- --setup      run the one-time toolchain setup first
 //
 // Toolchain details and rationale: packages/android/apkbuildontablet.md
@@ -18,6 +19,7 @@ import os from "os"
 import path from "path"
 import { fileURLToPath } from "url"
 import { loadAndroidToolchainEnv } from "./android-toolchain-env.ts"
+import { ensureAndroidSigning } from "./android-signing.ts"
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)))
 const bun = process.execPath
@@ -26,7 +28,7 @@ const args = process.argv.slice(2)
 let doSetup = false
 let doInstall = false
 let overwrite = false
-let release = false
+let release = true
 let device = process.env["ANDROID_SERIAL"] ?? ""
 
 for (let i = 0; i < args.length; i++) {
@@ -49,6 +51,9 @@ for (let i = 0; i < args.length; i++) {
     case "--release":
       release = true
       break
+    case "--debug":
+      release = false
+      break
     case "--device":
       device = requireValue(arg, args[++i])
       break
@@ -67,6 +72,7 @@ await fs.mkdir(logDir, { recursive: true })
 if (doSetup) await runSetup()
 loadAndroidToolchainEnv()
 await preflight()
+if (release) await ensureAndroidSigning(root)
 
 const variant = release ? "release" : "debug"
 await runStep(
@@ -235,14 +241,15 @@ function requireValue(name: string, value: string | undefined) {
 function printHelp() {
   console.log(`Usage: bun run tandem:tablet [options]
 
-Builds the Tandem Android debug APK natively in the aarch64 chroot, and optionally
-installs it on the connected device. The on-tablet counterpart to tandem:release.
+Builds the Tandem Android release APK (optimized Rust, non-debuggable dex, keystore
+signing; signing files auto-created on first run) natively in the aarch64 chroot, and
+optionally installs it on the connected device. The on-tablet counterpart to tandem:release.
 
 Options:
   --setup        Run the one-time toolchain setup (script/setup-tablet-android.sh) first
   --install      adb install -r the APK after building
   --overwrite    Like --install, but uninstall a signature-mismatched app first (erases its data)
-  --release      Build the release APK (optimized Rust, non-debuggable dex, keystore signing).
+  --debug        Build a debug APK instead of release.
                  Switching between debug and release signatures needs --overwrite once.
   --device <s>   Target ADB serial (else auto: connects 127.0.0.1:5555 / LAN, prefers loopback)
   -h, --help     Show this help

@@ -2,11 +2,11 @@
 
 import { createWriteStream } from "fs"
 import fs from "fs/promises"
-import { randomBytes } from "crypto"
 import os from "os"
 import path from "path"
 import { fileURLToPath } from "url"
 import { loadAndroidToolchainEnv } from "./android-toolchain-env.ts"
+import { ensureAndroidSigning } from "./android-signing.ts"
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)))
 const bun = process.execPath
@@ -97,7 +97,7 @@ await fs.mkdir(logDir, { recursive: true })
 if (!releaseVersion && !allowDevVersion) releaseVersion = await defaultReleaseVersion()
 if (releaseVersion) process.env["OPENCODE_VERSION"] = releaseVersion
 if (hasForwarded("--install-android")) await preflightAndroidInstall()
-if (!packageOnly && !skipAndroid && !debugAndroid) await ensureAndroidSigning()
+if (!packageOnly && !skipAndroid && !debugAndroid) await ensureAndroidSigning(root)
 if (!packageOnly && !skipAndroid) await ensureAndroidGeneratedProject()
 if (!packageOnly && (hasForwarded("--strict") || hasForwarded("--required-common"))) await preflightReleaseInputs()
 
@@ -226,58 +226,6 @@ async function preflightAndroidInstall() {
   if (devices.length !== 1) {
     throw new Error(`--install-android requires exactly one connected ADB device, or set ANDROID_SERIAL.\nadb devices output:\n${stdout.trim()}`)
   }
-}
-
-async function ensureAndroidSigning() {
-  const keystore = path.join(root, "packages/android/release.keystore")
-  const properties = path.join(root, "packages/android/keystore.properties")
-  const hasKeystore = await exists(keystore)
-  const hasProperties = await exists(properties)
-  if (hasKeystore && hasProperties) return
-
-  if (hasKeystore || hasProperties) {
-    throw new Error(
-      `Android release signing is incomplete. Restore the missing file, or delete both files so the release script can create a fresh local signing key:\n- packages/android/release.keystore\n- packages/android/keystore.properties`,
-    )
-  }
-
-  await fs.mkdir(path.dirname(keystore), { recursive: true })
-  const password = randomBytes(48).toString("base64url")
-  const command = [
-    "keytool",
-    "-genkeypair",
-    "-v",
-    "-keystore",
-    keystore,
-    "-storetype",
-    "PKCS12",
-    "-alias",
-    "tandem-release",
-    "-keyalg",
-    "RSA",
-    "-keysize",
-    "4096",
-    "-validity",
-    "10000",
-    "-storepass",
-    password,
-    "-keypass",
-    password,
-    "-dname",
-    "CN=Tandem, O=Tandem, C=US",
-  ]
-  const proc = Bun.spawn(command, { cwd: root, stdout: "pipe", stderr: "pipe" })
-  const [code, stdout, stderr] = await Promise.all([proc.exited, streamText(proc.stdout), streamText(proc.stderr)])
-  if (code !== 0) {
-    await fs.rm(keystore, { force: true })
-    throw new Error(`Failed to create Android release keystore with keytool.\n${stdout}${stderr}`)
-  }
-
-  await fs.writeFile(
-    properties,
-    [`storeFile=release.keystore`, `storePassword=${password}`, `keyAlias=tandem-release`, `keyPassword=${password}`, ""].join("\n"),
-  )
-  console.log("Created local Android release signing files under packages/android")
 }
 
 async function ensureAndroidGeneratedProject() {
