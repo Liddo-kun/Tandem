@@ -19,6 +19,9 @@ export interface SoundSettings {
   errors: string
 }
 
+// UPSTREAM-DIVERGENCE: Tandem prompt-enhance composer toggle state.
+export type PromptEnhanceState = "on" | "no-reprompt" | "off"
+
 export interface Settings {
   general: {
     autoSave: boolean
@@ -35,8 +38,11 @@ export interface Settings {
     showCustomAgents: boolean
     mobileTitlebarPosition: "top" | "bottom"
     newLayoutDesigns?: boolean
-    // UPSTREAM-DIVERGENCE: Tandem RePrompt (prompt-corrector plugin) composer toggle.
-    reprompt: boolean
+    // UPSTREAM-DIVERGENCE: Tandem prompt-enhance (prompt-corrector plugin) composer toggle.
+    // "on" = correction + RePrompt, "no-reprompt" = correction only, "off" = neither.
+    promptEnhance: PromptEnhanceState
+    // Legacy boolean from the old two-way RePrompt toggle; migrated on read.
+    reprompt?: boolean
   }
   appearance: {
     fontSize: number
@@ -131,7 +137,7 @@ const defaultSettings: Settings = {
     editToolPartsExpanded: false,
     showCustomAgents: false,
     mobileTitlebarPosition: "top",
-    reprompt: true,
+    promptEnhance: "on",
   },
   appearance: {
     fontSize: 14,
@@ -310,10 +316,16 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         setNewLayoutDesigns(value: boolean) {
           setStore("general", "newLayoutDesigns", value)
         },
-        // UPSTREAM-DIVERGENCE: Tandem RePrompt composer toggle.
-        reprompt: withFallback(() => store.general?.reprompt, defaultSettings.general.reprompt),
-        setReprompt(value: boolean) {
-          setStore("general", "reprompt", value)
+        // UPSTREAM-DIVERGENCE: Tandem prompt-enhance composer toggle. Falls back
+        // to the legacy boolean `reprompt` field written by the old two-way toggle.
+        promptEnhance: withFallback(() => {
+          const stored = store.general?.promptEnhance
+          if (stored === "on" || stored === "no-reprompt" || stored === "off") return stored
+          if (store.general?.reprompt === false) return "no-reprompt"
+          return undefined
+        }, defaultSettings.general.promptEnhance),
+        setPromptEnhance(value: PromptEnhanceState) {
+          setStore("general", "promptEnhance", value)
         },
       },
       visibility: {

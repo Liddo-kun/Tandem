@@ -49,8 +49,8 @@ describe("buildRequestParts", () => {
     expect(result.optimisticParts.every((part) => part.sessionID === "ses_1" && part.messageID === "msg_1")).toBe(true)
   })
 
-  // UPSTREAM-DIVERGENCE: Tandem RePrompt opt-out marker.
-  test("stamps the RePrompt opt-out marker only when disabled", () => {
+  // UPSTREAM-DIVERGENCE: Tandem prompt-enhance opt-out markers.
+  test("stamps the prompt-enhance opt-out markers only when disabled", () => {
     const prompt: Prompt = [{ type: "text", content: "hello", start: 0, end: 5 }]
     const base = {
       prompt,
@@ -64,6 +64,15 @@ describe("buildRequestParts", () => {
 
     const disabled = buildRequestParts({ ...base, repromptDisabled: true })
     expect(disabled.requestParts[0]).toMatchObject({ type: "text", metadata: { tandemRepromptDisabled: true } })
+    expect((disabled.requestParts[0] as { metadata?: Record<string, unknown> }).metadata).not.toHaveProperty(
+      "tandemCorrectorDisabled",
+    )
+
+    const allOff = buildRequestParts({ ...base, repromptDisabled: true, correctionDisabled: true })
+    expect(allOff.requestParts[0]).toMatchObject({
+      type: "text",
+      metadata: { tandemRepromptDisabled: true, tandemCorrectorDisabled: true },
+    })
 
     const enabled = buildRequestParts(base)
     expect(enabled.requestParts[0]?.type).toBe("text")

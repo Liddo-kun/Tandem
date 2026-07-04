@@ -27,9 +27,11 @@ type BuildRequestPartsInput = {
   messageID: string
   sessionID: string
   sessionDirectory: string
-  // UPSTREAM-DIVERGENCE: Tandem RePrompt opt-out; stamps a metadata marker the
-  // prompt-corrector plugin reads to skip its RePrompt duplication.
+  // UPSTREAM-DIVERGENCE: Tandem prompt-enhance opt-outs; stamp metadata markers
+  // the prompt-corrector plugin reads to skip its RePrompt duplication and/or
+  // its correction pass for this prompt.
   repromptDisabled?: boolean
+  correctionDisabled?: boolean
 }
 
 const absolute = (directory: string, path: string) => {
@@ -97,7 +99,14 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
       id: Identifier.ascending("part"),
       type: "text",
       text: input.text,
-      ...(input.repromptDisabled ? { metadata: { tandemRepromptDisabled: true } } : {}),
+      ...(input.repromptDisabled || input.correctionDisabled
+        ? {
+            metadata: {
+              ...(input.repromptDisabled ? { tandemRepromptDisabled: true } : {}),
+              ...(input.correctionDisabled ? { tandemCorrectorDisabled: true } : {}),
+            },
+          }
+        : {}),
     },
   ]
 

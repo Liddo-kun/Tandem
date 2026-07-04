@@ -37,9 +37,10 @@ export type FollowupDraft = {
   agent: string
   model: { providerID: string; modelID: string }
   variant?: string
-  // UPSTREAM-DIVERGENCE: Tandem RePrompt opt-out, captured at draft creation so
-  // queued followups keep the toggle state they were written with.
+  // UPSTREAM-DIVERGENCE: Tandem prompt-enhance opt-outs, captured at draft
+  // creation so queued followups keep the toggle state they were written with.
   repromptDisabled?: boolean
+  correctionDisabled?: boolean
 }
 
 type FollowupSendInput = {
@@ -117,6 +118,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
     messageID,
     sessionDirectory: input.draft.sessionDirectory,
     repromptDisabled: input.draft.repromptDisabled,
+    correctionDisabled: input.draft.correctionDisabled,
   })
 
   const message: Message = {
@@ -410,7 +412,8 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       agent,
       model,
       variant,
-      repromptDisabled: settings.general.reprompt() ? undefined : true,
+      repromptDisabled: settings.general.promptEnhance() === "on" ? undefined : true,
+      correctionDisabled: settings.general.promptEnhance() === "off" ? true : undefined,
     }
 
     const clearInput = () => {

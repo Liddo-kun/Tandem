@@ -129,16 +129,25 @@ least 3 words, and contains no backtick (so code is skipped). Newlines are
 allowed — multiline prose gets the standalone-marker form; one-/two-word answers
 are skipped by the word-count rule.
 
-### Live RePrompt toggle (app composer)
+### Live prompt-enhance toggle (app composer)
 
 The web/mobile app has a "RePrompt" button in the composer tray (next to the
-context-token button) that disables RePrompt **without restarting the server**.
-It flips a persisted app setting (`general.reprompt`, default on); when off, the
-app stamps `tandemRepromptDisabled: true` metadata onto the outgoing text part,
-and the plugin skips the duplication for that message. The toggle is per-client
-(each browser/device keeps its own state) and only affects RePrompt — the
-correction pass still runs. The state is captured when a prompt is submitted, so
-queued followups keep the toggle state they were written with.
+context-token button) that cycles through three states **without restarting the
+server**:
+
+1. **on** (default) — correction + RePrompt both active; plain "RePrompt" label.
+2. **no-reprompt** — RePrompt off, correction still runs; label struck through.
+3. **off** — correction and RePrompt both off; label struck through with a `✕`
+   prefix.
+
+It flips a persisted app setting (`general.promptEnhance`; the old boolean
+`general.reprompt` from the two-way toggle is migrated on read). Non-"on"
+states stamp metadata onto the outgoing text part: `tandemRepromptDisabled:
+true` (states 2 and 3) makes the plugin skip the duplication, and
+`tandemCorrectorDisabled: true` (state 3) makes it skip the correction pass.
+The toggle is per-client (each browser/device keeps its own state). The state
+is captured when a prompt is submitted, so queued followups keep the toggle
+state they were written with.
 
 ## Configuration (environment variables)
 
@@ -156,7 +165,7 @@ queued followups keep the toggle state they were written with.
 ## Files / divergence
 
 - `packages/opencode/src/plugin/prompt-corrector.ts` — the whole feature (new file).
-- Live RePrompt toggle (app side): `packages/app/src/components/session/reprompt-toggle-button.tsx`
+- Live prompt-enhance toggle (app side): `packages/app/src/components/session/reprompt-toggle-button.tsx`
   (new), plus small marked insertions in `prompt-input.tsx`,
   `prompt-input/build-request-parts.ts`, `prompt-input/submit.ts`,
   `context/settings.tsx`, and `i18n/en.ts`.

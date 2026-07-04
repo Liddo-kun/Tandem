@@ -79,8 +79,10 @@ const VARIANT_OVERRIDE = process.env.TANDEM_PROMPT_CORRECTOR_VARIANT?.trim() || 
 const ORIGINAL_KEY = "tandemPromptCorrectorOriginal"
 const CORRECTOR_PART_KEY = "tandemPromptCorrector"
 // Set by the app's composer toggle on the outgoing text part to opt a single
-// prompt out of the RePrompt duplication without restarting the server.
+// prompt out of the RePrompt duplication and/or the correction pass without
+// restarting the server. The toggle's "off" state stamps both markers.
 const REPROMPT_DISABLED_KEY = "tandemRepromptDisabled"
+const CORRECTOR_DISABLED_KEY = "tandemCorrectorDisabled"
 // Title given to every spawned corrector session; also used to find & prune them.
 const CORRECTOR_TITLE = "Prompt corrector (Tandem)"
 
@@ -362,7 +364,12 @@ export async function PromptCorrectorPlugin(input: PluginInput): Promise<Hooks> 
         return
 
       const textParts = output.parts.filter(
-        (part) => part.type === "text" && !part.synthetic && part.text.trim().length > 0,
+        (part) =>
+          part.type === "text" &&
+          !part.synthetic &&
+          part.text.trim().length > 0 &&
+          // Live opt-out: the app's composer toggle stamps this marker per prompt.
+          !(part.metadata as Record<string, unknown> | undefined)?.[CORRECTOR_DISABLED_KEY],
       )
       if (textParts.length === 0) return
 

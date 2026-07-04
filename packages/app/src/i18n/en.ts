@@ -285,8 +285,9 @@ export const dict = {
   "prompt.action.send": "Send",
   "prompt.action.stop": "Stop",
   "session.action.refresh": "Refresh session",
-  "prompt.reprompt.enable": "Enable RePrompt (prompt reinforcement)",
-  "prompt.reprompt.disable": "Disable RePrompt (prompt reinforcement)",
+  "prompt.enhance.state.on": "Prompt correction + RePrompt on",
+  "prompt.enhance.state.noReprompt": "RePrompt off (correction still on)",
+  "prompt.enhance.state.off": "Prompt correction + RePrompt off",
 
   "prompt.toast.pasteUnsupported.title": "Unsupported attachment",
   "prompt.toast.pasteUnsupported.description": "Only images, PDFs, or text files can be attached here.",
