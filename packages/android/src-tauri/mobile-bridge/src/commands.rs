@@ -3,21 +3,6 @@ use tauri::{command, AppHandle, Runtime};
 use crate::{MobileBridgeExt, Result};
 
 #[command]
-pub(crate) async fn is_whisper_ready<R: Runtime>(app: AppHandle<R>) -> Result<serde_json::Value> {
-    app.mobile_bridge().is_whisper_ready()
-}
-
-#[command]
-pub(crate) async fn start_recording<R: Runtime>(app: AppHandle<R>) -> Result<serde_json::Value> {
-    app.mobile_bridge().start_recording()
-}
-
-#[command]
-pub(crate) async fn stop_recording<R: Runtime>(app: AppHandle<R>) -> Result<serde_json::Value> {
-    app.mobile_bridge().stop_recording()
-}
-
-#[command]
 pub(crate) async fn scan_network<R: Runtime>(app: AppHandle<R>) -> Result<Vec<crate::ScanResult>> {
     app.mobile_bridge().scan_network()
 }

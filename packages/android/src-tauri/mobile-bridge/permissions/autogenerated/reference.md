@@ -8,9 +8,6 @@ Default permissions for the mobile bridge plugin
 - `allow-request-permissions`
 - `allow-register-listener`
 - `allow-remove-listener`
-- `allow-is-whisper-ready`
-- `allow-start-recording`
-- `allow-stop-recording`
 - `allow-scan-network`
 - `allow-cancel-scan`
 - `allow-share`
@@ -72,32 +69,6 @@ Enables the check_permissions command without any pre-configured scope.
 <td>
 
 Denies the check_permissions command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`mobile-bridge:allow-is-whisper-ready`
-
-</td>
-<td>
-
-Enables the is_whisper_ready command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`mobile-bridge:deny-is-whisper-ready`
-
-</td>
-<td>
-
-Denies the is_whisper_ready command without any pre-configured scope.
 
 </td>
 </tr>
@@ -228,58 +199,6 @@ Enables the share command without any pre-configured scope.
 <td>
 
 Denies the share command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`mobile-bridge:allow-start-recording`
-
-</td>
-<td>
-
-Enables the start_recording command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`mobile-bridge:deny-start-recording`
-
-</td>
-<td>
-
-Denies the start_recording command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`mobile-bridge:allow-stop-recording`
-
-</td>
-<td>
-
-Enables the stop_recording command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`mobile-bridge:deny-stop-recording`
-
-</td>
-<td>
-
-Denies the stop_recording command without any pre-configured scope.
 
 </td>
 </tr>

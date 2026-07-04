@@ -1,26 +1,14 @@
 package ai.opencode.mobilebridge
 
-import android.Manifest
 import android.app.Activity
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.speech.RecognitionListener
-import android.speech.RecognitionService
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
-import android.util.Log
-import android.webkit.WebView
-import androidx.core.content.ContextCompat
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
-import app.tauri.annotation.Permission
 import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
@@ -32,7 +20,6 @@ import java.net.NetworkInterface
 import java.net.Socket
 import java.net.URL
 import java.util.Collections
-import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
@@ -47,36 +34,10 @@ private data class WifiAddressInfo(val address: String, val prefixLength: Int)
 // UPSTREAM-DIVERGENCE: Prefer Tandem's parallel-install port while keeping opencode scan compatibility.
 private val tandemScanPorts = listOf(4097, 4096)
 
-// UPSTREAM-DIVERGENCE: Some devices (e.g. China-ROM tablets) default to a strict or
-// power-frozen recognizer that never returns results. Prefer a known-good engine,
-// favouring Google's on-device "Speech Services" before the (cloud) Google app.
-// On-device is first so EXTRA_PREFER_OFFLINE + ENABLE_FORMATTING engage the SODA
-// punctuation model; the cloud Google app remains as graceful fallback.
-private val preferredRecognizerPackages = listOf(
-    "com.google.android.tts",
-    "com.google.android.googlequicksearchbox",
-)
-private const val onDeviceRecognizerPackage = "com.google.android.tts"
-private const val voiceLogTag = "TandemVoice"
-
-@TauriPlugin(
-    permissions = [
-        Permission(strings = [Manifest.permission.RECORD_AUDIO], alias = "microphone")
-    ]
-)
-class MobileBridgePlugin(private val activity: Activity) : Plugin(activity), RecognitionListener {
+@TauriPlugin
+class MobileBridgePlugin(private val activity: Activity) : Plugin(activity) {
     private val main = Handler(Looper.getMainLooper())
     private val scanExecutor = Executors.newSingleThreadExecutor()
-
-    private var recognizer: SpeechRecognizer? = null
-    private var usingOnDeviceRecognizer = false
-    private var pendingStop: Invoke? = null
-    private var stopTimeout: Runnable? = null
-    private var latestText = ""
-    private var recording = false
-
-    private var voiceState = "prewarming"
-    private var voiceMessage: String? = null
 
     @Volatile
     private var scanCancelled = false
@@ -87,160 +48,11 @@ class MobileBridgePlugin(private val activity: Activity) : Plugin(activity), Rec
     @Volatile
     private var scanGeneration = 0
 
-    override fun load(webView: WebView) {
-        super.load(webView)
-        setVoiceState("ready")
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         scanCancelled = true
         scanTask?.cancel(true)
         scanExecutor.shutdownNow()
-        recording = false
-        pendingStop = null
-        val timeout = stopTimeout
-        if (timeout != null) {
-            main.removeCallbacks(timeout)
-            stopTimeout = null
-        }
-        try {
-            recognizer?.destroy()
-        } catch (_: Throwable) {
-        }
-        recognizer = null
-    }
-
-    @Command
-    fun isWhisperReady(invoke: Invoke) {
-        invoke.resolve(voicePayload())
-    }
-
-    @Command
-    fun startRecording(invoke: Invoke) {
-        if (recording || pendingStop != null) {
-            invoke.resolve(fail("already_recording", "Voice input is already active."))
-            return
-        }
-
-        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            invoke.resolve(fail("mic_permission_denied", "Microphone permission is required for voice input."))
-            return
-        }
-
-        if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
-            setVoiceState("error", "Speech recognition is unavailable.")
-            invoke.resolve(fail("transcription_unavailable", "Speech recognition is unavailable."))
-            setVoiceState("ready")
-            return
-        }
-
-        try {
-            if (recognizer == null) {
-                val component = pickRecognizer()
-                recognizer = if (component != null) {
-                    SpeechRecognizer.createSpeechRecognizer(activity, component)
-                } else {
-                    SpeechRecognizer.createSpeechRecognizer(activity)
-                }
-                recognizer?.setRecognitionListener(this)
-                usingOnDeviceRecognizer = component?.packageName == onDeviceRecognizerPackage
-                Log.i(voiceLogTag, "Created recognizer component=${component?.flattenToShortString() ?: "<system-default>"} onDevice=$usingOnDeviceRecognizer")
-            }
-
-            latestText = ""
-            recording = true
-            setVoiceState("recording")
-
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                // EXTRA_LANGUAGE expects an IETF BCP-47 tag String (e.g. "en-US"); passing a
-                // Locale object leaves strict engines with a null language and no results.
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                // Only force offline when we picked the on-device engine; otherwise a cloud
-                // engine with no offline model would fail to return results.
-                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, usingOnDeviceRecognizer)
-                // On-device SODA punctuation/casing model; Google gates EXTRA_ENABLE_FORMATTING
-                // to the offline path (discarded when PREFER_OFFLINE=false), so only send it
-                // for the on-device engine. The constants are compile-time strings, so this is
-                // safe below their API 33 introduction (minSdk 24).
-                if (usingOnDeviceRecognizer) {
-                    putExtra(RecognizerIntent.EXTRA_ENABLE_FORMATTING, RecognizerIntent.FORMATTING_OPTIMIZE_QUALITY)
-                    Log.i(voiceLogTag, "Requested ENABLE_FORMATTING=quality (on-device punctuation)")
-                }
-            }
-
-            recognizer?.startListening(intent)
-
-            val ret = JSObject()
-            ret.put("ok", true)
-            invoke.resolve(ret)
-        } catch (_: Throwable) {
-            recording = false
-            setVoiceState("error", "Failed to start speech recognition.")
-            invoke.resolve(fail("recorder_start_failed", "Failed to start microphone recording."))
-            setVoiceState("ready")
-        }
-    }
-
-    @Command
-    fun stopRecording(invoke: Invoke) {
-        if (!recording) {
-            invoke.resolve(stopResult("", "not_recording", "Voice input is not currently recording."))
-            return
-        }
-
-        recording = false
-        pendingStop = invoke
-        setVoiceState("processing")
-
-        try {
-            recognizer?.stopListening()
-        } catch (_: Throwable) {
-            finishStop("", "transcription_failed", "Voice transcription failed.")
-            return
-        }
-
-        val timeout = Runnable {
-            val text = latestText.trim()
-            if (text.isNotEmpty()) {
-                finishStop(text)
-                return@Runnable
-            }
-            finishStop("", "transcription_failed", "Voice transcription failed.")
-        }
-        stopTimeout = timeout
-        main.postDelayed(timeout, 5000)
-    }
-
-    // Choose the most reliable installed RecognitionService instead of the system default,
-    // which on some devices is a strict/frozen vendor engine that never returns results.
-    // Returns null to fall back to the platform default when no preferred engine is present.
-    private fun pickRecognizer(): ComponentName? {
-        val services = try {
-            activity.packageManager.queryIntentServices(
-                Intent(RecognitionService.SERVICE_INTERFACE),
-                0,
-            )
-        } catch (_: Throwable) {
-            return null
-        }
-
-        val available = services
-            .mapNotNull { it.serviceInfo }
-            .associateBy({ it.packageName }, { ComponentName(it.packageName, it.name) })
-
-        Log.i(voiceLogTag, "Available recognizers: ${available.values.joinToString { it.flattenToShortString() }}")
-
-        for (pkg in preferredRecognizerPackages) {
-            available[pkg]?.let {
-                Log.i(voiceLogTag, "Selected recognizer: ${it.flattenToShortString()}")
-                return it
-            }
-        }
-        Log.i(voiceLogTag, "No preferred recognizer found; using system default")
-        return null
     }
 
     @Command
@@ -468,142 +280,4 @@ class MobileBridgePlugin(private val activity: Activity) : Plugin(activity), Rec
     private fun isScanStale(gen: Int): Boolean {
         return scanCancelled || scanGeneration != gen || Thread.currentThread().isInterrupted
     }
-
-    private fun finishStop(text: String, code: String? = null, message: String? = null) {
-        val invoke = pendingStop ?: return
-        pendingStop = null
-
-        val timeout = stopTimeout
-        if (timeout != null) {
-            main.removeCallbacks(timeout)
-            stopTimeout = null
-        }
-
-        if (code == null) {
-            invoke.resolve(stopResult(text))
-            setVoiceState("ready")
-            return
-        }
-
-        invoke.resolve(stopResult(text, code, message))
-        setVoiceState("error", message)
-        setVoiceState("ready")
-    }
-
-    private fun stopResult(text: String, code: String? = null, message: String? = null): JSObject {
-        val ret = JSObject()
-        ret.put("text", text)
-        if (code != null) ret.put("code", code)
-        if (message != null) ret.put("message", message)
-        return ret
-    }
-
-    private fun fail(code: String, message: String): JSObject {
-        val ret = JSObject()
-        ret.put("ok", false)
-        ret.put("code", code)
-        ret.put("message", message)
-        return ret
-    }
-
-    private fun voicePayload(): JSObject {
-        val ret = JSObject()
-        ret.put("state", voiceState)
-        ret.put("ready", voiceState == "ready")
-        if (!voiceMessage.isNullOrEmpty()) ret.put("message", voiceMessage)
-        return ret
-    }
-
-    private fun setVoiceState(state: String, message: String? = null) {
-        voiceState = state
-        voiceMessage = message
-        trigger("voiceState", voicePayload())
-    }
-
-    override fun onReadyForSpeech(params: Bundle?) {}
-
-    override fun onBeginningOfSpeech() {}
-
-    override fun onRmsChanged(rmsdB: Float) {}
-
-    override fun onBufferReceived(buffer: ByteArray?) {}
-
-    override fun onEndOfSpeech() {}
-
-    override fun onError(error: Int) {
-        Log.e(voiceLogTag, "onError raw code=$error (pendingStop=${pendingStop != null}, latestText='${latestText}')")
-        val reason = when (error) {
-            SpeechRecognizer.ERROR_AUDIO -> "Audio recording error."
-            SpeechRecognizer.ERROR_CLIENT -> "Speech recognition client error."
-            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission is required for voice input."
-            SpeechRecognizer.ERROR_NETWORK -> "Network error during speech recognition."
-            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Speech recognition network timeout."
-            SpeechRecognizer.ERROR_NO_MATCH -> "No speech could be recognized."
-            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Speech recognizer is busy."
-            SpeechRecognizer.ERROR_SERVER -> "Speech recognition service error."
-            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech recognition timed out."
-            else -> "Voice transcription failed."
-        }
-
-        if (pendingStop != null) {
-            val text = latestText.trim()
-            if (text.isNotEmpty()) {
-                finishStop(text)
-                return
-            }
-            finishStop("", "transcription_failed", reason)
-            return
-        }
-
-        recording = false
-        setVoiceState("error", reason)
-        setVoiceState("ready")
-    }
-
-    override fun onResults(results: Bundle?) {
-        val text = results
-            ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-            ?.firstOrNull()
-            ?.trim()
-            .orEmpty()
-
-        Log.i(voiceLogTag, "onResults text='${text}'")
-
-        if (pendingStop != null) {
-            val finalText = if (text.isNotEmpty()) text else latestText.trim()
-            if (finalText.isEmpty()) {
-                finishStop("", "transcription_failed", "Voice transcription failed.")
-                return
-            }
-            finishStop(finalText)
-            return
-        }
-
-        if (text.isNotEmpty()) {
-            latestText = text
-            val payload = JSObject()
-            payload.put("text", text)
-            payload.put("isFinal", true)
-            trigger("transcription", payload)
-        }
-
-        recording = false
-        setVoiceState("ready")
-    }
-
-    override fun onPartialResults(partialResults: Bundle?) {
-        val text = partialResults
-            ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-            ?.firstOrNull()
-            ?.trim()
-            .orEmpty()
-        if (text.isEmpty()) return
-        latestText = text
-        val payload = JSObject()
-        payload.put("text", text)
-        payload.put("isFinal", false)
-        trigger("transcription", payload)
-    }
-
-    override fun onEvent(eventType: Int, params: Bundle?) {}
 }

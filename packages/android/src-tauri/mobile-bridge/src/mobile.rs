@@ -19,24 +19,6 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 pub struct MobileBridge<R: Runtime>(PluginHandle<R>);
 
 impl<R: Runtime> MobileBridge<R> {
-    pub fn is_whisper_ready(&self) -> crate::Result<serde_json::Value> {
-        self.0
-            .run_mobile_plugin("isWhisperReady", ())
-            .map_err(Into::into)
-    }
-
-    pub fn start_recording(&self) -> crate::Result<serde_json::Value> {
-        self.0
-            .run_mobile_plugin("startRecording", ())
-            .map_err(Into::into)
-    }
-
-    pub fn stop_recording(&self) -> crate::Result<serde_json::Value> {
-        self.0
-            .run_mobile_plugin("stopRecording", ())
-            .map_err(Into::into)
-    }
-
     pub fn scan_network(&self) -> crate::Result<Vec<ScanResult>> {
         self.0
             .run_mobile_plugin("scanNetwork", ())

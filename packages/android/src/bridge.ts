@@ -1,9 +1,6 @@
 import { addPluginListener, invoke } from "@tauri-apps/api/core"
 
 const commands = {
-  isWhisperReady: "is_whisper_ready",
-  startRecording: "start_recording",
-  stopRecording: "stop_recording",
   scanNetwork: "scan_network",
   cancelScan: "cancel_scan",
   share: "share",

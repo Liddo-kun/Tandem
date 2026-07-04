@@ -1,6 +1,6 @@
 [package]
 name = "tauri-plugin-mobile-bridge"
-description = "Mobile bridge for WhisperCode Android"
+description = "Mobile bridge for Tandem Android"
 version = "0.0.0"
 edition = "2024"
 links = "tauri-plugin-mobile-bridge"

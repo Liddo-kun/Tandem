@@ -8,7 +8,6 @@ type StoreLike = {
   clear: () => Promise<unknown>
   keys: () => Promise<string[]>
   length: () => Promise<number>
-  save: () => Promise<unknown>
 }
 
 const storeCache = new Map<string, Promise<StoreLike>>()
@@ -30,7 +29,6 @@ const createMemoryStore = () => {
     },
     keys: async () => Array.from(data.keys()),
     length: async () => data.size,
-    save: async () => {},
   }
   return store
 }
@@ -55,6 +53,9 @@ export const createTauriStorage = (name = "default.dat") => {
   const cached = apiCache.get(name)
   if (cached) return cached
 
+  // Writes rely on the store plugin's built-in auto-save (100ms debounce); an
+  // explicit save() per write would force an extra IPC round-trip plus a full
+  // file rewrite on every persisted value (e.g. each prompt-draft keystroke).
   const api: AsyncStorage = {
     getItem: async (key: string) => {
       const store = await getStore(name)
@@ -65,17 +66,14 @@ export const createTauriStorage = (name = "default.dat") => {
     setItem: async (key: string, value: string) => {
       const store = await getStore(name)
       await store.set(key, value).catch(() => undefined)
-      await store.save().catch(() => undefined)
     },
     removeItem: async (key: string) => {
       const store = await getStore(name)
       await store.delete(key).catch(() => undefined)
-      await store.save().catch(() => undefined)
     },
     clear: async () => {
       const store = await getStore(name)
       await store.clear().catch(() => undefined)
-      await store.save().catch(() => undefined)
     },
     key: async (index: number) => {
       const store = await getStore(name)

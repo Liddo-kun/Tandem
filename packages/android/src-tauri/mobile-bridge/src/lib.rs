@@ -33,9 +33,6 @@ impl<R: Runtime, T: Manager<R>> crate::MobileBridgeExt<R> for T {
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("mobile-bridge")
         .invoke_handler(tauri::generate_handler![
-            commands::is_whisper_ready,
-            commands::start_recording,
-            commands::stop_recording,
             commands::scan_network,
             commands::cancel_scan,
             commands::share

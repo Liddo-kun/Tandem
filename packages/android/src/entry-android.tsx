@@ -2,34 +2,14 @@
 import { render } from "solid-js/web"
 import { createResource, createSignal, onCleanup, onMount, Show } from "solid-js"
 import { AppBaseProviders, AppInterface, PlatformProvider, ServerConnection, type Platform } from "@opencode-ai/app"
-import { showToast } from "@opencode-ai/ui/toast"
-import { requestPermissions } from "@tauri-apps/api/core"
 import { impactFeedback, notificationFeedback } from "@tauri-apps/plugin-haptics"
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification"
 import { openUrl } from "@tauri-apps/plugin-opener"
 import { Store } from "@tauri-apps/plugin-store"
 import { bridge } from "./bridge"
 import { createTauriStorage } from "./storage"
-import { VoiceInputOverlay } from "./voice-input"
 import { Onboarding } from "./onboarding"
 import pkg from "../package.json"
-
-type VoiceState = "prewarming" | "ready" | "recording" | "processing" | "error"
-type VoiceStatus = {
-  state: VoiceState
-  ready: boolean
-  message?: string
-}
-type VoiceStartResult = {
-  ok: boolean
-  code?: string
-  message?: string
-}
-type VoiceStopResult = {
-  text: string
-  code?: string
-  message?: string
-}
 
 const SETTINGS_STORE = "opencode.settings.dat"
 const DEFAULT_SERVER_URL_KEY = "defaultServerUrl"
@@ -108,8 +88,18 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
 }
 
 let safeAreaProbe: HTMLDivElement | undefined
+// getComputedStyle on the probe forces a style recalc, and visualViewport
+// scroll/resize events fire continuously while the keyboard animates or pans
+// the page. Cache the insets (they only change with system bars/orientation,
+// which always fire a resize) and let resize invalidate the cache.
+let safeAreaCache: { top: number; bottom: number } | undefined
+
+const invalidateSafeArea = () => {
+  safeAreaCache = undefined
+}
 
 const safeAreaInset = () => {
+  if (safeAreaCache) return safeAreaCache
   if (!document.body) return { top: 0, bottom: 0 }
   if (!safeAreaProbe) {
     safeAreaProbe = document.createElement("div")
@@ -118,109 +108,35 @@ const safeAreaInset = () => {
     document.body.append(safeAreaProbe)
   }
   const style = getComputedStyle(safeAreaProbe)
-  return {
+  safeAreaCache = {
     top: Number.parseFloat(style.paddingTop) || 0,
     bottom: Number.parseFloat(style.paddingBottom) || 0,
   }
+  return safeAreaCache
+}
+
+// Only touch the CSS vars when a value actually changed so unchanged scroll
+// events do not invalidate styles on the whole document.
+const appliedViewportVars: Record<string, string> = {}
+const setViewportVar = (name: string, value: string) => {
+  if (appliedViewportVars[name] === value) return
+  appliedViewportVars[name] = value
+  document.documentElement.style.setProperty(name, value)
 }
 
 const syncAndroidViewport = (zoom: number) => {
   const height = window.visualViewport?.height ?? window.innerHeight
   const safeArea = safeAreaInset()
-  document.documentElement.style.setProperty("--android-viewport-height", `${height / zoom}px`)
-  document.documentElement.style.setProperty("--android-safe-area-top", `${safeArea.top / zoom}px`)
-  document.documentElement.style.setProperty("--android-safe-area-bottom", `${safeArea.bottom / zoom}px`)
+  setViewportVar("--android-viewport-height", `${height / zoom}px`)
+  setViewportVar("--android-safe-area-top", `${safeArea.top / zoom}px`)
+  setViewportVar("--android-safe-area-bottom", `${safeArea.bottom / zoom}px`)
 }
 
 const App = () => {
-  const [voice, setVoice] = createSignal<VoiceStatus>({ state: "prewarming", ready: false })
   const [webviewZoom, setWebviewZoomValue] = createSignal(1)
-
-  const emitTranscription = (text: string, isFinal?: boolean) => {
-    if (!text) return
-    window.dispatchEvent(new CustomEvent("opencode:transcription", { detail: { text, isFinal } }))
-  }
 
   const emitResume = () => {
     window.dispatchEvent(new Event("opencode:resume"))
-  }
-
-  const showVoiceError = (message?: string) => {
-    if (!message) return
-    showToast({
-      title: "Voice input failed",
-      description: message,
-      variant: "error",
-    })
-  }
-
-  const normalizeStatus = (value: unknown): VoiceStatus | null => {
-    if (!value || typeof value !== "object") return null
-    const state = (value as { state?: unknown }).state
-    if (
-      state !== "prewarming" &&
-      state !== "ready" &&
-      state !== "recording" &&
-      state !== "processing" &&
-      state !== "error"
-    ) {
-      return null
-    }
-    return {
-      state,
-      ready: (value as { ready?: unknown }).ready === true,
-      message:
-        typeof (value as { message?: unknown }).message === "string"
-          ? (value as { message: string }).message
-          : undefined,
-    }
-  }
-
-  const refreshVoice = async () => {
-    const result = await bridge.sendAsync<VoiceStatus>("isWhisperReady")
-    const status = normalizeStatus(result)
-    if (!status) return
-    setVoice(status)
-  }
-
-  const startVoiceInput = async (): Promise<VoiceStartResult> => {
-    await requestPermissions("mobile-bridge").catch(() => undefined)
-    const result = await bridge.sendAsync<VoiceStartResult>("startRecording")
-    if (result?.ok) {
-      setVoice({ state: "recording", ready: false })
-      return result
-    }
-    const message = result?.message ?? "Voice input is unavailable."
-    showVoiceError(message)
-    await refreshVoice()
-    return {
-      ok: false,
-      code: result?.code ?? "voice_start_failed",
-      message,
-    }
-  }
-
-  const stopVoiceInput = async (): Promise<VoiceStopResult> => {
-    setVoice((value) => (value.state === "recording" ? { ...value, state: "processing", ready: false } : value))
-    const result = await bridge.sendAsync<VoiceStopResult>("stopRecording")
-    if (!result) {
-      const message = "Voice input is unavailable."
-      showVoiceError(message)
-      await refreshVoice()
-      return {
-        text: "",
-        code: "voice_stop_failed",
-        message,
-      }
-    }
-    if (result.code) {
-      showVoiceError(result.message ?? "Voice transcription failed.")
-      await refreshVoice()
-      return result
-    }
-    await refreshVoice()
-    if (result.text) emitTranscription(result.text, true)
-    return result
   }
 
   const setWebviewZoom = (scale: number) => {
@@ -255,9 +171,6 @@ const App = () => {
     restart: async () => window.location.reload(),
     webviewZoom,
     setWebviewZoom,
-    voiceStatus: voice,
-    startVoiceInput,
-    stopVoiceInput,
     haptic: (style: "light" | "medium" | "heavy" | "success" | "warning" | "error") => {
       if (style === "success" || style === "warning" || style === "error") {
         void notificationFeedback(style).catch(() => undefined)
@@ -296,9 +209,12 @@ const App = () => {
 
   onMount(() => {
     document.documentElement.dataset.platform = "android"
-    void refreshVoice()
 
     const syncViewport = () => syncAndroidViewport(webviewZoom())
+    const onResize = () => {
+      invalidateSafeArea()
+      syncViewport()
+    }
     syncViewport()
 
     const handleClick = (event: MouseEvent) => {
@@ -313,47 +229,23 @@ const App = () => {
       emitResume()
     }
 
-    const stopListening = bridge.on("transcription", (payload) => {
-      if (!payload || typeof payload !== "object") return
-      const detail = payload as { text?: string; isFinal?: boolean }
-      if (typeof detail.text !== "string") return
-      emitTranscription(detail.text, detail.isFinal)
-    })
-
-    const stopVoiceState = bridge.on("voiceState", (payload) => {
-      const status = normalizeStatus(payload)
-      if (!status) return
-      setVoice(status)
-      if (status.state === "error") showVoiceError(status.message)
-    })
-
     document.addEventListener("click", handleClick)
-    window.addEventListener("resize", syncViewport)
-    window.visualViewport?.addEventListener("resize", syncViewport)
+    window.addEventListener("resize", onResize)
+    window.visualViewport?.addEventListener("resize", onResize)
     window.visualViewport?.addEventListener("scroll", syncViewport)
     document.addEventListener("visibilitychange", onVisible)
     onCleanup(() => {
       document.removeEventListener("click", handleClick)
-      window.removeEventListener("resize", syncViewport)
-      window.visualViewport?.removeEventListener("resize", syncViewport)
+      window.removeEventListener("resize", onResize)
+      window.visualViewport?.removeEventListener("resize", onResize)
       window.visualViewport?.removeEventListener("scroll", syncViewport)
       document.removeEventListener("visibilitychange", onVisible)
-      stopListening()
-      stopVoiceState()
     })
   })
 
   return (
     <PlatformProvider value={platform}>
       <AppBaseProviders>
-        <VoiceInputOverlay
-          state={() => {
-            const state = voice().state
-            if (state === "recording" || state === "processing") return state
-            return "hidden"
-          }}
-          onStop={() => void stopVoiceInput()}
-        />
         <Show when={!defaultServer.loading}>
           <Show
             when={defaultServer() ?? completedServer()}
