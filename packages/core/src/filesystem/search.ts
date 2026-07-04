@@ -20,9 +20,10 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/FileSystem/Search") {}
 
-export const ripgrepLayer = Layer.effect(
-  Service,
-  Effect.gen(function* () {
+// UPSTREAM-DIVERGENCE: extracted so fffLayer can fall back to the ripgrep
+// implementation when fff cannot index a location (e.g. home directories),
+// instead of silently degrading find/glob/grep to empty results.
+const ripgrepService = Effect.gen(function* () {
     const fs = yield* FSUtil.Service
     const location = yield* Location.Service
     const ripgrep = yield* Ripgrep.Service
@@ -116,8 +117,9 @@ export const ripgrepLayer = Layer.effect(
           })
         }),
     })
-  }),
-)
+  })
+
+export const ripgrepLayer = Layer.effect(Service, ripgrepService)
 
 export const fffLayer = Layer.effect(
   Service,
@@ -135,11 +137,10 @@ export const fffLayer = Layer.effect(
     )
     if (!result?.ok) {
       if (result) yield* Effect.logWarning("failed to initialize fff", { error: result.error })
-      return Service.of({
-        find: () => Effect.succeed([]),
-        glob: () => Effect.succeed([]),
-        grep: () => Effect.succeed([]),
-      })
+      // UPSTREAM-DIVERGENCE: fff refuses to index filesystem roots and home
+      // directories, which is exactly where fresh clients browse for projects.
+      // Fall back to the ripgrep-backed search instead of returning nothing.
+      return yield* ripgrepService
     }
     yield* Effect.addFinalizer(() => Effect.sync(() => result.value.destroy()).pipe(Effect.ignore))
     return Service.of({
