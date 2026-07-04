@@ -19,3 +19,9 @@ tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-store = "2"
 tauri-plugin-mobile-bridge = { path = "mobile-bridge" }
+
+# Smaller, faster native library for release APKs (asset serving + IPC path).
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

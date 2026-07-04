@@ -4,6 +4,9 @@
 //
 //   bun run tandem:tablet                 build the debug APK
 //   bun run tandem:tablet -- --install    build + adb install to the connected device
+//   bun run tandem:tablet -- --release    build a release APK instead (optimized Rust,
+//                                         non-debuggable dex; signed via keystore.properties).
+//                                         First install over a debug build needs --overwrite.
 //   bun run tandem:tablet -- --setup      run the one-time toolchain setup first
 //
 // Toolchain details and rationale: packages/android/apkbuildontablet.md
@@ -23,6 +26,7 @@ const args = process.argv.slice(2)
 let doSetup = false
 let doInstall = false
 let overwrite = false
+let release = false
 let device = process.env["ANDROID_SERIAL"] ?? ""
 
 for (let i = 0; i < args.length; i++) {
@@ -41,6 +45,9 @@ for (let i = 0; i < args.length; i++) {
     case "--overwrite":
       doInstall = true
       overwrite = true
+      break
+    case "--release":
+      release = true
       break
     case "--device":
       device = requireValue(arg, args[++i])
@@ -61,16 +68,29 @@ if (doSetup) await runSetup()
 loadAndroidToolchainEnv()
 await preflight()
 
+const variant = release ? "release" : "debug"
 await runStep(
-  "Android debug APK",
-  [bun, "run", "--cwd", "packages/android", "tauri", "android", "build", "--apk", "--debug", "--target", "aarch64"],
+  `Android ${variant} APK`,
+  [
+    bun,
+    "run",
+    "--cwd",
+    "packages/android",
+    "tauri",
+    "android",
+    "build",
+    "--apk",
+    ...(release ? [] : ["--debug"]),
+    "--target",
+    "aarch64",
+  ],
   path.join(logDir, "android-build.log"),
   /error|fail|exception|warning|building|built|assemble|apk|finished/i,
 )
 
 const apk = path.join(
   root,
-  "packages/android/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk",
+  `packages/android/src-tauri/gen/android/app/build/outputs/apk/universal/${variant}/app-universal-${variant}.apk`,
 )
 if (!existsSync(apk)) throw new Error(`Build reported success but APK is missing: ${apk}`)
 console.log(`\nAPK: ${apk}`)
@@ -222,6 +242,8 @@ Options:
   --setup        Run the one-time toolchain setup (script/setup-tablet-android.sh) first
   --install      adb install -r the APK after building
   --overwrite    Like --install, but uninstall a signature-mismatched app first (erases its data)
+  --release      Build the release APK (optimized Rust, non-debuggable dex, keystore signing).
+                 Switching between debug and release signatures needs --overwrite once.
   --device <s>   Target ADB serial (else auto: connects 127.0.0.1:5555 / LAN, prefers loopback)
   -h, --help     Show this help
 
