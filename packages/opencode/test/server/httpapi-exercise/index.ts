@@ -1608,6 +1608,36 @@ const scenarios: Scenario[] = [
         }),
       "status",
     ),
+  // UPSTREAM-DIVERGENCE: Tandem /compact-image. The fixture session is far below the
+  // imaging minimums and the test model is not allowlisted, so this exercises the
+  // deterministic refusal path (no LLM, no state change).
+  http.protected
+    .post("/session/{sessionID}/compact-image", "session.compact_image")
+    .preserveDatabase()
+    .seeded((ctx) =>
+      Effect.gen(function* () {
+        const session = yield* ctx.session({ title: "Compact image session" })
+        yield* ctx.message(session.id, { text: "image-compact this work" })
+        return session
+      }),
+    )
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/compact-image", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: { providerID: "test", modelID: "test-model" },
+    }))
+    .json(
+      200,
+      (body) => {
+        object(body)
+        check(body.ok === false, "compact-image should refuse for a non-allowlisted model")
+        check(
+          typeof body.message === "string" && body.message.length > 0,
+          "compact-image refusal should carry a message",
+        )
+      },
+      "status",
+    ),
   http.protected
     .post("/session/{sessionID}/revert", "session.revert")
     .mutating()

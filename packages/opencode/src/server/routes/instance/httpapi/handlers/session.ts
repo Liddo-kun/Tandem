@@ -7,6 +7,7 @@ import { Permission } from "@/permission"
 import { SessionShare } from "@/share/session"
 import { Session } from "@/session/session"
 import { SessionCompaction } from "@/session/compaction"
+import { SessionCompactionImage } from "@/session/compaction-image/compaction-image"
 import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
 import { SessionRevert } from "@/session/revert"
@@ -24,6 +25,7 @@ import { HttpApiBuilder, HttpApiError, HttpApiSchema } from "effect/unstable/htt
 import { InstanceHttpApi } from "../api"
 import {
   CommandPayload,
+  CompactImagePayload,
   DiffQuery,
   ForkPayload,
   InitPayload,
@@ -52,6 +54,8 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const promptSvc = yield* SessionPrompt.Service
     const revertSvc = yield* SessionRevert.Service
     const compactSvc = yield* SessionCompaction.Service
+    // UPSTREAM-DIVERGENCE: Tandem /compact-image.
+    const compactImageSvc = yield* SessionCompactionImage.Service
     const runState = yield* SessionRunState.Service
     const agentSvc = yield* Agent.Service
     const permissionSvc = yield* Permission.Service
@@ -292,6 +296,25 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       return true
     })
 
+    // UPSTREAM-DIVERGENCE: Tandem /compact-image (image-based context compaction).
+    const compactImage = Effect.fn("SessionHttpApi.compactImage")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: typeof CompactImagePayload.Type
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      const messages = yield* SessionError.mapStorageNotFound(session.messages({ sessionID: ctx.params.sessionID }))
+      const defaultAgent = yield* agentSvc.defaultAgent()
+      const currentAgent = messages.findLast((message) => message.info.role === "user")?.info.agent ?? defaultAgent
+      return yield* SessionError.mapStorageNotFound(
+        compactImageSvc.run({
+          sessionID: ctx.params.sessionID,
+          providerID: ctx.payload.providerID,
+          modelID: ctx.payload.modelID,
+          agent: currentAgent,
+        }),
+      )
+    })
+
     const prompt = Effect.fn("SessionHttpApi.prompt")(function* (ctx: {
       params: { sessionID: SessionID }
       payload: typeof PromptPayload.Type
@@ -428,6 +451,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("share", share)
       .handle("unshare", unshare)
       .handle("summarize", summarize)
+      .handle("compactImage", compactImage)
       .handle("prompt", prompt)
       .handle("promptAsync", promptAsync)
       .handle("command", command)

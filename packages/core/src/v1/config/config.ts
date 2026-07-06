@@ -161,6 +161,19 @@ export const Info = Schema.Struct({
       reserved: Schema.optional(NonNegativeInt).annotate({
         description: "Token buffer for compaction. Leaves enough window to avoid overflow during compaction.",
       }),
+      // UPSTREAM-DIVERGENCE: Tandem image-based compaction (/compact-image) settings.
+      image: Schema.optional(
+        Schema.Struct({
+          models: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
+            description:
+              "Model ID substrings allowed to trigger /compact-image (models that read dense transcript pages reliably). Default: claude-fable-5",
+          }),
+          discard_on_summary: Schema.optional(Schema.Boolean).annotate({
+            description:
+              "Allow manual /compact to proceed when it would discard imaged transcript pages from context (default: false)",
+          }),
+        }),
+      ),
     }),
   ),
   experimental: Schema.optional(

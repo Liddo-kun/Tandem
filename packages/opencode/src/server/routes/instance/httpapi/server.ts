@@ -29,6 +29,7 @@ import { ProviderAuth } from "@/provider/auth"
 import { Provider } from "@/provider/provider"
 import { Question } from "@/question"
 import { SessionCompaction } from "@/session/compaction"
+import { SessionCompactionImage } from "@/session/compaction-image/compaction-image"
 import { Instruction } from "@/session/instruction"
 import { LLM } from "@/session/llm"
 import { SessionProcessor } from "@/session/processor"
@@ -241,6 +242,8 @@ const app = LayerNode.group([
   SessionRunState.node,
   SessionProcessor.node,
   SessionCompaction.node,
+  // UPSTREAM-DIVERGENCE: Tandem /compact-image (image-based context compaction).
+  SessionCompactionImage.node,
   SessionRevert.node,
   SessionSummary.node,
   SessionPrompt.node,

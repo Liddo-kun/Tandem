@@ -374,6 +374,33 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     })
   }
 
+  // UPSTREAM-DIVERGENCE: Tandem /compact-image (image-based context compaction).
+  const compactImage = async () => {
+    const sessionID = params.id
+    if (!sessionID) return
+
+    const model = local.model.current()
+    if (!model) {
+      showToast({
+        title: language.t("toast.model.none.title"),
+        description: language.t("toast.model.none.description"),
+      })
+      return
+    }
+
+    const result = await sdk().client.session.compactImage({
+      sessionID,
+      modelID: model.id,
+      providerID: model.provider.id,
+    })
+    if (result.data && !result.data.ok) {
+      showToast({
+        title: language.t("command.session.compactImage"),
+        description: result.data.message,
+      })
+    }
+  }
+
   const fork = () => {
     void openDialog(
       () => import("@/components/dialog-fork"),
@@ -442,6 +469,15 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       slash: "compact",
       disabled: !params.id || visibleUserMessages().length === 0,
       onSelect: compact,
+    }),
+    // UPSTREAM-DIVERGENCE: Tandem /compact-image.
+    sessionCommand({
+      id: "session.compactImage",
+      title: language.t("command.session.compactImage"),
+      description: language.t("command.session.compactImage.description"),
+      slash: "compact-image",
+      disabled: !params.id || visibleUserMessages().length === 0,
+      onSelect: compactImage,
     }),
     sessionCommand({
       id: "session.fork",

@@ -186,6 +186,13 @@ bun typecheck
 
 Use `packages/opencode` when the batch touches server, Effect, CLI, tests, providers, LSP, sync, tools, or generated SDK/server code. Use `packages/plugin` when `packages/plugin` changes. Use app/ui/android/ios package checks when those packages change.
 
+If the batch touches `packages/opencode/src/session/*` (compaction, message-v2, prompt, session internals), also run the Tandem image-compaction tripwire tests — they pin upstream session behaviors that `/compact-image` depends on semantically, so a merge can pass typecheck yet silently break the feature:
+
+```sh
+# from packages/opencode
+bun test test/session/compaction-image.test.ts test/session/message-v2.test.ts --timeout 30000
+```
+
 ## Final Report
 
 After each batch, report briefly: the batch theme and commits, every conflicted file with its resolution, and remaining commits against `<sync-target>`.

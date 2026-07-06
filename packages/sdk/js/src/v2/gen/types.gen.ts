@@ -2012,6 +2012,10 @@ export type Config = {
     tail_turns?: number
     preserve_recent_tokens?: number
     reserved?: number
+    image?: {
+      models?: Array<string>
+      discard_on_summary?: boolean
+    }
   }
   experimental?: {
     disable_paste_summary?: boolean
@@ -2540,6 +2544,11 @@ export type NotFoundError = {
   data: {
     message: string
   }
+}
+
+export type CompactImageResult = {
+  ok: boolean
+  message: string
 }
 
 export type TextPartInput = {
@@ -10132,6 +10141,43 @@ export type SessionSummarizeResponses = {
 }
 
 export type SessionSummarizeResponse = SessionSummarizeResponses[keyof SessionSummarizeResponses]
+
+export type SessionCompactImageData = {
+  body?: {
+    providerID: string
+    modelID: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/compact-image"
+}
+
+export type SessionCompactImageErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type SessionCompactImageError = SessionCompactImageErrors[keyof SessionCompactImageErrors]
+
+export type SessionCompactImageResponses = {
+  /**
+   * Image compaction result
+   */
+  200: CompactImageResult
+}
+
+export type SessionCompactImageResponse = SessionCompactImageResponses[keyof SessionCompactImageResponses]
 
 export type SessionPromptAsyncData = {
   body?: {

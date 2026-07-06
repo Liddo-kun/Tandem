@@ -67,6 +67,15 @@ export const SummarizePayload = Schema.Struct({
   modelID: ModelV2.ID,
   auto: Schema.optional(Schema.Boolean),
 })
+// UPSTREAM-DIVERGENCE: Tandem /compact-image (image-based context compaction).
+export const CompactImagePayload = Schema.Struct({
+  providerID: ProviderV2.ID,
+  modelID: ModelV2.ID,
+})
+export const CompactImageResult = Schema.Struct({
+  ok: Schema.Boolean,
+  message: Schema.String,
+}).annotate({ identifier: "CompactImageResult" })
 export const PromptPayload = Schema.Struct(Struct.omit(SessionPrompt.PromptInput.fields, ["sessionID"]))
 export const CommandPayload = Schema.Struct(Struct.omit(SessionPrompt.CommandInput.fields, ["sessionID"]))
 export const ShellPayload = Schema.Struct(Struct.omit(SessionPrompt.ShellInput.fields, ["sessionID"]))
@@ -92,6 +101,8 @@ export const SessionPaths = {
   share: `${root}/:sessionID/share`,
   init: `${root}/:sessionID/init`,
   summarize: `${root}/:sessionID/summarize`,
+  // UPSTREAM-DIVERGENCE: Tandem /compact-image.
+  compactImage: `${root}/:sessionID/compact-image`,
   prompt: `${root}/:sessionID/message`,
   promptAsync: `${root}/:sessionID/prompt_async`,
   command: `${root}/:sessionID/command`,
@@ -311,6 +322,21 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.summarize",
             summary: "Summarize session",
             description: "Generate a concise summary of the session using AI compaction to preserve key information.",
+          }),
+        ),
+        // UPSTREAM-DIVERGENCE: Tandem /compact-image (image-based context compaction).
+        HttpApiEndpoint.post("compactImage", SessionPaths.compactImage, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: CompactImagePayload,
+          success: described(CompactImageResult, "Image compaction result"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.compact_image",
+            summary: "Image-compact session",
+            description:
+              "Compact the session's older history into dense transcript-page images (optical compaction) instead of a model-written summary.",
           }),
         ),
         HttpApiEndpoint.post("prompt", SessionPaths.prompt, {

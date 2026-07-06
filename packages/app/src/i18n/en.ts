@@ -84,6 +84,8 @@ export const dict = {
   "command.session.redo.description": "Redo the last undone message",
   "command.session.compact": "Compact session",
   "command.session.compact.description": "Summarize the session to reduce context size",
+  "command.session.compactImage": "Image-compact session",
+  "command.session.compactImage.description": "Render older turns into dense transcript images to reduce context size",
   "command.session.fork": "Fork from message",
   "command.session.fork.description": "Create a new session from a previous message",
   "command.session.share": "Share session",

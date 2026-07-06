@@ -42,6 +42,8 @@ import { Collapsible } from "@opencode-ai/ui/collapsible"
 import { FileIcon } from "@opencode-ai/ui/file-icon"
 import { Icon } from "@opencode-ai/ui/icon"
 import { ToolErrorCard } from "./tool-error-card"
+// UPSTREAM-DIVERGENCE: Tandem /compact-image collapsed page block.
+import { ImagedContextBlock, isImagedContext } from "./imaged-context"
 import { Checkbox } from "@opencode-ai/ui/checkbox"
 import { DiffChanges } from "@opencode-ai/ui/diff-changes"
 import { Markdown } from "./markdown"
@@ -1230,9 +1232,16 @@ export function UserMessageDisplay(props: {
       .finally(() => setState("busy", false))
   }
 
+  // UPSTREAM-DIVERGENCE: Tandem /compact-image — pages collapse to one block
+  // (component lives fork-owned in imaged-context.tsx).
+  const imagedContext = createMemo(() => isImagedContext(props.parts, attachments()))
+
   return (
     <div data-component="user-message" data-timeline-part-id={textPart()?.id}>
-      <Show when={attachments().length > 0}>
+      <Show when={imagedContext()}>
+        <ImagedContextBlock pages={attachments()} onPreview={openImagePreview} />
+      </Show>
+      <Show when={!imagedContext() && attachments().length > 0}>
         <div data-slot="user-message-attachments">
           <For each={attachments()}>
             {(file) => {

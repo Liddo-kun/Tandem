@@ -11,6 +11,8 @@ import { Agent } from "@/agent/agent"
 import { Plugin } from "@/plugin"
 import { Config } from "@/config/config"
 import { NotFoundError } from "@/storage/storage"
+// UPSTREAM-DIVERGENCE: Tandem /compact-image (guard used in processCompaction below).
+import { SessionCompactionImage } from "./compaction-image/compaction-image"
 
 import { Effect, Layer, Context } from "effect"
 import { InstanceState } from "@/effect/instance-state"
@@ -334,6 +336,21 @@ const layer = Layer.effect(
       const prior = completedCompactions(history)
       const hidden = new Set(prior.flatMap((item) => [item.userIndex, item.assistantIndex]))
       const previousSummary = prior.at(-1)?.summary
+      // UPSTREAM-DIVERGENCE: Tandem /compact-image interplay guard — refuses manual /compact
+      // that would silently drop imaged transcript pages. Logic lives fork-owned in
+      // compaction-image.ts (summaryGuard); merges only need to re-insert this call site.
+      const imagedGuard = SessionCompactionImage.summaryGuard({
+        history,
+        prior,
+        input,
+        cfg,
+        model,
+        ctx: yield* InstanceState.context,
+      })
+      if (imagedGuard) {
+        yield* session.updateMessage(imagedGuard)
+        return "stop"
+      }
       const selected = yield* select({
         messages: history.filter((_, index) => !hidden.has(index)),
         cfg,

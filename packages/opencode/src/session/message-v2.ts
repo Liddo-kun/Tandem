@@ -1,4 +1,6 @@
 import { SessionID, MessageID } from "./schema"
+// UPSTREAM-DIVERGENCE: Tandem /compact-image marker (dependency-free leaf, no cycle).
+import { PART_MARKER } from "./compaction-image/marker"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import {
@@ -226,10 +228,15 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
         }
 
         if (part.type === "compaction") {
-          userMessage.parts.push({
-            type: "text",
-            text: "What did we do so far?",
-          })
+          // UPSTREAM-DIVERGENCE: image compactions (compaction-image.ts) attach their own
+          // banner/pages/pointer parts to this message, so the legacy filler question is
+          // only injected when the compaction part is the message's sole content.
+          const imaged = msg.parts.some((p) => p.type === "text" && p.metadata?.[PART_MARKER] !== undefined)
+          if (!imaged)
+            userMessage.parts.push({
+              type: "text",
+              text: "What did we do so far?",
+            })
         }
         if (part.type === "subtask") {
           userMessage.parts.push({

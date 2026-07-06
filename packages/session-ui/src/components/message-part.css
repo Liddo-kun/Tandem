@@ -72,6 +72,38 @@
     margin-left: auto;
   }
 
+  /* UPSTREAM-DIVERGENCE: Tandem /compact-image collapsed page block. */
+  [data-slot="user-message-imaged-context"] {
+    width: 100%;
+    border-radius: 6px;
+    border: 0.5px solid var(--v2-border-border-base);
+    background: var(--v2-background-bg-layer-02);
+    padding: 4px 8px;
+
+    summary {
+      cursor: pointer;
+      font-size: var(--font-size-small, 12px);
+      color: var(--text-weak);
+      user-select: none;
+    }
+
+    [data-slot="user-message-imaged-pages"] {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    [data-slot="user-message-imaged-page"] {
+      width: 100%;
+      height: auto;
+      border: 0.5px solid var(--v2-border-border-base);
+      border-radius: 4px;
+      cursor: pointer;
+      background: white;
+    }
+  }
+
   [data-slot="user-message-attachment"] {
     display: flex;
     flex-direction: column;

@@ -10,3 +10,6 @@
 
 packages/core/migration/**/snapshot.json linguist-generated
 packages/core/src/database/migration.gen.ts linguist-generated
+
+# Vendored ~4MB base64 glyph atlas (generated in pxpipe); keep it out of diffs/PR views.
+packages/opencode/src/session/compaction-image/atlas-gray.ts -diff linguist-generated
