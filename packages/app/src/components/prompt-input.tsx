@@ -237,6 +237,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   let scrollRef!: HTMLDivElement
   let slashPopoverRef!: HTMLDivElement
   let restoreEndOnFocus = true
+  let savedCursor: number | null = null
 
   const mirror = { input: false }
   const inset = 56
@@ -622,7 +623,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const restoreFocus = () => {
     requestAnimationFrame(() => {
-      const cursor = prompt.cursor() ?? promptLength(prompt.current())
+      const cursor = savedCursor ?? prompt.cursor() ?? promptLength(prompt.current())
       editorRef.focus()
       setCursorPosition(editorRef, cursor)
       queueScroll()
@@ -659,6 +660,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const isImeComposing = (event: KeyboardEvent) => event.isComposing || composing() || event.keyCode === 229
 
   const handleBlur = () => {
+    savedCursor = currentCursor()
     closePopover()
     setComposing(false)
   }
