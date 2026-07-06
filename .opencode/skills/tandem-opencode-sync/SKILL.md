@@ -140,6 +140,8 @@ Keep the user in the loop. Resolve silently only when absolutely sure, meaning a
 - The resolution does not change behavior on either side beyond what upstream intends.
 - No mobile/compatibility-contract surface is affected (API shapes, platform contract, WebView/keyboard behavior).
 
+Generated SDK/OpenAPI files (`packages/sdk/openapi.json`, `packages/sdk/js/src/v2/gen/*`, `packages/client/src/generated*`) are never hand-merged: take the upstream side, then regenerate from repo root (`bun ./script/generate.ts`; `bun run generate` from `packages/client` when its API changed) so any Tandem-only endpoints are re-emitted.
+
 For everything else — ambiguous intent, overlapping behavior changes, a Tandem customization that may be obsolete, or any judgment call about dropping fork behavior — stop and present the conflict to the user before resolving: the file, both sides' intent, and a recommended resolution with reasoning.
 
 Even for silently resolved conflicts, list each conflicted file and the chosen resolution in the batch report so nothing is resolved invisibly.
