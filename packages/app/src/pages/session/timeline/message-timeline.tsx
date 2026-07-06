@@ -1447,18 +1447,14 @@ export function MessageTimeline(props: {
                             setTitle({ pendingShare: true, menuOpen: false })
                           }}
                         >
-                          <DropdownMenu.ItemLabel>
-                            {language.t("session.share.action.share")}
-                          </DropdownMenu.ItemLabel>
+                          <DropdownMenu.ItemLabel>{language.t("session.share.action.share")}</DropdownMenu.ItemLabel>
                         </DropdownMenu.Item>
                       </Show>
                       <DropdownMenu.Item onSelect={() => void archiveSession(id)}>
                         <DropdownMenu.ItemLabel>{language.t("common.archive")}</DropdownMenu.ItemLabel>
                       </DropdownMenu.Item>
                       <DropdownMenu.Separator />
-                      <DropdownMenu.Item
-                        onSelect={() => setTitle({ pendingDelete: id, menuOpen: false })}
-                      >
+                      <DropdownMenu.Item onSelect={() => setTitle({ pendingDelete: id, menuOpen: false })}>
                         <DropdownMenu.ItemLabel>{language.t("common.delete")}</DropdownMenu.ItemLabel>
                       </DropdownMenu.Item>
                     </DropdownMenu.Content>
@@ -1535,9 +1531,7 @@ export function MessageTimeline(props: {
                         {language.t("session.share.action.share")}...
                       </MenuV2.Item>
                     </Show>
-                    <MenuV2.Item onSelect={() => void archiveSession(id)}>
-                      {language.t("common.archive")}
-                    </MenuV2.Item>
+                    <MenuV2.Item onSelect={() => void archiveSession(id)}>{language.t("common.archive")}</MenuV2.Item>
                     <MenuV2.Separator />
                     <MenuV2.Item onSelect={() => setTitle({ pendingDelete: id, menuOpen: false })}>
                       {language.t("common.delete")}...
@@ -1587,9 +1581,7 @@ export function MessageTimeline(props: {
                     fallback={
                       <div class="flex flex-col p-3">
                         <div class="flex flex-col gap-1">
-                          <div class="text-13-medium text-text-strong">
-                            {language.t("session.share.popover.title")}
-                          </div>
+                          <div class="text-13-medium text-text-strong">{language.t("session.share.popover.title")}</div>
                           <div class="text-12-regular text-text-weak">
                             {shareUrl()
                               ? language.t("session.share.popover.description.shared")

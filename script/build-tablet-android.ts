@@ -110,7 +110,8 @@ async function preflight() {
   const problems: string[] = []
   if (!existsSync(path.join(os.homedir(), ".cargo/bin/cargo")) && !which("cargo")) problems.push("rust/cargo")
   if (!which("java")) problems.push("java (JDK 17)")
-  if (!process.env["NDK_HOME"] || !existsSync(process.env["NDK_HOME"])) problems.push("Android NDK under ~/Android/Sdk/ndk")
+  if (!process.env["NDK_HOME"] || !existsSync(process.env["NDK_HOME"]))
+    problems.push("Android NDK under ~/Android/Sdk/ndk")
   const aapt2 = firstAapt2(sdk)
   if (!aapt2) problems.push("arm64 build-tools (aapt2)")
 
@@ -193,7 +194,13 @@ async function runStep(name: string, command: string[], log: string, filter: Reg
   console.log(`Full log: ${log}`)
   const out = createWriteStream(log, { flags: "w" })
   out.write(`$ ${command.join(" ")}\n\n`)
-  const proc = Bun.spawn(command, { cwd: root, env: { ...process.env }, stdin: "inherit", stdout: "pipe", stderr: "pipe" })
+  const proc = Bun.spawn(command, {
+    cwd: root,
+    env: { ...process.env },
+    stdin: "inherit",
+    stdout: "pipe",
+    stderr: "pipe",
+  })
   const [code] = await Promise.all([proc.exited, pipe(proc.stdout, out, filter), pipe(proc.stderr, out, filter)])
   await new Promise<void>((resolve, reject) => out.end((e: Error | null | undefined) => (e ? reject(e) : resolve())))
   if (code !== 0) throw new Error(`${name} failed with exit code ${code}. See ${log}`)
@@ -218,7 +225,11 @@ async function pipe(stream: ReadableStream<Uint8Array> | null, out: NodeJS.Writa
 
 async function capture(command: string[]) {
   const proc = Bun.spawn(command, { cwd: root, env: { ...process.env }, stdout: "pipe", stderr: "pipe" })
-  const [code, stdout, stderr] = await Promise.all([proc.exited, new Response(proc.stdout).text(), new Response(proc.stderr).text()])
+  const [code, stdout, stderr] = await Promise.all([
+    proc.exited,
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ])
   return { code, stdout, stderr }
 }
 

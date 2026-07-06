@@ -175,7 +175,11 @@ function withFallback<T>(read: () => T | undefined, fallback: T) {
 function normalizeDisplayScale(value: number | undefined) {
   if (typeof value !== "number" || !Number.isFinite(value)) return displayScaleDefault
   const clamped = Math.min(displayScaleMax, Math.max(displayScaleMin, value))
-  return Math.round((displayScaleMin + Math.round((clamped - displayScaleMin) / displayScaleStep) * displayScaleStep) * 100) / 100
+  return (
+    Math.round(
+      (displayScaleMin + Math.round((clamped - displayScaleMin) / displayScaleStep) * displayScaleStep) * 100,
+    ) / 100
+  )
 }
 
 export const { use: useSettings, provider: SettingsProvider } = createSimpleContext({
@@ -230,9 +234,7 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         setStore(
           "appearance",
           "displayScale",
-          normalizeDisplayScale(
-            normalizeDisplayScale(store.appearance?.displayScale) + direction * displayScaleStep,
-          ),
+          normalizeDisplayScale(normalizeDisplayScale(store.appearance?.displayScale) + direction * displayScaleStep),
         )
       }
       window.addEventListener("opencode:hardware-zoom", onHardwareZoom)

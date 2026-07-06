@@ -3,6 +3,7 @@
 Status: ready to execute. Author handoff for another agent; results reviewed afterward.
 
 Repos involved:
+
 - `~/Tandem` — opencode fork (primary changes).
 - `~/opencode-anthropic-auth` — the `@ex-machina/opencode-anthropic-auth` OAuth plugin fork (trim only).
 
@@ -31,7 +32,7 @@ original response.
 ```
 
 It is intermittent because it only fires when the model quotes one of those snake_case
-tokens *inside its reasoning* — most often when asked to read/analyze a Claude Code prompt
+tokens _inside its reasoning_ — most often when asked to read/analyze a Claude Code prompt
 dump (dense with quoted snake_case tool params) or during edit-heavy turns. The same
 rewrite also silently corrupts the model's visible output and tool-result display, which
 can make the model think its environment is broken (e.g. spamming `echo hello`).
@@ -52,9 +53,10 @@ these are present before starting; build on them, don't duplicate:
   from the `system` array (`prompt.ts:1455`) and injected into the first user message.
 - **`anthropic.txt` `# Harness` rewrite**: `packages/opencode/src/session/prompt/anthropic.txt`
   already opens with the official identity (`You are Claude Code, Anthropic's official CLI for
-  Claude.`) and contains NO `OpenCode` / `opencode.ai/docs` / `github.com/anomalyco` anchors.
+Claude.`) and contains NO `OpenCode` / `opencode.ai/docs` / `github.com/anomalyco` anchors.
 
 Consequences for the plugin's current behavior (relevant to trimming it):
+
 - The plugin's `prependClaudeCodeIdentity` is already a **no-op** — the
   `CLAUDE_CODE_OFFICIAL_IDENTITY` detection (added in plugin commit `e51ae1b`) sees the official
   identity in `anthropic.txt` and does not prepend the Agent SDK identity.
@@ -105,7 +107,9 @@ these rather than adding a new pass.
 ## Item 1 — Source-side tool name + parameter mapping (essential)
 
 ### `packages/opencode/src/provider/transform.ts`
+
 Port from the plugin's `src/transform.ts` (commit `e51ae1b`):
+
 - `TOOL_NAME_TO_CLAUDE_CODE` + reverse map.
 - `TOOL_INPUT_TO_CLAUDE_CODE` (`edit`/`read`/`write` key maps) + reverse map.
 - `toClaudeCodeToolName` / `fromClaudeCodeToolName` (keep `StructuredOutput` passthrough and
@@ -113,9 +117,10 @@ Port from the plugin's `src/transform.ts` (commit `e51ae1b`):
   `rewriteJsonSchemaKeys`, `rewriteDescriptionKeys`.
 
 Add exports:
+
 - `toolsToClaudeCode(tools, model)` — rename `name`, rewrite `inputSchema` keys + `description`.
   **Verify the LanguageModelV2 tool part shape** (`{ type: "function", name, description,
-  inputSchema }`) for the installed `ai` version first.
+inputSchema }`) for the installed `ai` version first.
 
 **`eager_input_streaming` — probably nothing to do.** This is an Anthropic tool-def flag the
 `@ai-sdk/anthropic` provider only adds when `providerOptions.anthropic.eagerInputStreaming` is
@@ -126,12 +131,14 @@ absent, drop it from this plan. If present, do NOT re-add a strip — instead en
 `eagerInputStreaming` is left unset/false so the SDK never adds it (cleaner than stripping a
 field after the fact). It does not affect the thinking bug or tool correctness; it's purely
 Claude Code fingerprint matching.
+
 - Extend the **claude branch** in `message()` / `normalizeMessages()` to rename historical
   tool parts to Claude shape: assistant `tool-call` parts (`toolName` → Claude name,
   `input` keys → snake_case) and `tool-result` parts (`toolName` → Claude name). Keeps stored
   history consistent with the renamed tool definitions.
 
 ### `packages/opencode/src/session/llm.ts` (middleware ~311-329)
+
 - In `transformParams`, after the existing prompt rewrite, also rename `args.params.tools`
   via `ProviderTransform.toolsToClaudeCode(...)` (gated — see Gating).
 - Add response remapping to the **same middleware** via `wrapStream` (and `wrapGenerate` for
@@ -157,6 +164,7 @@ body or the response stream at all. All tool + system shaping lives in Tandem so
 and 3).
 
 ### `~/opencode-anthropic-auth/src/transform.ts`
+
 - Delete the response-stream rewriting: `createStrippedStream`, `stripToolPrefix`.
 - Delete the body-rewriting: `rewriteRequestBody`, `prefixToolNames`, `prependClaudeCodeIdentity`,
   `sanitizeSystemText`, and all the tool-name/tool-input/JSON-schema helpers + tables.
@@ -166,20 +174,24 @@ and 3).
   `isInsecure`.
 
 ### `~/opencode-anthropic-auth/src/index.ts`
+
 - Stop wrapping the response: `return response` instead of `createStrippedStream(response)`.
 - Remove the `rewriteRequestBody(body)` call; send `init.body` through unchanged.
 
 ### Delete entirely
+
 - `~/opencode-anthropic-auth/src/cch.ts` (ported to source in Item 3).
 - The cch / identity / anchor / text-replacement constants in `src/constants.ts` that are no
   longer referenced (keep `CLIENT_ID`, OAuth URLs/scopes, `REQUIRED_BETAS`, `USER_AGENT`).
 
 ### Keep in plugin (the auth bones)
+
 OAuth flow, token refresh/retry, `setOAuthHeaders` (authorization/anthropic-beta/user-agent,
 `x-api-key` delete), `mergeBetaHeaders`, `rewriteUrl` (`?beta=true` + `ANTHROPIC_BASE_URL`
 override), `isInsecure`, cost zeroing.
 
 ### Tests
+
 Remove now-dead cases + snapshots in `src/tests/transform.test.ts` and `src/tests/cch.test.ts`
 for deleted functions; keep auth/header/url tests.
 
@@ -205,12 +217,12 @@ above, so what remains is:
    insert it as the **first** `system` block.
    - **Locate the base-prompt assembly first.** The `system` array at `prompt.ts:1455` is only
      `[...env, ...skills]`; the `anthropic.txt` base/identity block is prepended elsewhere (trace
-     `handle.process` / the model prompt loader). The billing block must end up *before* the
+     `handle.process` / the model prompt loader). The billing block must end up _before_ the
      `anthropic.txt` block so the final order matches what the plugin produces today:
      `[billing, anthropic.txt(identity+harness), env, skills]`. Report the assembly site before
      editing — do not guess.
    - **Hash-input subtlety:** the plugin computes the hash from the first user message's first
-     text block *as sent*. Because the instruction `<system-reminder>` is unshifted to the front
+     text block _as sent_. Because the instruction `<system-reminder>` is unshifted to the front
      of the first user message (`prompt.ts:1444`), that block is currently the hash input. Decide
      deliberately whether to hash the system-reminder block (preserves current plugin behavior)
      or the real user text, and document the choice. Safest default: preserve current behavior.
@@ -251,6 +263,7 @@ Claude requests fall back to the AI SDK path where the disguise works. It only m
 plain-API-key Claude with the experimental flag on.
 
 **Required action (not optional):** document this gap explicitly so it is not a silent divergence.
+
 - Add a clear note to `~/Tandem/log.md` (and a one-line pointer in `context.md` if appropriate)
   stating: the Claude Code tool/param disguise and response remap are applied **only on the AI SDK
   runtime**, NOT on the experimental native runtime; native Claude (API-key) requests are
@@ -289,5 +302,6 @@ plain-API-key Claude with the experimental flag on.
 4. Item 3 as a separate follow-up once 1+2 are confirmed stable.
 
 ## Hand back for review
+
 Diffs in `transform.ts` + `llm.ts`, the trimmed plugin `transform.ts`/`index.ts`, the new
 tests, `bun typecheck` output, and the result of the prompt-dump repro on the tablet.

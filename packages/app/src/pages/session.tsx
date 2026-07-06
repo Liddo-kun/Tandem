@@ -639,8 +639,8 @@ export default function Page() {
       ["session-vcs", sdk().directory, sync().data.vcs?.branch ?? "", sync().data.vcs?.default_branch ?? ""] as const,
   )
   const fallbackGitDiff = async () => {
-    const status = await sdk().client.file
-      .status()
+    const status = await sdk()
+      .client.file.status()
       .then((result) => result.data ?? [])
       .catch(() => [])
     if (setReviewLimit("git", status.length)) return []
@@ -666,8 +666,8 @@ export default function Page() {
           }
         }
 
-        const content = await sdk().client.file
-          .read({ path: item.path })
+        const content = await sdk()
+          .client.file.read({ path: item.path })
           .then((result) => result.data)
           .catch(() => undefined)
         if (!content || content.type !== "text") return

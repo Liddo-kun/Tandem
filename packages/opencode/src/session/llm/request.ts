@@ -87,10 +87,7 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
   ]
     .filter((x) => x)
     .join("\n")
-  const system = [
-    ...(billingHeader ? [billingHeader] : []),
-    ...(baseSystem ? [baseSystem] : []),
-  ]
+  const system = [...(billingHeader ? [billingHeader] : []), ...(baseSystem ? [baseSystem] : [])]
 
   const header = system[0]
   yield* input.plugin.trigger(

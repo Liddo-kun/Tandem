@@ -114,8 +114,33 @@ if (!packageOnly && !skipAndroid) {
   steps.push({
     name: debugAndroid ? "Android debug APK" : "Android release APK/AAB",
     command: debugAndroid
-      ? [bun, "run", "--cwd", "packages/android", "tauri", "android", "build", "--apk", "--debug", "--target", "aarch64"]
-      : [bun, "run", "--cwd", "packages/android", "tauri", "android", "build", "--apk", "--aab", "--target", "aarch64", "--ci"],
+      ? [
+          bun,
+          "run",
+          "--cwd",
+          "packages/android",
+          "tauri",
+          "android",
+          "build",
+          "--apk",
+          "--debug",
+          "--target",
+          "aarch64",
+        ]
+      : [
+          bun,
+          "run",
+          "--cwd",
+          "packages/android",
+          "tauri",
+          "android",
+          "build",
+          "--apk",
+          "--aab",
+          "--target",
+          "aarch64",
+          "--ci",
+        ],
     log: path.join(logDir, "android-build.log"),
     filter: androidFilter,
   })
@@ -198,10 +223,14 @@ Examples:
 async function preflightReleaseInputs() {
   const missing: string[] = []
   if (!hasForwarded("--ios-ipa") && !(await hasStandardIosIpa())) {
-    missing.push("signed iOS .ipa under packages/ios/build, packages/ios/dist, packages/ios/export, or --ios-ipa <path>")
+    missing.push(
+      "signed iOS .ipa under packages/ios/build, packages/ios/dist, packages/ios/export, or --ios-ipa <path>",
+    )
   }
   if (missing.length > 0) {
-    throw new Error(`Missing release input(s):\n- ${missing.join("\n- ")}\nUse --allow-partial only for local/test builds.`)
+    throw new Error(
+      `Missing release input(s):\n- ${missing.join("\n- ")}\nUse --allow-partial only for local/test builds.`,
+    )
   }
 }
 
@@ -224,7 +253,9 @@ async function preflightAndroidInstall() {
     .filter(([serial, state]) => serial && state === "device")
 
   if (devices.length !== 1) {
-    throw new Error(`--install-android requires exactly one connected ADB device, or set ANDROID_SERIAL.\nadb devices output:\n${stdout.trim()}`)
+    throw new Error(
+      `--install-android requires exactly one connected ADB device, or set ANDROID_SERIAL.\nadb devices output:\n${stdout.trim()}`,
+    )
   }
 }
 
@@ -262,7 +293,11 @@ async function run(step: RunStep) {
     stderr: "pipe",
   })
 
-  const [code] = await Promise.all([proc.exited, pipe(proc.stdout, log, step.filter), pipe(proc.stderr, log, step.filter)])
+  const [code] = await Promise.all([
+    proc.exited,
+    pipe(proc.stdout, log, step.filter),
+    pipe(proc.stderr, log, step.filter),
+  ])
   await new Promise<void>((resolve, reject) => {
     log.end((error: Error | null | undefined) => (error ? reject(error) : resolve()))
   })
@@ -339,7 +374,8 @@ function defaultLogDir() {
 
 async function defaultReleaseVersion() {
   const pkg = await Bun.file(path.join(root, "packages/opencode/package.json")).json()
-  if (!pkg.version) throw new Error("packages/opencode/package.json does not contain a version. Pass --version <version>.")
+  if (!pkg.version)
+    throw new Error("packages/opencode/package.json does not contain a version. Pass --version <version>.")
   return String(pkg.version)
 }
 

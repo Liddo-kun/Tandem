@@ -32,7 +32,13 @@ export function VoiceInputOverlay(props: {
               </>
             )}
           </div>
-          <Button type="button" variant="primary" class="h-8 px-3" onClick={() => props.onStop()} disabled={processing()}>
+          <Button
+            type="button"
+            variant="primary"
+            class="h-8 px-3"
+            onClick={() => props.onStop()}
+            disabled={processing()}
+          >
             <div class="flex items-center gap-2">
               <Icon name="stop" class="size-4.5" />
               <span>{processing() ? language.t("voice.processingShort") : language.t("voice.stop")}</span>

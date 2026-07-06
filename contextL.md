@@ -8,7 +8,7 @@ Build and maintain one personal repo, `Tandem`, based on current official OpenCo
 
 Use `log.md` as the exhaustive final-state inventory of Tandem changes relative to official OpenCode. This file explains how to work in this repo from Ubuntu/Linux/proot; it should not become a skipped-commit ledger or merge-history log.
 
-`log.md` is a final-state inventory of Tandem's *divergence from upstream*, not a per-change changelog. Update it only when a change alters that divergence surface: it modifies an upstream-shared file, or adds/removes/retargets a fork-owned file a future merge must account for. When it applies, revise the existing entry to describe the new current state — do not append changelog-style "also changed X" bullets. A change confined to already fork-owned code that leaves the divergence surface unchanged (e.g. tuning an existing Tandem-only plugin or tool) is documented in that feature's own doc (e.g. `PromptEnhance.md`), not `log.md`. Always read `log.md` before changing opencode, the web UI, or the mobile apps.
+`log.md` is a final-state inventory of Tandem's _divergence from upstream_, not a per-change changelog. Update it only when a change alters that divergence surface: it modifies an upstream-shared file, or adds/removes/retargets a fork-owned file a future merge must account for. When it applies, revise the existing entry to describe the new current state — do not append changelog-style "also changed X" bullets. A change confined to already fork-owned code that leaves the divergence surface unchanged (e.g. tuning an existing Tandem-only plugin or tool) is documented in that feature's own doc (e.g. `PromptEnhance.md`), not `log.md`. Always read `log.md` before changing opencode, the web UI, or the mobile apps.
 
 See `PromptEnhance.md` for the built-in prompt-corrector/RePrompt plugin (a Tandem personal enhancement): what it corrects, how it works, and its env-var configuration.
 
@@ -79,7 +79,7 @@ whisper  = Whispercode
 - Desktop prebuild runs `packages/opencode/script/build-node.ts`; `packages/desktop/src/main/sidecar.ts` imports that node bundle through `virtual:opencode-server`, sets Basic auth/CORS, runs migrations, and starts `Server.listen`.
 - Web UI data flow is `AppInterface` -> `ServerProvider` -> `GlobalSDKProvider`/`GlobalSyncProvider`; server keys, project lists, and health polling live in `packages/app/src/context/server.tsx`.
 - Session UI flow is `packages/app/src/pages/session.tsx` for data orchestration, resume refresh, review/diff limits, tabs, and terminal panel; `SessionComposerRegion` for the bottom dock; `PromptInput` for editor behavior, attachments, slash/at popovers, voice, history, and submit.
- - Tool display flow is `SessionTurn` -> `message-part.tsx` `PART_MAPPING["tool"]` -> `ToolRegistry.render(...)`; shared compact trigger/collapse UI belongs in `basic-tool.tsx` and `basic-tool.css`, not one-off tool renderers.
+- Tool display flow is `SessionTurn` -> `message-part.tsx` `PART_MAPPING["tool"]` -> `ToolRegistry.render(...)`; shared compact trigger/collapse UI belongs in `basic-tool.tsx` and `basic-tool.css`, not one-off tool renderers.
 
 ## V2 Session Core
 

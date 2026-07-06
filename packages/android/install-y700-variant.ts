@@ -20,8 +20,30 @@ const TARGETS = new Set<Target>(["aarch64", "armv7", "i686", "x86_64"])
 const decoder = new TextDecoder()
 const scriptDir = import.meta.dir
 const buildGradle = path.join(scriptDir, "src-tauri", "gen", "android", "app", "build.gradle.kts")
-const stringsXml = path.join(scriptDir, "src-tauri", "gen", "android", "app", "src", "main", "res", "values", "strings.xml")
-const apkDir = path.join(scriptDir, "src-tauri", "gen", "android", "app", "build", "outputs", "apk", "universal", "debug")
+const stringsXml = path.join(
+  scriptDir,
+  "src-tauri",
+  "gen",
+  "android",
+  "app",
+  "src",
+  "main",
+  "res",
+  "values",
+  "strings.xml",
+)
+const apkDir = path.join(
+  scriptDir,
+  "src-tauri",
+  "gen",
+  "android",
+  "app",
+  "build",
+  "outputs",
+  "apk",
+  "universal",
+  "debug",
+)
 const sourceApk = path.join(apkDir, "app-universal-debug.apk")
 
 const options = parseArgs(process.argv.slice(2))
@@ -70,10 +92,15 @@ async function main() {
     await setVariantMetadata()
 
     console.log(`Building ${appName} (${packageId}); log: ${buildLog}`)
-    await runLoggedCommand(buildLog, "bun", ["run", "tauri", "android", "build", "--apk", "--debug", "--target", options.target], {
-      cwd: scriptDir,
-      env: { OPENCODE_ANDROID_VARIANT: "1" },
-    })
+    await runLoggedCommand(
+      buildLog,
+      "bun",
+      ["run", "tauri", "android", "build", "--apk", "--debug", "--target", options.target],
+      {
+        cwd: scriptDir,
+        env: { OPENCODE_ANDROID_VARIANT: "1" },
+      },
+    )
 
     if (!(await Bun.file(sourceApk).exists())) throw new Error(`Build finished but APK was not found: ${sourceApk}`)
 
@@ -172,21 +199,30 @@ async function resolveDevice({ device, deviceRetryDelaySeconds, deviceRetrySecon
       if (state.exitCode === 0 && state.stdout.trim() === "device") return requested
 
       if (strict && Date.now() >= deadline) {
-        throw new Error(`Device '${requested}' is not connected after ${deviceRetrySeconds} seconds. Run 'adb devices' and pass -Device <serial>.`)
+        throw new Error(
+          `Device '${requested}' is not connected after ${deviceRetrySeconds} seconds. Run 'adb devices' and pass -Device <serial>.`,
+        )
       }
     }
 
     const devices = getConnectedDevices()
     if (devices.length === 1 && !strict) {
-      if (requested && requested !== devices[0]) console.log(`Configured device '${requested}' is unavailable. Using connected device '${devices[0]}'.`)
+      if (requested && requested !== devices[0])
+        console.log(`Configured device '${requested}' is unavailable. Using connected device '${devices[0]}'.`)
       return devices[0]!
     }
 
-    if (devices.length > 1) throw new Error(`Multiple Android devices found: ${devices.join(", ")}. Pass -Device <serial>.`)
+    if (devices.length > 1)
+      throw new Error(`Multiple Android devices found: ${devices.join(", ")}. Pass -Device <serial>.`)
 
     if (Date.now() >= deadline) {
-      if (strict) throw new Error(`Device '${requested}' is not connected after ${deviceRetrySeconds} seconds. Run 'adb devices' and pass -Device <serial>.`)
-      throw new Error(`No connected Android devices found after ${deviceRetrySeconds} seconds. Connect the Y700 or pass -Device <serial>.`)
+      if (strict)
+        throw new Error(
+          `Device '${requested}' is not connected after ${deviceRetrySeconds} seconds. Run 'adb devices' and pass -Device <serial>.`,
+        )
+      throw new Error(
+        `No connected Android devices found after ${deviceRetrySeconds} seconds. Connect the Y700 or pass -Device <serial>.`,
+      )
     }
 
     console.log(`Waiting for Android device (${attempt}). Retrying in ${deviceRetryDelaySeconds} seconds...`)
@@ -288,7 +324,8 @@ async function runLoggedCommand(
   await rm(logPath, { force: true })
 
   const log = createWriteStream(logPath, { flags: "a" })
-  const progressPattern = /(^\s*(\$|error|failed|exception|warning|building|built|compiling|finished|installing|success|created apk|restored|generated|info using|\[incubating\]|deprecated gradle|problems report)|apk|assemble)/i
+  const progressPattern =
+    /(^\s*(\$|error|failed|exception|warning|building|built|compiling|finished|installing|success|created apk|restored|generated|info using|\[incubating\]|deprecated gradle|problems report)|apk|assemble)/i
   let lastOutput = Date.now()
   let lastNotice = Date.now()
   let timeoutError: Error | undefined
@@ -304,7 +341,9 @@ async function runLoggedCommand(
     if (options.noOutputTimeoutSeconds !== 0) {
       const idleSeconds = (Date.now() - lastOutput) / 1000
       if (idleSeconds >= options.noOutputTimeoutSeconds) {
-        timeoutError = new Error(`Command produced no output for ${options.noOutputTimeoutSeconds} seconds and was stopped. See log: ${logPath}`)
+        timeoutError = new Error(
+          `Command produced no output for ${options.noOutputTimeoutSeconds} seconds and was stopped. See log: ${logPath}`,
+        )
         child.kill()
         return
       }
@@ -337,7 +376,12 @@ async function runLoggedCommand(
   }
 }
 
-async function pipeProgress(stream: ReadableStream<Uint8Array>, log: NodeJS.WritableStream, progressPattern: RegExp, markOutput: () => void) {
+async function pipeProgress(
+  stream: ReadableStream<Uint8Array>,
+  log: NodeJS.WritableStream,
+  progressPattern: RegExp,
+  markOutput: () => void,
+) {
   const reader = stream.getReader()
   const streamDecoder = new TextDecoder()
   let pending = ""

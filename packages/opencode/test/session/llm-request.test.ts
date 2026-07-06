@@ -23,7 +23,14 @@ describe("LLMRequestPrep.prepare - Claude Code system shaping", () => {
             npm: "@ai-sdk/anthropic",
           },
           name: "Claude 3.5 Sonnet",
-          capabilities: { temperature: false, reasoning: false, input: {}, output: {}, toolcall: true, attachment: false },
+          capabilities: {
+            temperature: false,
+            reasoning: false,
+            input: {},
+            output: {},
+            toolcall: true,
+            attachment: false,
+          },
           cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
           limit: { context: 200000, output: 8192 },
           status: "active",
@@ -43,9 +50,7 @@ describe("LLMRequestPrep.prepare - Claude Code system shaping", () => {
       } as any),
     )
 
-    expect(prepared.system[0]).toBe(
-      "x-anthropic-billing-header: cc_version=2.1.159.a3f; cc_entrypoint=cli; cch=4ffc3;",
-    )
+    expect(prepared.system[0]).toBe("x-anthropic-billing-header: cc_version=2.1.159.a3f; cc_entrypoint=cli; cch=4ffc3;")
     expect(prepared.system[1]).toStartWith("You are Claude Code, Anthropic's official CLI for Claude.")
     expect(prepared.system[1]).toContain("Environment context you are running in:")
   })

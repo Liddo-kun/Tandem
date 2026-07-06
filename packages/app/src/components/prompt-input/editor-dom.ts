@@ -117,7 +117,8 @@ export function getDeleteWordRange(value: string, range?: { start: number; end: 
   }
 
   const pos = Math.max(0, Math.min(range?.start ?? value.length, value.length))
-  const span = pos > 0 && pos < value.length && !gap(value[pos - 1]) && !gap(value[pos]) ? word(value, pos) : left(value, pos)
+  const span =
+    pos > 0 && pos < value.length && !gap(value[pos - 1]) && !gap(value[pos]) ? word(value, pos) : left(value, pos)
   if (!span) return null
 
   let end = span.end

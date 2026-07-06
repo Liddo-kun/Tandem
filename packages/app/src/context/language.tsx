@@ -120,7 +120,9 @@ const base = withBrandOverrides(i18n.flatten({ ...en, ...uiEn }) as Dictionary)
 const dicts = new Map<Locale, Dictionary>([["en", base]])
 
 const merge = (app: Promise<Source>, ui: Promise<Source>) =>
-  Promise.all([app, ui]).then(([a, b]) => withBrandOverrides({ ...base, ...i18n.flatten({ ...a.dict, ...b.dict }) } as Dictionary))
+  Promise.all([app, ui]).then(([a, b]) =>
+    withBrandOverrides({ ...base, ...i18n.flatten({ ...a.dict, ...b.dict }) } as Dictionary),
+  )
 
 const loaders: Record<Exclude<Locale, "en">, () => Promise<Dictionary>> = {
   zh: () => merge(import("@/i18n/zh"), import("@opencode-ai/ui/i18n/zh")),

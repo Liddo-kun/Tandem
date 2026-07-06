@@ -257,8 +257,8 @@ The full `session.diff` event behavior appears to be upstream OpenCode behavior,
 Read-only check against `upstream/dev` showed upstream also has this pattern in `packages/opencode/src/session/summary.ts`:
 
 ```ts
-yield* storage.write(["session_diff", input.sessionID], diffs).pipe(Effect.ignore)
-yield* bus.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: diffs })
+yield * storage.write(["session_diff", input.sessionID], diffs).pipe(Effect.ignore)
+yield * bus.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: diffs })
 ```
 
 And upstream also defines `Session.Event.Diff` with the full diff array in `packages/opencode/src/session/session.ts`:

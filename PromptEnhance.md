@@ -57,7 +57,7 @@ plugin hooks:
   are retained (older ones pruned).
 - **`experimental.chat.system.transform`** — fully **replaces** the corrector
   session's system prompt with the correction instruction. (A prompt body's
-  `system` field only *appends* to the agent prompt, so replacement via this
+  `system` field only _appends_ to the agent prompt, so replacement via this
   hook is what makes the spawned session behave as a pure text corrector instead
   of running as the real coding agent.)
 - **`experimental.chat.messages.transform`** — performs the model-only RePrompt
@@ -151,16 +151,16 @@ state they were written with.
 
 ## Configuration (environment variables)
 
-| Variable | Default | Effect |
-|---|---|---|
-| `TANDEM_PROMPT_CORRECTOR` | on | Master switch; `0`/`false`/`off`/`no` disables the whole feature. Always off for the `tandem run` CLI command (see Notes). |
-| `TANDEM_PROMPT_CORRECTOR_MAX` | 600 | Max characters to send to the corrector; longer prompts skip correction entirely. `0` = no cap. |
-| `TANDEM_PROMPT_CORRECTOR_MODEL` | unset | Personal per-install model override for the corrector only, as `providerID/modelID` (e.g. `deepseek/deepseek-v4-pro`). Bypasses `small_model` and the priority fallback; other cheap-model tasks are unaffected. |
-| `TANDEM_PROMPT_CORRECTOR_VARIANT` | unset | Model variant name passed with every corrector prompt (e.g. a config-defined reasoning-disabled variant). Must be a variant the resolved model actually defines. Useful to stop a "thinking" model from reasoning about a copy edit — see below. |
-| `TANDEM_PROMPT_CORRECTOR_DEBUG` | off | Keeps the throwaway corrector sessions (visible in the session list) for inspection. |
-| `TANDEM_PROMPT_CORRECTOR_DEBUG_KEEP` | 2 | In debug mode, retain only this many newest corrector sessions (older ones pruned). `0` = keep all. |
-| `TANDEM_PROMPT_CORRECTOR_REPROMPT_MAX` | 300 | Max characters for RePrompt; `0` disables RePrompt (server-wide; see also the per-client live toggle above). |
-| `TANDEM_PROMPT_CORRECTOR_REPROMPT_MIN` | 10 | Min characters for RePrompt. |
+| Variable                               | Default | Effect                                                                                                                                                                                                                                           |
+| -------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `TANDEM_PROMPT_CORRECTOR`              | on      | Master switch; `0`/`false`/`off`/`no` disables the whole feature. Always off for the `tandem run` CLI command (see Notes).                                                                                                                       |
+| `TANDEM_PROMPT_CORRECTOR_MAX`          | 600     | Max characters to send to the corrector; longer prompts skip correction entirely. `0` = no cap.                                                                                                                                                  |
+| `TANDEM_PROMPT_CORRECTOR_MODEL`        | unset   | Personal per-install model override for the corrector only, as `providerID/modelID` (e.g. `deepseek/deepseek-v4-pro`). Bypasses `small_model` and the priority fallback; other cheap-model tasks are unaffected.                                 |
+| `TANDEM_PROMPT_CORRECTOR_VARIANT`      | unset   | Model variant name passed with every corrector prompt (e.g. a config-defined reasoning-disabled variant). Must be a variant the resolved model actually defines. Useful to stop a "thinking" model from reasoning about a copy edit — see below. |
+| `TANDEM_PROMPT_CORRECTOR_DEBUG`        | off     | Keeps the throwaway corrector sessions (visible in the session list) for inspection.                                                                                                                                                             |
+| `TANDEM_PROMPT_CORRECTOR_DEBUG_KEEP`   | 2       | In debug mode, retain only this many newest corrector sessions (older ones pruned). `0` = keep all.                                                                                                                                              |
+| `TANDEM_PROMPT_CORRECTOR_REPROMPT_MAX` | 300     | Max characters for RePrompt; `0` disables RePrompt (server-wide; see also the per-client live toggle above).                                                                                                                                     |
+| `TANDEM_PROMPT_CORRECTOR_REPROMPT_MIN` | 10      | Min characters for RePrompt.                                                                                                                                                                                                                     |
 
 ## Files / divergence
 

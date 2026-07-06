@@ -102,7 +102,11 @@ export function ContextTokenButton(props: {
   // count = token-count color, ttl = countdown color (differ only between the v2 and legacy themes).
   const tone = createMemo(() =>
     props.legacy
-      ? { button: "text-13-regular text-text-weak hover:text-text-base", count: "text-text-base", ttl: "text-text-weak" }
+      ? {
+          button: "text-13-regular text-text-weak hover:text-text-base",
+          count: "text-text-base",
+          ttl: "text-text-weak",
+        }
       : {
           button: "text-[13px] font-[440] leading-4 text-v2-text-text-muted hover:text-v2-text-text-base",
           count: "text-v2-text-text-faint",
@@ -126,10 +130,11 @@ export function ContextTokenButton(props: {
           class="[grid-area:1/1] transition-opacity duration-[400ms] [transform:translateZ(0)]"
           classList={{ "opacity-0": cachePulse() }}
         >
-          <span>Context: </span>
           <span class={tone().count}>{contextTokenLabel()}</span>
           <span>t</span>
-          <Show when={cacheCountdownLabel()}>{(label) => <span class={`ml-2 ${tone().ttl}`}>TTL: {label()}</span>}</Show>
+          <Show when={cacheCountdownLabel()}>
+            {(label) => <span class={`ml-2 ${tone().ttl}`}>TTL: {label()}</span>}
+          </Show>
         </span>
         <span
           class="[grid-area:1/1] transition-opacity duration-[400ms] [transform:translateZ(0)]"

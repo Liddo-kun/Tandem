@@ -64,7 +64,10 @@ async function patchBuildGradle() {
     text
       .replace(/applicationId\s*=\s*"[^"]+"/, `applicationId = "${config.identifier ?? "app.liddokun.tandem"}"`)
       // UPSTREAM-DIVERGENCE: Android release APKs must connect to LAN HTTP Tandem/opencode servers.
-      .replace(/manifestPlaceholders\["usesCleartextTraffic"\]\s*=\s*"[^"]+"/, `manifestPlaceholders["usesCleartextTraffic"] = "true"`),
+      .replace(
+        /manifestPlaceholders\["usesCleartextTraffic"\]\s*=\s*"[^"]+"/,
+        `manifestPlaceholders["usesCleartextTraffic"] = "true"`,
+      ),
   )
 }
 
@@ -72,10 +75,7 @@ function patchReleaseSigning(text: string) {
   const propertiesMarker = `val releaseKeystorePropertiesFile = file("../../../../keystore.properties")`
   const signingMarker = `signingConfigs {`
 
-  let updated = text.replace(
-    `val releaseKeystorePropertiesFile = file("../keystore.properties")`,
-    propertiesMarker,
-  )
+  let updated = text.replace(`val releaseKeystorePropertiesFile = file("../keystore.properties")`, propertiesMarker)
   if (!updated.includes(propertiesMarker)) {
     updated = updated.replace(
       /(val tauriProperties = Properties\(\)\.apply \{[\s\S]*?\n\})/,
@@ -174,7 +174,10 @@ async function patchStrings() {
     stringsPath,
     text
       .replace(/<string name="app_name">[^<]*<\/string>/, `<string name="app_name">${appName}</string>`)
-      .replace(/<string name="main_activity_title">[^<]*<\/string>/, `<string name="main_activity_title">${title}</string>`),
+      .replace(
+        /<string name="main_activity_title">[^<]*<\/string>/,
+        `<string name="main_activity_title">${title}</string>`,
+      ),
   )
 }
 

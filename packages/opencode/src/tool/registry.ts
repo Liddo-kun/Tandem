@@ -248,7 +248,6 @@ const layer = Layer.effect(
       return (yield* all()).map((tool) => tool.id)
     })
 
-
     const describeTask = Effect.fn("ToolRegistry.describeTask")(function* (agent: Agent.Info) {
       const items = (yield* agents.list()).filter((item) => item.mode !== "primary")
       const filtered = items.filter(

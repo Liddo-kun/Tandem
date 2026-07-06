@@ -136,7 +136,9 @@ describe("ClaudeCodeToolDisguise", () => {
 
     // task -> Agent: every "Task tool" mention becomes "Agent tool".
     expect(result[0].name).toBe("Agent")
-    expect(result[0].description).toBe("When using the Agent tool, specify subagent_type. When NOT to use the Agent tool: ...")
+    expect(result[0].description).toBe(
+      "When using the Agent tool, specify subagent_type. When NOT to use the Agent tool: ...",
+    )
     // glob: description rewritten despite having no param keyMap.
     expect(result[1].name).toBe("Glob")
     expect(result[1].description).toBe("...use the Agent tool instead for open-ended search.")
@@ -147,9 +149,9 @@ describe("ClaudeCodeToolDisguise", () => {
   })
 
   test("round-trips same-concept param keys back to opencode names", () => {
-    expect(ClaudeCodeToolDisguise.toolCallFromClaudeCode("Grep", JSON.stringify({ pattern: "x", glob: "*.ts" }))).toEqual(
-      { toolName: "grep", input: JSON.stringify({ pattern: "x", include: "*.ts" }) },
-    )
+    expect(
+      ClaudeCodeToolDisguise.toolCallFromClaudeCode("Grep", JSON.stringify({ pattern: "x", glob: "*.ts" })),
+    ).toEqual({ toolName: "grep", input: JSON.stringify({ pattern: "x", include: "*.ts" }) })
     expect(ClaudeCodeToolDisguise.toolCallFromClaudeCode("Skill", JSON.stringify({ skill: "docx" }))).toEqual({
       toolName: "skill",
       input: JSON.stringify({ name: "docx" }),
@@ -176,7 +178,9 @@ describe("ClaudeCodeToolDisguise", () => {
       },
       {
         role: "tool",
-        content: [{ type: "tool-result", toolCallId: "toolu_1", toolName: "edit", output: { type: "text", value: "ok" } }],
+        content: [
+          { type: "tool-result", toolCallId: "toolu_1", toolName: "edit", output: { type: "text", value: "ok" } },
+        ],
       },
     ] as any
 

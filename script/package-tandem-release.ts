@@ -93,7 +93,10 @@ const checksumEntries = [
   ...artifacts.map((artifact) => ({ name: path.basename(artifact.output), sha256: artifact.sha256 })),
   { name: path.basename(manifestPath), sha256: await sha256File(manifestPath) },
 ].sort((a, b) => a.name.localeCompare(b.name))
-await Bun.write(path.join(outDir, "SHA256SUMS"), checksumEntries.map((entry) => `${entry.sha256}  ${entry.name}`).join("\n") + "\n")
+await Bun.write(
+  path.join(outDir, "SHA256SUMS"),
+  checksumEntries.map((entry) => `${entry.sha256}  ${entry.name}`).join("\n") + "\n",
+)
 
 if (installWindows) await installWindowsBinary()
 if (installAndroid) await installAndroidApk()
@@ -109,7 +112,9 @@ if (missing.length > 0) {
 async function stageCliArtifacts() {
   const dist = path.join(root, "packages/opencode/dist")
   if (!(await isDirectory(dist))) {
-    missing.push("CLI: build first with `bun run --cwd packages/opencode build` or `bun run --cwd packages/opencode build --single`.")
+    missing.push(
+      "CLI: build first with `bun run --cwd packages/opencode build` or `bun run --cwd packages/opencode build --single`.",
+    )
     return
   }
 
@@ -172,7 +177,9 @@ async function stageIosArtifacts() {
   }
 
   if (candidates.size === 0) {
-    missing.push("iOS: export a signed .ipa into packages/ios/build, packages/ios/dist, packages/ios/export, or pass --ios-ipa <path>.")
+    missing.push(
+      "iOS: export a signed .ipa into packages/ios/build, packages/ios/dist, packages/ios/export, or pass --ios-ipa <path>.",
+    )
     return
   }
 
@@ -195,9 +202,11 @@ async function stageFile(kind: ArtifactKind, source: string, requestedName: stri
 async function installWindowsBinary() {
   if (process.platform !== "win32") throw new Error("--install-windows can only run on Windows.")
   const source = path.join(outDir, "tandem-windows-x64.exe")
-  if (!(await exists(source))) throw new Error("--install-windows requires tandem-windows-x64.exe. Build the Windows x64 CLI first.")
+  if (!(await exists(source)))
+    throw new Error("--install-windows requires tandem-windows-x64.exe. Build the Windows x64 CLI first.")
   const target = "C:\\Program_Files\\tandem.exe"
-  if (!(await isDirectory(path.dirname(target)))) throw new Error(`Install parent does not exist: ${path.dirname(target)}`)
+  if (!(await isDirectory(path.dirname(target))))
+    throw new Error(`Install parent does not exist: ${path.dirname(target)}`)
   await fs.copyFile(source, target)
   console.log(`Installed ${target}`)
 }
@@ -229,13 +238,18 @@ async function uploadReleaseFiles(tag: string, repo: string | undefined) {
 
 function mobileName(prefix: string, file: string) {
   const parsed = path.parse(file)
-  let stem = parsed.name.replace(/^app[-_]?/i, "").replace(/^opencode[-_]?/i, "").replace(/^tandem[-_]?/i, "")
+  let stem = parsed.name
+    .replace(/^app[-_]?/i, "")
+    .replace(/^opencode[-_]?/i, "")
+    .replace(/^tandem[-_]?/i, "")
   stem = sanitize(stem)
   return stem ? `${prefix}-${stem}${parsed.ext.toLowerCase()}` : `${prefix}${parsed.ext.toLowerCase()}`
 }
 
 function isDebugAndroidArtifact(file: string) {
-  return file.replaceAll("\\", "/").toLowerCase().includes("/debug/") || path.basename(file).toLowerCase().includes("debug")
+  return (
+    file.replaceAll("\\", "/").toLowerCase().includes("/debug/") || path.basename(file).toLowerCase().includes("debug")
+  )
 }
 
 function isUnsignedAndroidArtifact(file: string) {
@@ -277,7 +291,10 @@ function uniqueName(name: string) {
 }
 
 function sanitize(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
 }
 
 async function globFiles(cwd: string, patterns: string[]) {
@@ -316,7 +333,9 @@ async function isDirectory(file: string) {
 }
 
 async function sha256File(file: string) {
-  return createHash("sha256").update(await fs.readFile(file)).digest("hex")
+  return createHash("sha256")
+    .update(await fs.readFile(file))
+    .digest("hex")
 }
 
 function has(name: string) {

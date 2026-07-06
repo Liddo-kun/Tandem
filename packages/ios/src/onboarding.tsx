@@ -164,11 +164,17 @@ export function Onboarding(props: { onComplete: (server: ServerConfig) => void }
             </p>
           </div>
           <div class="flex flex-col gap-3 w-full">
-            <a href={TANDEM_RELEASES_URL} class="external-link flex items-center justify-center gap-2 w-full px-4 py-3 rounded-md bg-surface-raised-base text-text-strong text-14-regular hover:bg-surface-base-hover transition-colors">
+            <a
+              href={TANDEM_RELEASES_URL}
+              class="external-link flex items-center justify-center gap-2 w-full px-4 py-3 rounded-md bg-surface-raised-base text-text-strong text-14-regular hover:bg-surface-base-hover transition-colors"
+            >
               <span>Tandem releases</span>
               <Icon name="square-arrow-top-right" size="small" />
             </a>
-            <a href={OPENCODE_DOCS_URL} class="external-link flex items-center justify-center gap-2 w-full px-4 py-3 rounded-md bg-surface-raised-base text-text-strong text-14-regular hover:bg-surface-base-hover transition-colors">
+            <a
+              href={OPENCODE_DOCS_URL}
+              class="external-link flex items-center justify-center gap-2 w-full px-4 py-3 rounded-md bg-surface-raised-base text-text-strong text-14-regular hover:bg-surface-base-hover transition-colors"
+            >
               <span>OpenCode docs</span>
               <Icon name="square-arrow-top-right" size="small" />
             </a>
@@ -225,7 +231,14 @@ export function Onboarding(props: { onComplete: (server: ServerConfig) => void }
             </p>
           </div>
 
-          <Button variant="secondary" size="large" class="w-full" icon="magnifying-glass" onClick={startScan} disabled={store.scanning}>
+          <Button
+            variant="secondary"
+            size="large"
+            class="w-full"
+            icon="magnifying-glass"
+            onClick={startScan}
+            disabled={store.scanning}
+          >
             {store.scanning ? "Scanning..." : "Scan Network"}
           </Button>
 

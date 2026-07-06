@@ -226,7 +226,12 @@ const App = () => {
     else await credentialStorage.removeItem("username")
     if (server.password) await credentialStorage.setItem("password", server.password)
     else await credentialStorage.removeItem("password")
-    setCompletedServer({ url: normalized, displayName: server.displayName, username: server.username, password: server.password })
+    setCompletedServer({
+      url: normalized,
+      displayName: server.displayName,
+      username: server.username,
+      password: server.password,
+    })
   }
 
   onMount(() => {
@@ -315,15 +320,15 @@ const App = () => {
   return (
     <PlatformProvider value={platform}>
       <AppBaseProviders>
-                    <VoiceInputOverlay
-                      state={() => {
-                        const state = voice().state
-                        if (state === "recording" || state === "processing") return state
-                        return "hidden"
-                      }}
-                      speechLabel={speechLabel}
-                      onStop={() => void stopVoiceInput()}
-                    />
+        <VoiceInputOverlay
+          state={() => {
+            const state = voice().state
+            if (state === "recording" || state === "processing") return state
+            return "hidden"
+          }}
+          speechLabel={speechLabel}
+          onStop={() => void stopVoiceInput()}
+        />
         <Show when={!defaultServer.loading}>
           <Show
             when={defaultServer() ?? completedServer()}

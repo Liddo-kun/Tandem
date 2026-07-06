@@ -324,7 +324,9 @@ function normalizeMessages(
 // system block; it must not consume an ephemeral cache breakpoint (it is below
 // Anthropic's min cacheable size and would waste 1 of the 4 breakpoint slots).
 export function isClaudeBillingMessage(msg: ModelMessage): boolean {
-  return msg.role === "system" && typeof msg.content === "string" && msg.content.startsWith("x-anthropic-billing-header:")
+  return (
+    msg.role === "system" && typeof msg.content === "string" && msg.content.startsWith("x-anthropic-billing-header:")
+  )
 }
 
 function applyCaching(msgs: ModelMessage[], model: Provider.Model): ModelMessage[] {

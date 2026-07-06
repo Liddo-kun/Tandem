@@ -153,7 +153,9 @@ function rewriteJsonSchemaKeys(
   )
 }
 
-export function toolsToClaudeCode(tools: Array<LanguageModelV3Tool> | undefined): Array<LanguageModelV3Tool> | undefined {
+export function toolsToClaudeCode(
+  tools: Array<LanguageModelV3Tool> | undefined,
+): Array<LanguageModelV3Tool> | undefined {
   if (!tools) return tools
   return tools.map((tool) => {
     if (tool.type !== "function") return tool

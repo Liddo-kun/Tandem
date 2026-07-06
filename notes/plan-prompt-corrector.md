@@ -27,8 +27,8 @@ It improves prompt quality for both voice-dictated and typed input.
   model's adherence to terse instructions and its reasoning on tricky/niche
   logic** (the "re-reading" effect). On certain reasoning problems models snap to
   a default heuristic answer instead of engaging with the actual logic; a second
-  pass helps them catch it. Example: *"I want to wash my car. The car wash is
-  about 50 meters away. Should I walk or drive?"* — most models answer **"walk"**
+  pass helps them catch it. Example: _"I want to wash my car. The car wash is
+  about 50 meters away. Should I walk or drive?"_ — most models answer **"walk"**
   (short-distance heuristic), but the correct answer is **"drive"**, because the
   car has to be taken to the car wash to be washed. RePrompt helps the model reach
   the correct answer. This only helps for short prompts; repeating long prompts
@@ -39,13 +39,13 @@ It improves prompt quality for both voice-dictated and typed input.
 
 - Implement as an **opencode plugin / hook** (not a `packages/app` UI fork, not a
   `packages/opencode` request-pipeline rewrite).
-  *Why:* hooks let us rewrite the outgoing message with the least fork divergence,
-  and (verified) `chat.message` rewrites the message *before persistence*, so the
+  _Why:_ hooks let us rewrite the outgoing message with the least fork divergence,
+  and (verified) `chat.message` rewrites the message _before persistence_, so the
   corrected text is what gets stored and shown — which the safety model below
   depends on. A `packages/app` change would touch shared UI across all platforms;
   a request-pipeline rewrite would be deeper core divergence.
 - **One unified feature** used for **both voice transcription and typed input**.
-  *Why:* typed input still has spelling/punctuation/ambiguous-structure issues;
+  _Why:_ typed input still has spelling/punctuation/ambiguous-structure issues;
   voice has those plus transcription artifacts. One corrector covers both.
 - Corrector behavior:
   - fix spelling errors,
@@ -54,14 +54,14 @@ It improves prompt quality for both voice-dictated and typed input.
   - do **basic sentence-structure correction to solidify meaning only when
     necessary**. The aggressiveness of this is tuned via the instruction/prompt
     fed to the corrector LLM.
-    *Why "only when necessary":* aggressive restructuring of an **agent prompt**
+    _Why "only when necessary":_ aggressive restructuring of an **agent prompt**
     risks changing its intent or scope; the corrector should fix clarity without
     altering what the user is actually asking for. Making it tunable via the
     instruction lets that line be adjusted without code changes.
 - **RePrompt**: for **short prompts only**, repeat the **corrected** prompt in the
   form `"<corrected>. Repeated again: <corrected>"`. Order is **correct first,
   then repeat** (the repetition uses the corrected text).
-  *Why:* repeating a short prompt improves both adherence to terse instructions
+  _Why:_ repeating a short prompt improves both adherence to terse instructions
   and reasoning on tricky/niche logic (re-reading effect) — see the car-wash
   example in Background. Long prompts are excluded because repetition wastes
   context and can hurt. Correcting before repeating means the model sees the clean
@@ -94,7 +94,7 @@ These were confirmed by reading the repo; rely on them.
   persisted at `:1125-1126`. Mutating `output.parts[].text` (or `output.message`)
   changes what is recorded and shown in the conversation.
   Signature: `packages/plugin/src/index.ts:234-243`, `output = { message:
-  UserMessage, parts: Part[] }`, mutated in place.
+UserMessage, parts: Part[] }`, mutated in place.
 - **`experimental.chat.messages.transform` is model-only (not persisted).** Fires
   at `packages/opencode/src/session/prompt.ts:1443` on a fresh in-memory array
   that is converted and sent to the provider (`:1464-1468`) but never written

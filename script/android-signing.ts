@@ -59,7 +59,13 @@ export async function ensureAndroidSigning(root: string) {
 
   await fs.writeFile(
     properties,
-    [`storeFile=release.keystore`, `storePassword=${password}`, `keyAlias=tandem-release`, `keyPassword=${password}`, ""].join("\n"),
+    [
+      `storeFile=release.keystore`,
+      `storePassword=${password}`,
+      `keyAlias=tandem-release`,
+      `keyPassword=${password}`,
+      "",
+    ].join("\n"),
   )
   console.log("Created local Android release signing files under packages/android")
 }

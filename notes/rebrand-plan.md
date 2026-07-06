@@ -43,6 +43,7 @@ export const Brand = {
 ```
 
 Notes for the executor:
+
 - `packages/core` already uses plain top-level exports; this file exports a `const`, no self-reexport namespace needed. Import it as `import { Brand } from "./brand"` (within core) or `import { Brand } from "@opencode-ai/core/brand"` (from `packages/opencode`). Confirm the working import style by checking how a sibling like `packages/core/src/flag/flag.ts` is imported elsewhere; `@opencode-ai/core/*` subpath imports are used throughout `packages/opencode`.
 
 ### Step 2 — Point the global dirs at `Brand.dir`
@@ -50,11 +51,13 @@ Notes for the executor:
 File: `packages/core/src/global.ts` (currently ~line 9).
 
 Current:
+
 ```ts
 const app = "opencode"
 ```
 
 Change to:
+
 ```ts
 import { Brand } from "./brand"
 // ...
@@ -70,6 +73,7 @@ const app = Brand.dir // UPSTREAM-DIVERGENCE: see brand.ts — separates Tandem 
 File: `packages/opencode/src/index.ts` (currently ~line 72): `.scriptName("opencode")`.
 
 Change to use the brand:
+
 ```ts
 import { Brand } from "@opencode-ai/core/brand"
 // ...
@@ -88,6 +92,7 @@ File: `packages/app/index.html` (line 6): `<title>OpenCode</title>` → `<title>
 ### Step 5 — TUI ASCII wordmark (OPTIONAL — recommend DEFER)
 
 The startup logo spells "OPENCODE" in custom block-letter art across two files:
+
 - `packages/opencode/src/cli/ui.ts` lines 5-10 (`wordmark`, plain non-TTY fallback)
 - `packages/opencode/src/cli/logo.ts` (`logo.left`/`logo.right` glyph art for TTY, using the `_ ^ ~` encoding decoded in `ui.ts` `draw()`)
 
@@ -118,9 +123,11 @@ Adjust wording if Step 5/6 are done.
 ## Step 8 — Typecheck
 
 From `packages/core` and `packages/opencode`:
+
 ```
 bun typecheck
 ```
+
 (Run from each package dir; do NOT run `tsc` directly. Root `bun typecheck` runs Turbo if you prefer.)
 
 Fix any import errors from the new `brand.ts` (most likely: subpath export resolution — confirm `@opencode-ai/core/brand` resolves; `packages/core` exports `./src/*` per its package.json `exports`, so `@opencode-ai/core/brand` should map to `src/brand.ts`. Verify against how `@opencode-ai/core/global` is imported.)
@@ -128,9 +135,11 @@ Fix any import errors from the new `brand.ts` (most likely: subpath export resol
 ## Step 9 — Build the tablet binary (Linux ARM64)
 
 This repo runs on an Android tablet under Ubuntu/proot; the tablet uses the **Linux ARM64** binary. From `packages/opencode`:
+
 ```
 bun run build 2>&1 | tee /tmp/opencode/opencode-build.log | rg -i "error|fail|exception|warning|building|smoke test|passed"
 ```
+
 Confirm `building opencode-linux-arm64` and `Smoke test passed`. Output binary: `packages/opencode/dist/opencode-linux-arm64/bin/opencode`.
 
 ## Step 10 — Install as `tandem` (parallel, leaves any opencode install intact)
@@ -140,8 +149,9 @@ install -m 755 packages/opencode/dist/opencode-linux-arm64/bin/opencode /home/jo
 export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$PATH"
 which tandem && tandem --version
 ```
+
 - Installs the command as `tandem` on PATH. Any existing `opencode` binary in `~/.opencode/bin` is untouched, so both commands coexist.
-- The current `~/.opencode/bin/opencode` is presently a *Tandem* build from a prior session; that's fine. If the user later installs official opencode there, it will not collide with `tandem`.
+- The current `~/.opencode/bin/opencode` is presently a _Tandem_ build from a prior session; that's fine. If the user later installs official opencode there, it will not collide with `tandem`.
 
 ## Step 11 — Seed Tandem's dirs from the existing opencode dirs (user's "start at same spot")
 
@@ -157,7 +167,9 @@ cp -rn ~/.local/state/opencode/.  ~/.local/state/tandem/   2>/dev/null
 # cache (optional; safe to skip / let it rebuild)
 cp -rn ~/.cache/opencode/.        ~/.cache/tandem/          2>/dev/null
 ```
+
 Notes:
+
 - `tandem --version` (Step 10) already created the empty tandem dirs (`global.ts` mkdirs them on load), so the targets exist.
 - `-n` (no-clobber) avoids overwriting anything Tandem already wrote. Use `cp -r` (no `-n`) only if you want a clean overwrite.
 - If `XDG_DATA_HOME`/`XDG_CONFIG_HOME`/etc. are set in the environment, use those bases instead of the `~/.local/share` etc. defaults. Confirm with `echo "$XDG_DATA_HOME $XDG_CONFIG_HOME $XDG_STATE_HOME $XDG_CACHE_HOME"`.
@@ -174,6 +186,7 @@ Notes:
 ## Step 13 — Commit
 
 Use the repo's `personal:` prefix (this is a Tandem-specific enhancement). Suggested message:
+
 ```
 personal: rebrand to Tandem with parallel-install-safe data dirs
 
@@ -184,6 +197,7 @@ title to Tandem. Deliberately leaves the @opencode-ai scope, OPENCODE_*
 env vars, and HTTP/install identity untouched for upstream-sync and
 wire compatibility.
 ```
+
 Stage only the intended files: `packages/core/src/brand.ts`, `packages/core/src/global.ts`, `packages/opencode/src/index.ts`, `packages/app/index.html`, `log.md` (and `packages/opencode/package.json` if Step 6 done). Do NOT commit `problem.md` or `rebrand-plan.md` unless asked. Then push: `git push origin dev` (gh is set up as the credential helper for the `Liddo-kun` account).
 
 ## Quick reference — verified facts
@@ -196,4 +210,7 @@ Stage only the intended files: `packages/core/src/brand.ts`, `packages/core/src/
 - Compiled binary path: `packages/opencode/dist/opencode-linux-arm64/bin/opencode` (name stays `opencode` in build; rename at install only).
 - Tablet install target: `/home/jon/.opencode/bin/tandem`.
 - Build: `bun run build` from `packages/opencode` (produces all targets incl. linux-arm64).
+
+```
+
 ```
