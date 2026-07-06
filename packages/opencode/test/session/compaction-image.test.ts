@@ -439,9 +439,7 @@ describe("SessionCompactionImage.run", () => {
         const messages = yield* ssn.messages({ sessionID: info.id })
         const compactionMsg = messages.find((m) => m.parts.some((p) => p.type === "compaction"))!
         expect(compactionMsg).toBeDefined()
-        const compactionPart = compactionMsg.parts.find(
-          (p): p is SessionV1.CompactionPart => p.type === "compaction",
-        )!
+        const compactionPart = compactionMsg.parts.find((p): p is SessionV1.CompactionPart => p.type === "compaction")!
         expect(compactionPart.tail_start_id).toBeDefined()
         const files = compactionMsg.parts.filter((p): p is SessionV1.FilePart => p.type === "file")
         expect(files.length).toBeGreaterThan(0)
@@ -591,8 +589,7 @@ describe("SessionCompactionImage.run", () => {
         expect(tailUsers.length).toBe(2)
         // The giant turn left text context entirely — no truncated remnant.
         for (const msg of live.slice(2))
-          for (const part of msg.parts)
-            if (part.type === "text") expect(part.text).not.toContain("turn 5:")
+          for (const part of msg.parts) if (part.type === "text") expect(part.text).not.toContain("turn 5:")
       }),
     ),
   )

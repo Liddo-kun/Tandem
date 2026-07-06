@@ -31,8 +31,8 @@ assistant message cannot be modified. These blocks must remain as they were in t
 original response.
 ```
 
-It is intermittent because it only fires when the model quotes one of those snake_case
-tokens _inside its reasoning_ — most often when asked to read/analyze a Claude Code prompt
+It is intermittent because it only fires when the model quotes one of those snake*case
+tokens \_inside its reasoning* — most often when asked to read/analyze a Claude Code prompt
 dump (dense with quoted snake_case tool params) or during edit-heavy turns. The same
 rewrite also silently corrupts the model's visible output and tool-result display, which
 can make the model think its environment is broken (e.g. spamming `echo hello`).

@@ -16,14 +16,14 @@ Three artifacts protect fidelity:
 
 Fork-owned core — `packages/opencode/src/session/compaction-image/`:
 
-| File | Role |
-| --- | --- |
-| `compaction-image.ts` | Orchestration + Effect service: gate → boundary → serialize → render → sidecar → durable injection. All constants for tail/budget/refusal live here. Also exports pure `summaryGuard` — the manual-`/compact` refusal logic behind `compaction.ts`'s marked call site (§8). |
-| `marker.ts` | Dependency-free leaf holding `PART_MARKER`, so upstream-shared files (`message-v2.ts`) can key on it without importing `compaction-image.ts` (which imports `message-v2` — a cycle otherwise). |
-| `transcript.ts` | Message → tagged-text serialization, lockstep role-slot string, deterministic junk passes, cross-message junk state. |
-| `render.ts` | Reflow (↵ sentinel, tab expansion), wrapping, paging, glyph blitting, role tinting, page geometry. Pure JS. |
-| `png.ts` | Minimal deterministic PNG encoder (8-bit gray/RGB, filter=None, single IDAT, `CompressionStream("deflate")`). No native deps. |
-| `atlas-gray.ts` | ~4 MB vendored pre-rasterized 5×8 grayscale glyph atlas (Spleen 5×8 + Unifont fallback, 35,501 BMP codepoints, wide-flag table, binary-searched codepoint index). AUTO-GENERATED — the generator (`gen-atlas.ts`) lives in the pxpipe repo, not here. Note: its header's "EVAL-ONLY artifact" line is stale vendored text; in Tandem this **is** the production atlas. |
+| File                  | Role                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `compaction-image.ts` | Orchestration + Effect service: gate → boundary → serialize → render → sidecar → durable injection. All constants for tail/budget/refusal live here. Also exports pure `summaryGuard` — the manual-`/compact` refusal logic behind `compaction.ts`'s marked call site (§8).                                                                                            |
+| `marker.ts`           | Dependency-free leaf holding `PART_MARKER`, so upstream-shared files (`message-v2.ts`) can key on it without importing `compaction-image.ts` (which imports `message-v2` — a cycle otherwise).                                                                                                                                                                         |
+| `transcript.ts`       | Message → tagged-text serialization, lockstep role-slot string, deterministic junk passes, cross-message junk state.                                                                                                                                                                                                                                                   |
+| `render.ts`           | Reflow (↵ sentinel, tab expansion), wrapping, paging, glyph blitting, role tinting, page geometry. Pure JS.                                                                                                                                                                                                                                                            |
+| `png.ts`              | Minimal deterministic PNG encoder (8-bit gray/RGB, filter=None, single IDAT, `CompressionStream("deflate")`). No native deps.                                                                                                                                                                                                                                          |
+| `atlas-gray.ts`       | ~4 MB vendored pre-rasterized 5×8 grayscale glyph atlas (Spleen 5×8 + Unifont fallback, 35,501 BMP codepoints, wide-flag table, binary-searched codepoint index). AUTO-GENERATED — the generator (`gen-atlas.ts`) lives in the pxpipe repo, not here. Note: its header's "EVAL-ONLY artifact" line is stale vendored text; in Tandem this **is** the production atlas. |
 
 Integration surfaces (all `UPSTREAM-DIVERGENCE`-marked):
 
@@ -59,7 +59,7 @@ Per-turn cost estimation (`turnChars`) prices what the **API request** would car
 The walk only ever moves **whole turns** across the image boundary — never a mid-sentence or mid-tool-call seam. Three cases:
 
 1. Turn fits → keep in tail, continue walking.
-2. Turn doesn't fit (the **straddler**) but clearing its oldest completed tool outputs would make it fit → it stays in the tail *softened*: a stub plan (`stubPlan`) selects outputs to clear via the upstream prune mechanism (`state.time.compacted` → rendered as `[old tool result content cleared]`), oldest first, skipping `STUB_PROTECTED_TOOLS = ["skill"]`. The straddler is then **also rendered onto the pages**, so the cleared outputs stay recoverable in pixels. The walk stops there.
+2. Turn doesn't fit (the **straddler**) but clearing its oldest completed tool outputs would make it fit → it stays in the tail _softened_: a stub plan (`stubPlan`) selects outputs to clear via the upstream prune mechanism (`state.time.compacted` → rendered as `[old tool result content cleared]`), oldest first, skipping `STUB_PROTECTED_TOOLS = ["skill"]`. The straddler is then **also rendered onto the pages**, so the cleared outputs stay recoverable in pixels. The walk stops there.
 3. Turn doesn't fit and can't be softened enough → the tail stops at the turn boundary before it; the turn is imaged intact. Exception: the **newest turn is always kept** as text, softened as far as possible, even when it alone exceeds the budget.
 
 ### 3.4 Carry-forward of earlier compactions
@@ -107,7 +107,7 @@ The only state change, and the last thing that happens (event `SessionCompaction
    - carried page `FilePart`s, then new pages as `FilePart`s (`data:image/png;base64,...` URLs, filenames `context-page-NN.png`, numbered after the carried ones);
    - carried pointer text parts, then the new sidecar pointer (marker `sidecar`);
    - end-marker text part (marker `end`).
-   All text parts are `synthetic: true` with metadata `{compactionImage: <marker>}` (`PART_MARKER = "compactionImage"`).
+     All text parts are `synthetic: true` with metadata `{compactionImage: <marker>}` (`PART_MARKER = "compactionImage"`).
 2. **Fabricated assistant message** paired via `parentID`: `summary: true`, `finish: "stop"`, no error, mode/agent `"compaction"`, zero cost/tokens, no processor or model run. Its text is the receipt: `"Context before this point was compacted into N transcript-page images carried in the preceding message. " + feedback`. This text also becomes `previousSummary` for any later summary compaction.
 3. **Straddler clearing last**: only after the pages are durably in place are the planned tool outputs stamped `state.time.compacted` (rendering already read the live outputs).
 
@@ -134,15 +134,15 @@ Part rendering:
 
 Numbered per the PRD; state shared across the walk lives in `JunkContext`:
 
-| Pass | What | Mechanism |
-| --- | --- | --- |
-| 1 | Already-pruned outputs | `state.time.compacted` → one-line stub |
-| 2 | Superseded reads | `buildJunkContext` maps older `read`s of the same path (tool `read`, input `filePath\|file_path\|path`) to `[read of <path> superseded by the read at turn N]`; only the newest read keeps content |
-| 5a | Giant outputs | head 40 + tail 20 lines, `[… N lines elided …]`, only when it saves >20 lines (`OUTPUT_HEAD_LINES`/`OUTPUT_TAIL_LINES`) |
-| 5b | Repeated lines | ≥3 consecutive identical non-empty lines → one + `[repeated ×N]` (`REPEAT_COLLAPSE_MIN`) |
-| 6 | Binary payloads | data URLs → `[<mime> data-url ~NKB]`; standalone base64 runs ≥240 chars → `[base64 ~NKB]` (`BASE64_RUN_MIN`); applied to tool outputs **and** message text |
-| 7 | ANSI/control | CSI/OSC/lone-ESC sequences stripped (atlas can't render them) |
-| 8 | Reminder dedup | identical `<system-reminder>` blocks keep first occurrence, repeats → `[system-reminder repeated — see first occurrence]` |
+| Pass | What                   | Mechanism                                                                                                                                                                                          |
+| ---- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Already-pruned outputs | `state.time.compacted` → one-line stub                                                                                                                                                             |
+| 2    | Superseded reads       | `buildJunkContext` maps older `read`s of the same path (tool `read`, input `filePath\|file_path\|path`) to `[read of <path> superseded by the read at turn N]`; only the newest read keeps content |
+| 5a   | Giant outputs          | head 40 + tail 20 lines, `[… N lines elided …]`, only when it saves >20 lines (`OUTPUT_HEAD_LINES`/`OUTPUT_TAIL_LINES`)                                                                            |
+| 5b   | Repeated lines         | ≥3 consecutive identical non-empty lines → one + `[repeated ×N]` (`REPEAT_COLLAPSE_MIN`)                                                                                                           |
+| 6    | Binary payloads        | data URLs → `[<mime> data-url ~NKB]`; standalone base64 runs ≥240 chars → `[base64 ~NKB]` (`BASE64_RUN_MIN`); applied to tool outputs **and** message text                                         |
+| 7    | ANSI/control           | CSI/OSC/lone-ESC sequences stripped (atlas can't render them)                                                                                                                                      |
+| 8    | Reminder dedup         | identical `<system-reminder>` blocks keep first occurrence, repeats → `[system-reminder repeated — see first occurrence]`                                                                          |
 
 Passes 3 (stale-by-edit reads) and 4 (state-snapshot tools) from the PRD are **not implemented** (deferred: cross-session edit tracking for marginal savings). Tool outputs get the full chain (`stripAnsi → stripBinaryPayloads → collapseRepeatedLines → capOutputLines`); message text gets ANSI/base64/reminder treatment only.
 
@@ -150,7 +150,7 @@ Passes 3 (stale-by-edit reads) and 4 (state-snapshot tools) from the PRD are **n
 
 After compaction, `filterCompacted` reorders model context to `[compaction-user, receipt-assistant, tail…]`. Rendered through `toModelMessage`, the compaction user message yields, in order:
 
-1. **Banner** — declares the images are verbatim transcript pages of *prior* turns (not the current request); reading guide (`↵` = original newline, `→` = tab stop, role tags authoritative, higher `t` = more recent); instruction that exact strings MUST be re-read from disk/tools, with a forward reference to the sidecar pointer. When a straddler exists, an extra bracketed sentence explains that the final imaged turn continues after the images as live text with older outputs cleared.
+1. **Banner** — declares the images are verbatim transcript pages of _prior_ turns (not the current request); reading guide (`↵` = original newline, `→` = tab stop, role tags authoritative, higher `t` = more recent); instruction that exact strings MUST be re-read from disk/tools, with a forward reference to the sidecar pointer. When a straddler exists, an extra bracketed sentence explains that the final imaged turn continues after the images as live text with older outputs cleared.
 2. **Pages** — the PNGs (carried batches first, chronological).
 3. **Pointer part(s)** — one per page batch: exact sidecar path + "grep it for any string needed exactly; it holds the full pre-elision content, including outputs the pages elided."
 4. **End marker** — `[End of imaged context.]`, sealing the archive off from live conversation.
@@ -162,7 +162,7 @@ The legacy summary-compaction filler (`"What did we do so far?"`) is **suppresse
 
 **Geometry.** 312 columns × 5 px/cell + 2×4 px padding = **1568 px wide exactly**; page height ≤ 728 px (90 rows of 8 px + padding); ≤ `CHARS_PER_PAGE = 28,080` source chars per page. The Anthropic API downscales any image to fit both long-edge ≤1568 **and** ~1.15 MP before billing ≈ px/750 — a 1568×728 page fits both bounds, so billed pixels reach the vision encoder unresampled (WYSIWYG glyphs). 313 columns would trigger a 0.997× resample that blurs every glyph.
 
-**Reflow.** `reflow()` = neutralize (any pre-existing `↵` in content becomes `⏎` so the sentinel stays unambiguous — necessary when the transcript is *about* image compaction) → minify (strip trailing whitespace per line, collapse ≥4 blank lines to 3; leading indent untouched) → expand tabs to a visible `→` + padding to 4-col stops (U+0009 has no glyph) → join lines with the `↵` sentinel. `wrapLines` then wraps to 312 columns by **visual width** (East Asian Wide glyphs advance 2 cells; codepoint iteration handles surrogate pairs).
+**Reflow.** `reflow()` = neutralize (any pre-existing `↵` in content becomes `⏎` so the sentinel stays unambiguous — necessary when the transcript is _about_ image compaction) → minify (strip trailing whitespace per line, collapse ≥4 blank lines to 3; leading indent untouched) → expand tabs to a visible `→` + padding to 4-col stops (U+0009 has no glyph) → join lines with the `↵` sentinel. `wrapLines` then wraps to 312 columns by **visual width** (East Asian Wide glyphs advance 2 cells; codepoint iteration handles surrogate pairs).
 
 **Blitting.** For each glyph, binary-search the codepoint table (`atlasGrayRank`), max-blend its coverage bytes into a grayscale framebuffer, invert to black-on-white, then tint pixels whose lockstep slot marker names a role: green for `<user>` tags, blue for `<assistant>` tags; body ink stays black. Codepoints missing from the atlas advance one cell (wrap stability) and increment `droppedChars` (telemetry on `RenderedPage`).
 
@@ -182,24 +182,24 @@ Conversely `/compact-image` composes fine over prior compactions of either kind:
 
 ## 9. Constants reference
 
-| Constant | Value | Where | Meaning |
-| --- | --- | --- | --- |
-| `DEFAULT_MODELS` | `["claude-fable-5"]` | compaction-image.ts | model-gate substrings (config `compaction.image.models`) |
-| `TAIL_TURNS` | 6 | compaction-image.ts | max text-tail turns |
-| `TAIL_TOKEN_BUDGET` | 8,000 | compaction-image.ts | text-tail token budget |
-| `CHARS_PER_TOKEN` | 3.3 | compaction-image.ts | tail estimator (measured on code-heavy sessions) |
-| `SIGNATURE_CHARS_PER_TOKEN` | 2.5 | compaction-image.ts | thinking-signature weight |
-| `MIN_CHARS` | 20,000 | compaction-image.ts | refusal floor (raw chars imaged) |
-| `MAX_PAGES` | 40 | compaction-image.ts | page cap incl. carried pages |
-| `PART_MARKER` | `"compactionImage"` | marker.ts (leaf; re-exported by compaction-image.ts) | metadata key on synthetic text parts (`banner`/`sidecar`/`end`; legacy `factsheet`) |
-| `STUB_PROTECTED_TOOLS` | `["skill"]` | compaction-image.ts | never stub-cleared (mirrors `PRUNE_PROTECTED_TOOLS`) |
-| `OUTPUT_HEAD_LINES` / `OUTPUT_TAIL_LINES` | 40 / 20 | transcript.ts | junk-pass 5a cap |
-| `REPEAT_COLLAPSE_MIN` | 3 | transcript.ts | junk-pass 5b threshold |
-| `BASE64_RUN_MIN` | 240 | transcript.ts | junk-pass 6 threshold |
-| `COLS` | 312 | render.ts | columns per page |
-| `MAX_HEIGHT_PX` | 728 | render.ts | page height ceiling |
-| `CHARS_PER_PAGE` | 28,080 | render.ts | paging granularity |
-| `PIXEL_TOKEN_DIVISOR` | 750 | render.ts | Anthropic pixels-per-token |
+| Constant                                  | Value                | Where                                                | Meaning                                                                             |
+| ----------------------------------------- | -------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `DEFAULT_MODELS`                          | `["claude-fable-5"]` | compaction-image.ts                                  | model-gate substrings (config `compaction.image.models`)                            |
+| `TAIL_TURNS`                              | 6                    | compaction-image.ts                                  | max text-tail turns                                                                 |
+| `TAIL_TOKEN_BUDGET`                       | 8,000                | compaction-image.ts                                  | text-tail token budget                                                              |
+| `CHARS_PER_TOKEN`                         | 3.3                  | compaction-image.ts                                  | tail estimator (measured on code-heavy sessions)                                    |
+| `SIGNATURE_CHARS_PER_TOKEN`               | 2.5                  | compaction-image.ts                                  | thinking-signature weight                                                           |
+| `MIN_CHARS`                               | 20,000               | compaction-image.ts                                  | refusal floor (raw chars imaged)                                                    |
+| `MAX_PAGES`                               | 40                   | compaction-image.ts                                  | page cap incl. carried pages                                                        |
+| `PART_MARKER`                             | `"compactionImage"`  | marker.ts (leaf; re-exported by compaction-image.ts) | metadata key on synthetic text parts (`banner`/`sidecar`/`end`; legacy `factsheet`) |
+| `STUB_PROTECTED_TOOLS`                    | `["skill"]`          | compaction-image.ts                                  | never stub-cleared (mirrors `PRUNE_PROTECTED_TOOLS`)                                |
+| `OUTPUT_HEAD_LINES` / `OUTPUT_TAIL_LINES` | 40 / 20              | transcript.ts                                        | junk-pass 5a cap                                                                    |
+| `REPEAT_COLLAPSE_MIN`                     | 3                    | transcript.ts                                        | junk-pass 5b threshold                                                              |
+| `BASE64_RUN_MIN`                          | 240                  | transcript.ts                                        | junk-pass 6 threshold                                                               |
+| `COLS`                                    | 312                  | render.ts                                            | columns per page                                                                    |
+| `MAX_HEIGHT_PX`                           | 728                  | render.ts                                            | page height ceiling                                                                 |
+| `CHARS_PER_PAGE`                          | 28,080               | render.ts                                            | paging granularity                                                                  |
+| `PIXEL_TOKEN_DIVISOR`                     | 750                  | render.ts                                            | Anthropic pixels-per-token                                                          |
 
 ## 10. Recovery workflows (operational)
 
