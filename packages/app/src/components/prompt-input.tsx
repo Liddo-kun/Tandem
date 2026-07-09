@@ -47,6 +47,8 @@ import { ModelSelectorPopover, ModelSelectorPopoverV2 } from "@/components/dialo
 import { useProviders } from "@/hooks/use-providers"
 import { ContextTokenButton } from "@/components/session/context-token-button"
 import { RepromptToggleButton } from "@/components/session/reprompt-toggle-button"
+import { DialogSelectModelUnpaid } from "@/components/dialog-select-model-unpaid"
+import { DialogSelectModelUnpaidV2 } from "@/components/dialog-select-model-unpaid-v2"
 import { useCommand } from "@/context/command"
 import { Persist, persisted } from "@/utils/persist"
 import { usePermission } from "@/context/permission"
@@ -1634,9 +1636,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     style: { ...control(), "margin-left": "-4px" },
     onClose: restoreFocus,
     onUnpaidClick: () => {
-      void import("@/components/dialog-select-model-unpaid").then((x) => {
-        dialog.show(() => <x.DialogSelectModelUnpaid model={props.controls.model.selection} />)
-      })
+      if (props.controls.newLayoutDesigns) {
+        dialog.show(() => <DialogSelectModelUnpaidV2 model={props.controls.model.selection} />)
+        return
+      }
+      dialog.show(() => <DialogSelectModelUnpaid model={props.controls.model.selection} />)
     },
   }))
 
@@ -1878,7 +1882,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                           class="max-w-[160px] justify-start capitalize"
                           style={control()}
                         >
-                          <span class="truncate">
+                          <span class="truncate leading-5">
                             {props.controls.model.selection.variant.current() ?? language.t("common.default")}
                           </span>
                           <span class="-ml-0.5 -mr-1 flex shrink-0">
@@ -2183,11 +2187,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                                   class="min-w-0 max-w-[320px] text-13-regular text-text-base group"
                                   style={control()}
                                   onClick={() => {
-                                    void import("@/components/dialog-select-model-unpaid").then((x) => {
-                                      dialog.show(() => (
-                                        <x.DialogSelectModelUnpaid model={props.controls.model.selection} />
-                                      ))
-                                    })
+                                    dialog.show(() => (
+                                      <DialogSelectModelUnpaid model={props.controls.model.selection} />
+                                    ))
                                   }}
                                 >
                                   <Show when={props.controls.model.selection.current()?.provider?.id}>
@@ -2380,30 +2382,47 @@ function ComposerModelControl(props: { state: ComposerModelControlState }) {
               </>
             }
           >
-            <Button
-              data-action="prompt-model"
-              as="div"
-              variant="ghost"
-              size="normal"
-              class="min-w-0 max-w-[220px] justify-start text-[13px] font-[440] leading-5 text-v2-text-text-faint group"
-              classList={{ "animate-in fade-in": props.state.shouldAnimate }}
-              style={props.state.style}
-              onClick={props.state.onUnpaidClick}
+            <Show
+              when={props.state.newLayoutDesigns}
+              fallback={
+                <Button
+                  data-action="prompt-model"
+                  as="div"
+                  variant="ghost"
+                  size="normal"
+                  class="min-w-0 max-w-[220px] justify-start text-[13px] font-[440] leading-5 text-v2-text-text-faint group"
+                  classList={{ "animate-in fade-in": props.state.shouldAnimate }}
+                  style={props.state.style}
+                  onClick={props.state.onUnpaidClick}
+                >
+                  <Show when={props.state.providerID}>
+                    {(providerID) => (
+                      <ProviderIcon
+                        id={providerID()}
+                        class="size-4 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity duration-150"
+                        style={{ "will-change": "opacity", transform: "translateZ(0)" }}
+                      />
+                    )}
+                  </Show>
+                  <span class="truncate">{props.state.modelName}</span>
+                  <span class="-ml-1 shrink-0 flex size-fit">
+                    <Icon name="chevron-down" size="small" class="text-v2-icon-icon-muted" />
+                  </span>
+                </Button>
+              }
             >
-              <Show when={props.state.providerID}>
-                {(providerID) => (
-                  <ProviderIcon
-                    id={providerID()}
-                    class="size-4 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity duration-150"
-                    style={{ "will-change": "opacity", transform: "translateZ(0)" }}
-                  />
-                )}
-              </Show>
-              <span class="truncate">{props.state.modelName}</span>
-              <span class="-ml-1 shrink-0 flex size-fit">
-                <Icon name="chevron-down" size="small" class="text-v2-icon-icon-muted" />
-              </span>
-            </Button>
+              <ButtonV2
+                data-action="prompt-model"
+                variant="ghost-muted"
+                size="normal"
+                class="min-w-0 max-w-[220px] justify-start ![font-weight:440] group"
+                classList={{ "animate-in fade-in": props.state.shouldAnimate }}
+                style={props.state.style}
+                onClick={props.state.onUnpaidClick}
+              >
+                <ModelControlContent state={props.state} v2 />
+              </ButtonV2>
+            </Show>
           </TooltipV2>
         }
       >
