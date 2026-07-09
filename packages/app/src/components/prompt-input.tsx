@@ -291,7 +291,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   })
   const activeFileTab = sessionTabs.activeFileTab
 
-  const openContext = () => {
+  // UPSTREAM-DIVERGENCE: Tandem's context-token button toggles the session
+  // context tab; named openContextTab to avoid upstream's add-menu openContext.
+  const openContextTab = () => {
     if (!props.controls.session.id) return
     if (sessionTabs.activeTab() === "context") {
       props.controls.session.tabs.close("context")
@@ -552,7 +554,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const setMode = (mode: "normal" | "shell") => {
     setStore("mode", mode)
-    setStore("popover", null)
+    setStore({ popover: null, slashMenu: false, slashMenuQuery: "" })
     requestAnimationFrame(() => editorRef?.focus())
   }
 
@@ -586,7 +588,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     },
   ])
 
-  const closePopover = () => setStore("popover", null)
+  const closePopover = () => setStore({ popover: null, slashMenu: false, slashMenuQuery: "" })
 
   const resetHistoryNavigation = (force = false) => {
     if (!force && (store.historyIndex < 0 || store.applyingHistory)) return
@@ -870,14 +872,27 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const handleSlashSelect = (cmd: SlashCommand | undefined) => {
     if (!cmd) return
+    const menu = store.slashMenu
     closePopover()
     const images = imageAttachments()
 
     if (cmd.type === "custom") {
       const text = `/${cmd.trigger} `
+      if (menu) {
+        editorRef.focus()
+        setCursorPosition(editorRef, 0)
+        addPart({ type: "text", content: text, start: 0, end: text.length })
+        focusEditorEnd()
+        return
+      }
       setEditorText(text)
       prompt.set([{ type: "text", content: text, start: 0, end: text.length }, ...images], text.length)
       focusEditorEnd()
+      return
+    }
+
+    if (menu) {
+      command.trigger(cmd.id, "slash")
       return
     }
 
@@ -1143,10 +1158,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
       if (atMatch) {
         atOnInput(atMatch[1])
-        setStore("popover", "at")
+        setStore({ popover: "at", slashMenu: false, slashMenuQuery: "" })
       } else if (slashMatch) {
         slashOnInput(slashMatch[1])
-        setStore("popover", "slash")
+        setStore({ popover: "slash", slashMenu: false, slashMenuQuery: "" })
       } else {
         closePopover()
       }
@@ -1242,6 +1257,28 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     return true
   }
 
+  const openCommands = () => {
+    const populated = prompt.dirty() || commentCount() > 0
+    requestAnimationFrame(() => {
+      if (!populated) {
+        if (!addPart({ type: "text", content: "/", start: 0, end: 0 })) return
+        slashOnInput("")
+        setStore({ popover: "slash", slashMenu: false, slashMenuQuery: "" })
+        return
+      }
+      slashOnInput("")
+      setStore({ popover: "slash", slashMenu: true, slashMenuQuery: "" })
+    })
+  }
+
+  const openContext = () => {
+    requestAnimationFrame(() => {
+      if (!addPart({ type: "text", content: "@", start: 0, end: 0 })) return
+      atOnInput("")
+      setStore({ popover: "at", slashMenu: false, slashMenuQuery: "" })
+    })
+  }
+
   const addToHistory = (prompt: Prompt, mode: "normal" | "shell") => {
     history.add(prompt, mode, mode === "shell" ? [] : historyComments())
   }
@@ -1270,7 +1307,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         }
 
         setStore("mode", "normal")
-        setStore("popover", null)
+        closePopover()
         setStore("historyIndex", -1)
         setStore("savedPrompt", null)
         prompt.set(edit.prompt, promptLength(edit.prompt))
@@ -1360,7 +1397,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         resetHistoryNavigation(true)
       },
       setMode: (mode) => setStore("mode", mode),
-      setPopover: (popover) => setStore("popover", popover),
+      setPopover: (popover) => {
+        if (!popover) return closePopover()
+        setStore({ popover, slashMenu: false, slashMenuQuery: "" })
+      },
       newSessionWorktree: () => props.newSessionWorktree,
       onNewSessionWorktreeReset: props.onNewSessionWorktreeReset,
       shouldQueue: props.shouldQueue,
@@ -1399,7 +1439,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       const cursorPosition = getCursorPosition(editorRef)
       if (cursorPosition === 0) {
         setStore("mode", "shell")
-        setStore("popover", null)
+        closePopover()
         event.preventDefault()
         return
       }
@@ -1540,6 +1580,29 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     }
   }
 
+  const handleSlashMenuKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Escape") {
+      closePopover()
+      requestAnimationFrame(() => editorRef.focus())
+      event.preventDefault()
+      return
+    }
+
+    if (event.key === "Tab") {
+      selectPopoverActive()
+      event.preventDefault()
+      return
+    }
+
+    const ctrl = event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey
+    const nav = event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "Enter"
+    const ctrlNav = ctrl && (event.key === "n" || event.key === "p")
+    if (!nav && !ctrlNav) return
+    slashOnKeyDown(event)
+    if (event.key === "ArrowUp" || event.key === "ArrowDown" || ctrlNav) scrollSlashActiveIntoView()
+    event.preventDefault()
+  }
+
   const agentsLoading = () => props.controls.agents.loading
   const agentsShouldFadeIn = createMemo<boolean>((prev) => prev ?? agentsLoading())
   const providersLoading = () => props.controls.model.loading
@@ -1631,6 +1694,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         slashActive={slashActive() ?? undefined}
         setSlashActive={setSlashActive}
         onSlashSelect={handleSlashSelect}
+        slashMenu={store.slashMenu}
+        slashMenuQuery={store.slashMenuQuery}
+        onSlashMenuInput={(value) => {
+          setStore("slashMenuQuery", value)
+          slashOnInput(value)
+        }}
+        onSlashMenuKeyDown={handleSlashMenuKeyDown}
         commandKeybind={command.keybind}
         commandKeybindParts={command.keybindParts}
         newLayoutDesigns={props.controls.newLayoutDesigns}
@@ -1728,23 +1798,45 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   placement="top"
                   value={
                     <>
-                      {language.t("prompt.action.attachFile")}
+                      {language.t("prompt.menu.addImagesAndFiles")}
                       <KeybindV2 keys={command.keybindParts("file.attach")} variant="neutral" />
                     </>
                   }
                 >
-                  <IconButton
-                    data-action="prompt-attach"
-                    type="button"
-                    icon="plus"
-                    variant="ghost"
-                    class="size-7 rounded-md p-[6px] text-v2-icon-icon-muted"
-                    style={buttons()}
-                    onClick={pick}
-                    disabled={store.mode !== "normal"}
-                    tabIndex={store.mode === "normal" ? undefined : -1}
-                    aria-label={language.t("prompt.action.attachFile")}
-                  />
+                  <MenuV2 gutter={6} modal={false} placement="top-start">
+                    <MenuV2.Trigger
+                      as={IconButton}
+                      data-action="prompt-attach"
+                      type="button"
+                      icon="plus"
+                      variant="ghost"
+                      class="size-7 rounded-md p-[6px] text-v2-icon-icon-muted"
+                      style={buttons()}
+                      disabled={store.mode !== "normal"}
+                      tabIndex={store.mode === "normal" ? undefined : -1}
+                      aria-label={language.t("prompt.menu.addImagesAndFiles")}
+                    />
+                    <MenuV2.Portal>
+                      <MenuV2.Content
+                        class="[&_[data-slot=menu-v2-item-shortcut]]:w-5 [&_[data-slot=menu-v2-item-shortcut]]:justify-center"
+                        style={{ "min-width": "180px" }}
+                      >
+                        <MenuV2.Item onSelect={pick} shortcut={command.keybind("file.attach")}>
+                          {language.t("prompt.menu.imagesAndFiles")}
+                        </MenuV2.Item>
+                        <MenuV2.Separator />
+                        <MenuV2.Item onSelect={openCommands} shortcut="/">
+                          {language.t("prompt.menu.commands")}
+                        </MenuV2.Item>
+                        <MenuV2.Item onSelect={openContext} shortcut="@">
+                          {language.t("prompt.menu.context")}
+                        </MenuV2.Item>
+                        <MenuV2.Item onSelect={() => setMode("shell")} shortcut="!">
+                          {language.t("prompt.menu.shellCommand")}
+                        </MenuV2.Item>
+                      </MenuV2.Content>
+                    </MenuV2.Portal>
+                  </MenuV2>
                 </TooltipV2>
                 {voiceInputButton("v2")}
                 <Show when={showAgentControl()}>
@@ -1819,7 +1911,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   <ContextTokenButton
                     messages={sessionMessages()}
                     providers={[...providers.all().values()]}
-                    onClick={openContext}
+                    onClick={openContextTab}
                   />
                 </Show>
                 {/* UPSTREAM-DIVERGENCE: Tandem RePrompt toggle (reprompt-toggle-button.tsx) */}
@@ -2192,7 +2284,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                           <ContextTokenButton
                             messages={sessionMessages()}
                             providers={[...providers.all().values()]}
-                            onClick={openContext}
+                            onClick={openContextTab}
                             legacy
                           />
                         </Show>
