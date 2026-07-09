@@ -1139,7 +1139,10 @@ export function options(input: {
     }
   }
 
-  if (input.model.providerID === "openai" || input.providerOptions?.setCacheKey) {
+  if (
+    input.providerOptions?.setCacheKey !== false &&
+    (input.model.providerID === "openai" || input.model.api.npm === "@ai-sdk/xai" || input.providerOptions?.setCacheKey)
+  ) {
     result["promptCacheKey"] = input.sessionID
   }
 
