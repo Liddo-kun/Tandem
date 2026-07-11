@@ -103,6 +103,7 @@ beforeAll(async () => {
 
   mock.module("@opencode-ai/core/util/encode", () => ({
     base64Encode: (value: string) => value,
+    checksum: (value: string) => value,
   }))
 
   mock.module("@/context/local", () => ({
@@ -119,6 +120,12 @@ beforeAll(async () => {
           promoted.push({ directory, sessionID })
         },
       },
+    }),
+  }))
+
+  mock.module("@/context/settings", () => ({
+    useSettings: () => ({
+      general: { promptEnhance: () => "on" },
     }),
   }))
 
