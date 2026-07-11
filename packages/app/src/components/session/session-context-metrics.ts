@@ -1,4 +1,4 @@
-import type { AssistantMessage, Message, Session } from "@opencode-ai/sdk/v2/client"
+import type { AssistantMessage, Message } from "@opencode-ai/sdk/v2/client"
 
 type Provider = {
   id: string
@@ -21,6 +21,7 @@ type Context = {
   modelLabel: string
   limit: number | undefined
   input: number
+  total: number
   usage: number | null
 }
 
@@ -31,7 +32,6 @@ type ContextMetrics = Context & {
   reasoning: number
   cacheRead: number
   cacheWrite: number
-  total: number
   // cache.read + cache.write of the PREVIOUS request, used to score how much of the
   // prior cache survived into this request (read_now / previousCacheTotal).
   previousCacheTotal: number
@@ -85,6 +85,7 @@ const build = (messages: Message[] = [], providers: Provider[] = []): Context | 
     modelLabel: model?.name ?? message.modelID,
     limit,
     input: message.tokens.input,
+    total,
     usage: limit ? Math.round((total / limit) * 100) : null,
   }
 }
@@ -128,9 +129,4 @@ export function getSessionContext(messages: Message[] = [], providers: Provider[
 // UPSTREAM-DIVERGENCE: Tandem cache-health metrics entry point (context-token-button.tsx).
 export function getSessionContextMetrics(messages: Message[] = [], providers: Provider[] = []) {
   return buildMetrics(messages, providers)
-}
-
-export function getSessionTokenTotal(tokens: Session["tokens"] | undefined) {
-  if (!tokens) return undefined
-  return tokens.input + tokens.output + tokens.reasoning + tokens.cache.read + tokens.cache.write
 }
