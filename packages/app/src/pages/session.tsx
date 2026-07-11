@@ -488,7 +488,7 @@ export default function Page() {
     if (desktopSessionResizeOpen()) return `${sessionPanelResizedWidth()}px`
     return `calc(100% - ${layout.fileTree.width()}px)`
   })
-  const centered = createMemo(() => isDesktop() && !desktopReviewOpen())
+  const centered = createMemo(() => isDesktop() && (newSessionDesign() || !desktopReviewOpen()))
   const desktopV2PanelLayout = createMemo(() =>
     sessionPanelLayout({
       review: desktopV2ReviewOpen(),
@@ -1447,7 +1447,7 @@ export default function Page() {
   const reviewPanelV2Rendered = createMemo<boolean>((prev) => prev || !store.deferRender, false)
 
   const reviewPanelV2 = () => (
-    <div class="flex flex-col h-full overflow-hidden bg-background-stronger contain-strict">
+    <div class="flex flex-col h-full overflow-hidden bg-v2-background-bg-base contain-strict">
       <Show when={reviewPanelV2Rendered()}>
         <ReviewPanelV2 {...reviewPanelV2Props()} />
       </Show>
