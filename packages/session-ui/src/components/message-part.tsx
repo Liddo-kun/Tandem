@@ -66,28 +66,35 @@ import { attached, inline, kind } from "./message-file"
 import { readPartText } from "./message-part-text"
 import { SessionProgressIndicatorV2 } from "../v2/components/session-progress-indicator-v2"
 
+// UPSTREAM-DIVERGENCE: prefer navigator.clipboard.writeText over the hidden
+// textarea + execCommand("copy") path. On Android WebView, execCommand writes a
+// multi-mime (plain+html) clip that clipboard bridges like Termux:X11 silently
+// reject, while writeText produces a single text/plain clip. The textarea path
+// stays as fallback for non-secure contexts (plain-http LAN) where
+// navigator.clipboard is unavailable.
 async function writeClipboard(text: string): Promise<boolean> {
-  const body = typeof document === "undefined" ? undefined : document.body
-  if (body) {
-    const textarea = document.createElement("textarea")
-    textarea.value = text
-    textarea.setAttribute("readonly", "")
-    textarea.style.position = "fixed"
-    textarea.style.opacity = "0"
-    textarea.style.pointerEvents = "none"
-    body.appendChild(textarea)
-    textarea.select()
-    const copied = document.execCommand("copy")
-    body.removeChild(textarea)
+  const clipboard = typeof navigator === "undefined" ? undefined : navigator.clipboard
+  if (clipboard?.writeText) {
+    const copied = await clipboard.writeText(text).then(
+      () => true,
+      () => false,
+    )
     if (copied) return true
   }
 
-  const clipboard = typeof navigator === "undefined" ? undefined : navigator.clipboard
-  if (!clipboard?.writeText) return false
-  return clipboard.writeText(text).then(
-    () => true,
-    () => false,
-  )
+  const body = typeof document === "undefined" ? undefined : document.body
+  if (!body) return false
+  const textarea = document.createElement("textarea")
+  textarea.value = text
+  textarea.setAttribute("readonly", "")
+  textarea.style.position = "fixed"
+  textarea.style.opacity = "0"
+  textarea.style.pointerEvents = "none"
+  body.appendChild(textarea)
+  textarea.select()
+  const copied = document.execCommand("copy")
+  body.removeChild(textarea)
+  return copied
 }
 
 interface Diagnostic {
