@@ -20,6 +20,7 @@ Default permissions for the mobile bridge plugin
 <th>Description</th>
 </tr>
 
+
 <tr>
 <td>
 
