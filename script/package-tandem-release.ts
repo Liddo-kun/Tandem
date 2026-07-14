@@ -143,7 +143,7 @@ async function stageCliArtifacts() {
 async function stageAndroidArtifacts() {
   const outputs = path.join(root, "packages/android/src-tauri/gen/android/app/build/outputs")
   if (!(await isDirectory(outputs))) {
-    missing.push("Android: build first with the filtered Android APK command from context.md.")
+    missing.push("Android: build first with the filtered Android APK command from contextW.md.")
     return
   }
 

@@ -17,7 +17,7 @@ When the user says "get us up to date from opencode upstream", do not rely on pr
 - If the user asks to get up to date, process all pending commits, broken into logical batches and worked batch by batch, unless review or dry-run finds risk.
 - Only use an older pinned target if the user explicitly asks to continue that older target.
 
-Read the environment context file (`contextL.md` on Ubuntu/Linux/proot, `context.md` on Windows) and `log.md` in full before syncing. Use `log.md` as the authoritative inventory of intentional Tandem differences from official OpenCode.
+Read the environment context file (`contextL.md` on Ubuntu/Linux/proot, `contextW.md` on Windows) and `log.md` in full before syncing. Use `log.md` as the authoritative inventory of intentional Tandem differences from official OpenCode.
 
 ## Hard Rules
 

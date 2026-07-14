@@ -344,7 +344,7 @@ The earlier source-code changes were undone.
 
 The Tandem repo no longer contains the time-sync script.
 
-`context.md` was added to `.gitignore` so it remains local and untracked.
+`contextW.md` was added to `.gitignore` so it remains local and untracked.
 
 The time-sync script lives at:
 

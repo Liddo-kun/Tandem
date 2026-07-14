@@ -264,7 +264,7 @@ plain-API-key Claude with the experimental flag on.
 
 **Required action (not optional):** document this gap explicitly so it is not a silent divergence.
 
-- Add a clear note to `~/Tandem/log.md` (and a one-line pointer in `context.md` if appropriate)
+- Add a clear note to `~/Tandem/log.md` (and a one-line pointer in `contextW.md` if appropriate)
   stating: the Claude Code tool/param disguise and response remap are applied **only on the AI SDK
   runtime**, NOT on the experimental native runtime; native Claude (API-key) requests are
   undisguised and can regress the thinking-block bug.
@@ -286,10 +286,10 @@ plain-API-key Claude with the experimental flag on.
 - Add a regression test asserting `reasoning`/thinking and `text` stream parts pass through the
   middleware **unmodified**.
 - `cd packages/opencode && bun typecheck`; run the focused transform test.
-- Build a single CLI (`context.md` "Verification Commands"); smoke-test the original repro:
+- Build a single CLI (`contextW.md` "Verification Commands"); smoke-test the original repro:
   read + analyze a Claude Code prompt dump and an edit-heavy session on BOTH desktop and the
   Y700. Confirm no signature error and that snake_case tokens in visible output are no longer mangled.
-- Update `~/Tandem/log.md` with the new provider-transform divergence (per `context.md`), AND
+- Update `~/Tandem/log.md` with the new provider-transform divergence (per `contextW.md`), AND
   the native-runtime limitation called out in "Known limitation — native runtime NOT covered".
 
 ---

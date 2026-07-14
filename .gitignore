@@ -27,7 +27,7 @@ target
 .direnv/
 
 # Local dev files
-context.md
+contextW.md
 opencode-dev
 UPCOMING_CHANGELOG.md
 logs/
