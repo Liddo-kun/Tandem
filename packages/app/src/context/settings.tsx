@@ -45,6 +45,7 @@ export interface Settings {
     reprompt?: boolean
     layoutTransitionEligible?: boolean
     newInterfaceNoticeDismissed?: boolean
+    shouldDisplayTabsToast?: boolean
   }
   appearance: {
     fontSize: number
@@ -76,7 +77,49 @@ const displayScaleDefault: DisplayScale = 1
 const legacyNewLayoutDesignsDefault = import.meta.env.VITE_OPENCODE_CHANNEL !== "prod"
 export const newLayoutDesignsDefault = true
 // Existing users can switch layouts until local midnight on this date. Set new Date(YYYY, M-1, D) to show.
-export const oldInterfaceSunset = import.meta.env.VITE_OPENCODE_CHANNEL !== "prod" ? new Date(2026, 7, 14) : null
+export const oldInterfaceSunset = new Date(2026, 8, 14)
+const newLayoutDesignsUpgradeCutoff = "1.17.19"
+
+function compareVersions(a: string, b: string) {
+  const parse = (version: string) => {
+    const match = /^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/i.exec(version.trim())
+    if (!match) return
+    return match.slice(1).map(Number)
+  }
+  const left = parse(a)
+  const right = parse(b)
+  if (!left || !right) return
+  const index = left.findIndex((part, index) => part !== right[index])
+  return index === -1 ? 0 : left[index]! - right[index]!
+}
+
+export function isAppUpgrade(previous: string | undefined, current: string | undefined) {
+  if (!previous || !current) return false
+  const comparison = compareVersions(current, previous)
+  return comparison !== undefined && comparison > 0
+}
+
+export function shouldDisplayTabsToast(
+  previous: string | undefined,
+  current: string | undefined,
+  existingInstall: boolean,
+) {
+  return isAppUpgrade(previous, current) || (!previous && existingInstall)
+}
+
+export function shouldEnableNewLayout(previous: string | undefined, current: string | undefined) {
+  if (!current) return false
+  const currentComparison = compareVersions(current, newLayoutDesignsUpgradeCutoff)
+  if (!previous) return currentComparison !== undefined && currentComparison > 0
+  if (!isAppUpgrade(previous, current)) return false
+  const previousComparison = compareVersions(previous, newLayoutDesignsUpgradeCutoff)
+  return (
+    previousComparison !== undefined &&
+    currentComparison !== undefined &&
+    previousComparison <= 0 &&
+    currentComparison > 0
+  )
+}
 
 export function layoutTransitionState(scheduled: boolean, eligible: boolean, retired: boolean, dismissed: boolean) {
   return {
@@ -211,6 +254,15 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
   init: () => {
     const platform = usePlatform()
     const [store, setStore, _, ready] = persisted("settings.v3", createStore<Settings>(defaultSettings))
+    const [launch, setLaunch, , launchReady] = persisted(
+      "app-version.v1",
+      createStore<{ version?: string }>({ version: undefined }),
+    )
+    const [launchState, setLaunchState] = createStore({
+      classified: false,
+      migrationApplied: false,
+      previous: undefined as string | undefined,
+    })
     const showFileTree = withFallback(() => store.general?.showFileTree, defaultSettings.general.showFileTree)
     const showSearch = withFallback(() => store.general?.showSearch, defaultSettings.general.showSearch)
     const showStatus = withFallback(() => store.general?.showStatus, defaultSettings.general.showStatus)
@@ -223,10 +275,16 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
     const layoutTransitionClassified = createMemo(() => typeof store.general?.layoutTransitionEligible === "boolean")
     const layoutTransitionEligible = withFallback(() => store.general?.layoutTransitionEligible, false)
     const newInterfaceNoticeDismissed = withFallback(() => store.general?.newInterfaceNoticeDismissed, false)
+    const layoutUpgrade = createMemo(() =>
+      launchState.classified && !launchState.migrationApplied
+        ? shouldEnableNewLayout(launchState.previous, platform.version)
+        : false,
+    )
     const layoutTransition = createMemo(() =>
       layoutTransitionState(!!sunset, layoutTransitionEligible(), oldInterfaceRetired(), newInterfaceNoticeDismissed()),
     )
     const newLayoutDesigns = createMemo(() => {
+      if (layoutUpgrade()) return true
       if (!ready() && !oldInterfaceRetired()) return legacyNewLayoutDesignsDefault
       if (!layoutTransitionClassified()) {
         return resolveNewLayoutDesigns(
@@ -257,6 +315,35 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         if (timeout.current !== undefined) clearTimeout(timeout.current)
       })
     }
+
+    createEffect(() => {
+      if (!launchReady() || launchState.classified) return
+      setLaunchState({
+        classified: true,
+        previous: launch.version,
+      })
+      if (!platform.version || launch.version === platform.version) return
+      setLaunch("version", platform.version)
+    })
+
+    createEffect(() => {
+      if (!ready() || !launchState.classified || launchState.migrationApplied) return
+      if (layoutUpgrade() && store.general?.newLayoutDesigns !== true) {
+        setStore("general", "newLayoutDesigns", true)
+      }
+      setLaunchState("migrationApplied", true)
+    })
+
+    createEffect(() => {
+      if (!ready() || !launchState.classified) return
+      if (typeof store.general?.shouldDisplayTabsToast === "boolean") return
+      if (!launchState.previous && !layoutTransitionClassified()) return
+      setStore(
+        "general",
+        "shouldDisplayTabsToast",
+        shouldDisplayTabsToast(launchState.previous, platform.version, layoutTransitionEligible()),
+      )
+    })
 
     createEffect(() => {
       if (!ready() || !oldInterfaceRetired()) return
@@ -382,7 +469,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         },
         newLayoutDesigns,
         setNewLayoutDesigns(value: boolean) {
-          setStore("general", "newLayoutDesigns", oldInterfaceRetired() ? true : value)
+          const next = oldInterfaceRetired() ? true : value
+          if (newLayoutDesigns() === next) return
+          setStore("general", "newLayoutDesigns", next)
+          if (typeof window !== "undefined") setTimeout(() => window.location.reload())
         },
         layoutTransitionClassified,
         setOldLayoutEligible(eligible: boolean) {
@@ -405,6 +495,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         }, defaultSettings.general.promptEnhance),
         setPromptEnhance(value: PromptEnhanceState) {
           setStore("general", "promptEnhance", value)
+        },
+        shouldDisplayTabsToast: withFallback(() => store.general?.shouldDisplayTabsToast, false),
+        dismissTabsToast() {
+          setStore("general", "shouldDisplayTabsToast", false)
         },
       },
       visibility: {
