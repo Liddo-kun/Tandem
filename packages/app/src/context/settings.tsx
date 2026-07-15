@@ -1,5 +1,5 @@
 import { createStore, reconcile } from "solid-js/store"
-import { createEffect, createMemo, onCleanup } from "solid-js"
+import { createEffect, createMemo, createSignal, onCleanup } from "solid-js"
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { usePlatform } from "@/context/platform"
 import { persisted } from "@/utils/persist"
@@ -43,6 +43,8 @@ export interface Settings {
     promptEnhance: PromptEnhanceState
     // Legacy boolean from the old two-way RePrompt toggle; migrated on read.
     reprompt?: boolean
+    layoutTransitionEligible?: boolean
+    newInterfaceNoticeDismissed?: boolean
   }
   appearance: {
     fontSize: number
@@ -71,7 +73,28 @@ export const displayScaleStep = 0.02
 export type DisplayScale = number
 
 const displayScaleDefault: DisplayScale = 1
-export const newLayoutDesignsDefault = import.meta.env.VITE_OPENCODE_CHANNEL !== "prod"
+const legacyNewLayoutDesignsDefault = import.meta.env.VITE_OPENCODE_CHANNEL !== "prod"
+export const newLayoutDesignsDefault = true
+// Existing users can switch layouts until local midnight on this date. Set new Date(YYYY, M-1, D) to show.
+export const oldInterfaceSunset = import.meta.env.VITE_OPENCODE_CHANNEL !== "prod" ? new Date(2026, 7, 14) : null
+
+export function layoutTransitionState(scheduled: boolean, eligible: boolean, retired: boolean, dismissed: boolean) {
+  return {
+    available: scheduled && eligible && !retired,
+    notice: scheduled && eligible && retired && !dismissed,
+  }
+}
+
+export const maximumSunsetTimeout = 2_147_483_647
+
+export function nextSunsetCheckDelay(sunset: number, now: number) {
+  return Math.min(Math.max(0, sunset - now), maximumSunsetTimeout)
+}
+
+export function resolveNewLayoutDesigns(retired: boolean, preference: boolean | undefined, fallback = true) {
+  if (retired) return true
+  return preference ?? fallback
+}
 
 const monoFallback =
   'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
@@ -195,8 +218,51 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
       () => store.general?.showCustomAgents,
       defaultSettings.general.showCustomAgents,
     )
-    const newLayoutDesigns = withFallback(() => store.general?.newLayoutDesigns, newLayoutDesignsDefault)
+    const sunset = oldInterfaceSunset
+    const [oldInterfaceRetired, setOldInterfaceRetired] = createSignal(sunset ? Date.now() >= sunset.getTime() : false)
+    const layoutTransitionClassified = createMemo(() => typeof store.general?.layoutTransitionEligible === "boolean")
+    const layoutTransitionEligible = withFallback(() => store.general?.layoutTransitionEligible, false)
+    const newInterfaceNoticeDismissed = withFallback(() => store.general?.newInterfaceNoticeDismissed, false)
+    const layoutTransition = createMemo(() =>
+      layoutTransitionState(!!sunset, layoutTransitionEligible(), oldInterfaceRetired(), newInterfaceNoticeDismissed()),
+    )
+    const newLayoutDesigns = createMemo(() => {
+      if (!ready() && !oldInterfaceRetired()) return legacyNewLayoutDesignsDefault
+      if (!layoutTransitionClassified()) {
+        return resolveNewLayoutDesigns(
+          oldInterfaceRetired(),
+          store.general?.newLayoutDesigns,
+          legacyNewLayoutDesignsDefault,
+        )
+      }
+      return resolveNewLayoutDesigns(
+        oldInterfaceRetired(),
+        store.general?.newLayoutDesigns,
+        layoutTransitionEligible() ? legacyNewLayoutDesignsDefault : newLayoutDesignsDefault,
+      )
+    })
     const visible = (preference: () => boolean) => createMemo(() => !newLayoutDesigns() || preference())
+
+    if (sunset && !oldInterfaceRetired()) {
+      const timeout = { current: undefined as ReturnType<typeof setTimeout> | undefined }
+      const checkSunset = () => {
+        if (Date.now() >= sunset.getTime()) {
+          setOldInterfaceRetired(true)
+          return
+        }
+        timeout.current = setTimeout(checkSunset, nextSunsetCheckDelay(sunset.getTime(), Date.now()))
+      }
+      checkSunset()
+      onCleanup(() => {
+        if (timeout.current !== undefined) clearTimeout(timeout.current)
+      })
+    }
+
+    createEffect(() => {
+      if (!ready() || !oldInterfaceRetired()) return
+      if (store.general?.newLayoutDesigns === true) return
+      setStore("general", "newLayoutDesigns", true)
+    })
 
     createEffect(() => {
       if (typeof document === "undefined") return
@@ -316,7 +382,18 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         },
         newLayoutDesigns,
         setNewLayoutDesigns(value: boolean) {
-          setStore("general", "newLayoutDesigns", value)
+          setStore("general", "newLayoutDesigns", oldInterfaceRetired() ? true : value)
+        },
+        layoutTransitionClassified,
+        setOldLayoutEligible(eligible: boolean) {
+          const current = store.general?.layoutTransitionEligible
+          if (typeof current === "boolean") return
+          setStore("general", "layoutTransitionEligible", eligible)
+        },
+        layoutTransitionAvailable: createMemo(() => ready() && layoutTransition().available),
+        newInterfaceNoticeVisible: createMemo(() => ready() && layoutTransition().notice),
+        dismissNewInterfaceNotice() {
+          setStore("general", "newInterfaceNoticeDismissed", true)
         },
         // UPSTREAM-DIVERGENCE: Tandem prompt-enhance composer toggle. Falls back
         // to the legacy boolean `reprompt` field written by the old two-way toggle.
