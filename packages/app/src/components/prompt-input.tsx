@@ -20,6 +20,7 @@ import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/f
 import {
   ContentPart,
   DEFAULT_PROMPT,
+  isCommentItem,
   isPromptEqual,
   Prompt,
   usePrompt,
@@ -1731,7 +1732,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               )}
             />
             <PromptContextItems
-              items={contextItems()}
+              items={contextItems().filter((item) => !isCommentItem(item))}
               active={(item) => {
                 const active = comments.active()
                 return !!item.commentID && item.commentID === active?.id && item.path === active?.file
@@ -1741,6 +1742,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 if (item.commentID) comments.remove(item.path, item.commentID)
                 prompt.context.remove(item.key)
               }}
+              newLayoutDesigns={props.controls.newLayoutDesigns}
               t={(key) => language.t(key as Parameters<typeof language.t>[0])}
             />
             <PromptImageAttachments
@@ -1750,6 +1752,17 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               }
               onRemove={removeAttachment}
               removeLabel={language.t("prompt.attachment.remove")}
+              newLayoutDesigns={props.controls.newLayoutDesigns}
+              comments={contextItems().filter(isCommentItem)}
+              commentActive={(item) => {
+                const active = comments.active()
+                return !!item.commentID && item.commentID === active?.id && item.path === active?.file
+              }}
+              onOpenComment={openComment}
+              onRemoveComment={(item) => {
+                if (item.commentID) comments.remove(item.path, item.commentID)
+                prompt.context.remove(item.key)
+              }}
             />
             <div
               class="relative min-h-[52px]"
@@ -1971,6 +1984,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 if (item.commentID) comments.remove(item.path, item.commentID)
                 prompt.context.remove(item.key)
               }}
+              newLayoutDesigns={props.controls.newLayoutDesigns}
               t={(key) => language.t(key as Parameters<typeof language.t>[0])}
             />
             <PromptImageAttachments
@@ -1980,6 +1994,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               }
               onRemove={removeAttachment}
               removeLabel={language.t("prompt.attachment.remove")}
+              newLayoutDesigns={props.controls.newLayoutDesigns}
             />
             <div
               class="relative"

@@ -577,39 +577,6 @@ export function Session() {
         dialog.clear()
       },
     },
-    // UPSTREAM-DIVERGENCE: Tandem /compact-image (image-based context compaction).
-    {
-      title: "Image-compact session",
-      value: "session.compactImage",
-      category: "Session",
-      slash: {
-        name: "compact-image",
-        aliases: [],
-      },
-      run: () => {
-        const selectedModel = local.model.current()
-        if (!selectedModel) {
-          toast.show({
-            variant: "warning",
-            message: "Connect a provider to image-compact this session",
-            duration: 3000,
-          })
-          return
-        }
-        void sdk.client.session
-          .compactImage({
-            sessionID: route.sessionID,
-            modelID: selectedModel.modelID,
-            providerID: selectedModel.providerID,
-          })
-          .then((result) => {
-            if (result.data && !result.data.ok) {
-              toast.show({ variant: "warning", message: result.data.message, duration: 6000 })
-            }
-          })
-        dialog.clear()
-      },
-    },
     {
       title: "Unshare session",
       value: "session.unshare",

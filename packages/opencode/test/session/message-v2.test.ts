@@ -319,63 +319,6 @@ describe("session.message-v2.toModelMessage", () => {
     ])
   })
 
-  // UPSTREAM-DIVERGENCE: image compactions carry their own banner/pages/pointer
-  // parts, so the legacy "What did we do so far?" filler must not be injected.
-  test("suppresses the compaction filler question for image compactions", async () => {
-    const messageID = "m-user"
-
-    const input: SessionV1.WithParts[] = [
-      {
-        info: userInfo(messageID),
-        parts: [
-          {
-            ...basePart(messageID, "p1"),
-            type: "compaction",
-            auto: false,
-            tail_start_id: MessageID.make("msg_tail"),
-          },
-          {
-            ...basePart(messageID, "p2"),
-            type: "text",
-            text: "[Imaged context begins.]",
-            synthetic: true,
-            metadata: { compactionImage: "banner" },
-          },
-          {
-            ...basePart(messageID, "p3"),
-            type: "file",
-            mime: "image/png",
-            filename: "context-page-01.png",
-            url: "data:image/png;base64,AAAA",
-          },
-          {
-            ...basePart(messageID, "p4"),
-            type: "text",
-            text: "[End of imaged context.]",
-            synthetic: true,
-            metadata: { compactionImage: "end" },
-          },
-        ] as SessionV1.Part[],
-      },
-    ]
-
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([
-      {
-        role: "user",
-        content: [
-          { type: "text", text: "[Imaged context begins.]" },
-          {
-            type: "file",
-            mediaType: "image/png",
-            filename: "context-page-01.png",
-            data: "data:image/png;base64,AAAA",
-          },
-          { type: "text", text: "[End of imaged context.]" },
-        ],
-      },
-    ])
-  })
-
   test("converts assistant tool completion into tool-call + tool-result messages with attachments", async () => {
     const userID = "m-user"
     const assistantID = "m-assistant"

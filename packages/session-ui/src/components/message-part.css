@@ -72,38 +72,6 @@
     margin-left: auto;
   }
 
-  /* UPSTREAM-DIVERGENCE: Tandem /compact-image collapsed page block. */
-  [data-slot="user-message-imaged-context"] {
-    width: 100%;
-    border-radius: 6px;
-    border: 0.5px solid var(--v2-border-border-base);
-    background: var(--v2-background-bg-layer-02);
-    padding: 4px 8px;
-
-    summary {
-      cursor: pointer;
-      font-size: var(--font-size-small, 12px);
-      color: var(--text-weak);
-      user-select: none;
-    }
-
-    [data-slot="user-message-imaged-pages"] {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-top: 8px;
-    }
-
-    [data-slot="user-message-imaged-page"] {
-      width: 100%;
-      height: auto;
-      border: 0.5px solid var(--v2-border-border-base);
-      border-radius: 4px;
-      cursor: pointer;
-      background: white;
-    }
-  }
-
   [data-slot="user-message-attachment"] {
     display: flex;
     flex-direction: column;
@@ -128,8 +96,20 @@
     }
 
     &[data-type="image"] {
-      width: 48px;
-      height: 48px;
+      position: relative;
+      width: 58px;
+      height: 46px;
+      border: none;
+
+      /* inset box-shadows do not paint over <img> content, so the hairline is an overlay */
+      &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        box-shadow: inset 0 0 0 0.5px var(--v2-border-border-base);
+        pointer-events: none;
+      }
     }
 
     &[data-type="file"] {
@@ -1399,6 +1379,16 @@ body:not([data-new-layout]) {
 
       &:hover {
         border-color: var(--border-strong-base);
+      }
+
+      &[data-type="image"] {
+        width: 48px;
+        height: 48px;
+        border: 1px solid var(--border-weak-base);
+
+        &::after {
+          content: none;
+        }
       }
     }
 

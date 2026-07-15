@@ -7099,105 +7099,6 @@
         ]
       }
     },
-    "/session/{sessionID}/compact-image": {
-      "post": {
-        "tags": ["session"],
-        "operationId": "session.compact_image",
-        "parameters": [
-          {
-            "name": "sessionID",
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "pattern": "^ses"
-            },
-            "required": true
-          },
-          {
-            "name": "directory",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "required": false
-          },
-          {
-            "name": "workspace",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "required": false
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Image compaction result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CompactImageResult"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "BadRequest | InvalidRequestError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/effect_HttpApiError_BadRequest"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestError"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NotFoundError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFoundError"
-                }
-              }
-            }
-          }
-        },
-        "description": "Compact the session's older history into dense transcript-page images (optical compaction) instead of a model-written summary.",
-        "summary": "Image-compact session",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "providerID": {
-                    "type": "string"
-                  },
-                  "modelID": {
-                    "type": "string"
-                  }
-                },
-                "required": ["providerID", "modelID"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "js",
-            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.session.compact_image({\n  ...\n})"
-          }
-        ]
-      }
-    },
     "/session/{sessionID}/prompt_async": {
       "post": {
         "tags": ["session"],
@@ -21596,21 +21497,6 @@
               "reserved": {
                 "type": "integer",
                 "minimum": 0
-              },
-              "image": {
-                "type": "object",
-                "properties": {
-                  "models": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "discard_on_summary": {
-                    "type": "boolean"
-                  }
-                },
-                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -23171,19 +23057,6 @@
             }
           }
         }
-      },
-      "CompactImageResult": {
-        "type": "object",
-        "properties": {
-          "ok": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          }
-        },
-        "required": ["ok", "message"],
-        "additionalProperties": false
       },
       "TextPartInput": {
         "type": "object",
