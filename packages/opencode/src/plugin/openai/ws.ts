@@ -368,6 +368,12 @@ function cancelError(reason: unknown) {
 function abortError(signal: AbortSignal | undefined) {
   const reason = signal?.reason
   if (isAbortError(reason)) return reason
+  // UPSTREAM-DIVERGENCE(temporary): preserve typed abort reasons like ProviderHeaderTimeoutError,
+  // matching cancelError above. Flattening them into a DOMException("AbortError") makes
+  // MessageV2.fromError misclassify retryable provider timeouts as user interrupts, so the
+  // session shows "Interrupted" instead of auto-retrying. Delete this line (restoring the
+  // upstream ternary below) once upstream fixes abortError in plugin/openai/ws.ts.
+  if (reason instanceof Error) return reason
   return new DOMException(reason instanceof Error ? reason.message : "Aborted", "AbortError")
 }
 
