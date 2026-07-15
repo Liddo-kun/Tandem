@@ -269,7 +269,8 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   }
 
   const openTerminal = () => {
-    if (terminal.all().length > 0) terminal.new()
+    if (terminal.all().length > 0) terminal.new({ focus: true })
+    if (terminal.all().length === 0) terminal.requestFocus()
     view().terminal.open()
   }
 
@@ -503,7 +504,15 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       title: language.t("command.terminal.toggle"),
       keybind: "ctrl+`",
       slash: "terminal",
-      onSelect: () => view().terminal.toggle(),
+      onSelect: () => {
+        if (view().terminal.opened()) {
+          terminal.cancelFocus()
+          view().terminal.close()
+          return
+        }
+        terminal.requestFocus(terminal.active())
+        view().terminal.open()
+      },
     }),
     viewCommand({
       id: "review.toggle",
