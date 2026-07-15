@@ -151,3 +151,4 @@ For each item, reference the modified files or stable symbols; line numbers are 
 
 - Keeps the OpenTUI diff file tree snapshot test stable on Windows by waiting for a non-empty settled frame before reading rendered rows. Files: `packages/opencode/test/cli/tui/diff-viewer-file-tree.test.tsx`.
 - Extends the prompt-submit test's mocks with the `checksum` encode export and Tandem's prompt-enhance setting, which Tandem's prompt/persistence and submit paths require, so upstream's focused submit tests can run under Bun. File: `packages/app/src/components/prompt-input/submit.test.ts`.
+- Points the HTTP API exerciser's isolated XDG config/data directories at `Brand.dir` so auth and config scenarios test Tandem's parallel-install paths instead of hardcoding upstream's `opencode` directory. File: `packages/opencode/test/server/httpapi-exercise/environment.ts`.
