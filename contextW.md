@@ -163,6 +163,7 @@ Enhanced-only features should be additive or feature-detected where possible.
 ## Local Development
 
 - Bun path on this machine: `C:\Program_Files\Bun\bin\bun.exe`.
+- User env vars set `XDG_CONFIG_HOME=C:\Program_Files\Config`, so Tandem/opencode global config lives under `C:\Program_Files\Config\tandem\`, not `~\.config\`.
 - `oc web` or `opencode dev web` may show the remote `https://app.opencode.ai` UI, so it is not proof that local `packages/app` changes are visible.
 - LAN web test command: `oc web --hostname 0.0.0.0 --port 4096` or `opencode web --hostname 0.0.0.0 --port 4096`.
 - Local app UI test backend: `C:\Program_Files\Bun\bin\bun.exe run --cwd packages/opencode --conditions=browser ./src/index.ts serve --port 4096`.
@@ -210,7 +211,7 @@ Enhanced-only features should be additive or feature-detected where possible.
 
 - Normal Android builds should package as `Tandem` with Android package id `app.liddokun.tandem`.
 - `bun run prepare:android` regenerates launcher icons and restores generated Android metadata/MainActivity patches from `packages/android/src-tauri/tauri.conf.json`.
-- Use `bun run install:y700 -- -Name <name>` from `packages/android` for a side-by-side Y700 APK build. This builds a temporary parallel-installable debug APK, installs it on the Y700, and restores generated Android metadata afterward.
+- Use `bun run install:y700 -- -Name <name>` from `packages/android` for a side-by-side Y700 APK build. This builds a parallel-installable optimized release APK with normal release signing, installs it on the Y700, and restores generated Android metadata afterward. Existing debug-signed variants need a one-time `-Overwrite` migration, which erases only that variant's app data.
 - Run the Y700 installer directly, without wrapping it in `Tee-Object`, `rg`, or another output-filtering pipeline. `install-y700-variant.ts` already writes full logs and prints progress; an outer pipeline can leave the shell/tool call waiting even after the build and install have completed.
 - Y700 was previously seen on ADB as `192.168.1.85:42979` and `adb-HA28HF30-cGyG7x._adb-tls-connect._tcp`.
 - If ADB shows no devices even when the Y700 is connected, restart the adb server.

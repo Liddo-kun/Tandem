@@ -2,6 +2,7 @@ import { createWriteStream, existsSync, readdirSync } from "node:fs"
 import { copyFile, mkdir, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
+import { ensureAndroidSigning } from "../../script/android-signing"
 
 type Target = "aarch64" | "armv7" | "i686" | "x86_64"
 
@@ -9,6 +10,7 @@ type Options = {
   name: string
   device?: string
   target: Target
+  overwrite: boolean
   deviceRetrySeconds: number
   deviceRetryDelaySeconds: number
   noOutputTimeoutSeconds: number
@@ -42,9 +44,10 @@ const apkDir = path.join(
   "outputs",
   "apk",
   "universal",
-  "debug",
+  "release",
 )
-const sourceApk = path.join(apkDir, "app-universal-debug.apk")
+const sourceApk = path.join(apkDir, "app-universal-release.apk")
+const root = path.resolve(scriptDir, "../..")
 
 const options = parseArgs(process.argv.slice(2))
 const variantName = options.name.trim()
@@ -58,10 +61,10 @@ const packageSegments = variantName
 
 if (packageSegments.length === 0) throw new Error("-Name must contain at least one ASCII letter or digit.")
 
-// UPSTREAM-DIVERGENCE: Side-by-side debug variants should show Tandem while package IDs stay compatible.
+// UPSTREAM-DIVERGENCE: Side-by-side release variants should show Tandem while package IDs stay compatible.
 const appName = `Tandem ${variantName}`
 const packageId = `ai.opencode.android.${packageSegments.join(".")}`
-const renamedApk = path.join(apkDir, `opencode-${packageSegments.join("-")}-y700-debug.apk`)
+const renamedApk = path.join(apkDir, `opencode-${packageSegments.join("-")}-y700-release.apk`)
 const workDir = path.join(os.tmpdir(), `opencode-y700-${crypto.randomUUID().replaceAll("-", "")}`)
 const buildLog = path.join(workDir, "android-build.log")
 const restoreLog = path.join(workDir, "android-restore.log")
@@ -82,6 +85,7 @@ async function main() {
   loadToolchainEnv()
   requireCommands(["adb", "bun", "cargo", "python"])
   await mkdir(workDir, { recursive: true })
+  await ensureAndroidSigning(root)
   const resolvedDevice = await resolveDevice(options)
 
   await requireAndroidProject()
@@ -92,15 +96,10 @@ async function main() {
     await setVariantMetadata()
 
     console.log(`Building ${appName} (${packageId}); log: ${buildLog}`)
-    await runLoggedCommand(
-      buildLog,
-      "bun",
-      ["run", "tauri", "android", "build", "--apk", "--debug", "--target", options.target],
-      {
-        cwd: scriptDir,
-        env: { OPENCODE_ANDROID_VARIANT: "1" },
-      },
-    )
+    await runLoggedCommand(buildLog, "bun", ["run", "tauri", "android", "build", "--apk", "--target", options.target], {
+      cwd: scriptDir,
+      env: { OPENCODE_ANDROID_VARIANT: "1" },
+    })
 
     if (!(await Bun.file(sourceApk).exists())) throw new Error(`Build finished but APK was not found: ${sourceApk}`)
 
@@ -108,8 +107,26 @@ async function main() {
     console.log(`Created APK: ${renamedApk}`)
 
     console.log(`Installing on ${resolvedDevice}`)
-    const install = runCommand("adb", ["-s", resolvedDevice, "install", "-r", renamedApk])
+    let install = runCommand("adb", ["-s", resolvedDevice, "install", "-r", renamedApk])
     writeCommandOutput(install)
+    if (
+      install.exitCode !== 0 &&
+      /signatures do not match|INSTALL_FAILED_UPDATE_INCOMPATIBLE/i.test(install.stdout + install.stderr)
+    ) {
+      if (!options.overwrite) {
+        throw new Error(
+          `The installed ${appName} uses the old debug signature. Re-run with -Overwrite to replace it with the optimized release build (this erases that variant's app data).`,
+        )
+      }
+
+      console.log(`Signature mismatch; uninstalling ${packageId} before installing the release build.`)
+      const uninstall = runCommand("adb", ["-s", resolvedDevice, "uninstall", packageId])
+      writeCommandOutput(uninstall)
+      if (uninstall.exitCode !== 0) throw new Error(`adb uninstall failed with exit code ${uninstall.exitCode}`)
+
+      install = runCommand("adb", ["-s", resolvedDevice, "install", renamedApk])
+      writeCommandOutput(install)
+    }
     if (install.exitCode !== 0) throw new Error(`adb install failed with exit code ${install.exitCode}`)
 
     const verify = runCommand("adb", ["-s", resolvedDevice, "shell", "pm", "path", packageId])
@@ -138,6 +155,7 @@ function parseArgs(args: string[]): Options {
   const result: Options = {
     name: "",
     target: "aarch64",
+    overwrite: false,
     deviceRetrySeconds: 45,
     deviceRetryDelaySeconds: 3,
     noOutputTimeoutSeconds: 600,
@@ -150,6 +168,12 @@ function parseArgs(args: string[]): Options {
 
     const [rawKey, inlineValue] = arg.replace(/^-+/, "").split("=", 2)
     const key = normalizeKey(rawKey ?? "")
+    if (key === "overwrite") {
+      if (inlineValue !== undefined) throw new Error(`${arg} does not take a value.`)
+      result.overwrite = true
+      continue
+    }
+
     const value = inlineValue ?? args[++index]
     if (!value) throw new Error(`Missing value for ${arg}`)
 

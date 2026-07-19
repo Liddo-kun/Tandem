@@ -23,10 +23,9 @@ const mainActivity = await findMainActivity()
 
 await patchGradleProperties()
 
-if (process.env.OPENCODE_ANDROID_VARIANT !== "1") {
-  await patchBuildGradle()
-  await patchStrings()
-}
+const preserveVariantMetadata = process.env.OPENCODE_ANDROID_VARIANT === "1"
+await patchBuildGradle(preserveVariantMetadata)
+if (!preserveVariantMetadata) await patchStrings()
 
 if (await manifest.exists()) {
   const text = await manifest.text()
@@ -54,15 +53,21 @@ if (mainActivity && (await Bun.file(mainActivity).exists())) {
   )
 }
 
-async function patchBuildGradle() {
+async function patchBuildGradle(preserveIdentifier: boolean) {
   const buildGradle = Bun.file(buildGradlePath)
   if (!(await buildGradle.exists())) return
 
-  const text = patchReleaseSigning(await buildGradle.text())
+  let text = patchReleaseSigning(await buildGradle.text())
+  if (!preserveIdentifier) {
+    text = text.replace(
+      /applicationId\s*=\s*"[^"]+"/,
+      `applicationId = "${config.identifier ?? "app.liddokun.tandem"}"`,
+    )
+  }
+
   await Bun.write(
     buildGradlePath,
     text
-      .replace(/applicationId\s*=\s*"[^"]+"/, `applicationId = "${config.identifier ?? "app.liddokun.tandem"}"`)
       // UPSTREAM-DIVERGENCE: Android release APKs must connect to LAN HTTP Tandem/opencode servers.
       .replace(
         /manifestPlaceholders\["usesCleartextTraffic"\]\s*=\s*"[^"]+"/,
