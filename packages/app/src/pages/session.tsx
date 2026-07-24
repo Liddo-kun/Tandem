@@ -58,6 +58,7 @@ import { useSync } from "@/context/sync"
 import { useTabs } from "@/context/tabs"
 import { TerminalProvider, useTerminal } from "@/context/terminal"
 import { PromptInput } from "@/components/prompt-input"
+import { PromptInputV2Composer, usePromptInputV2Controller } from "@/components/prompt-input-v2"
 import { useSettingsCommand } from "@/components/settings-dialog"
 import { setCursorPosition } from "@/components/prompt-input/editor-dom"
 import { promptLength } from "@/components/prompt-input/history"
@@ -2213,83 +2214,6 @@ export default function Page() {
 
   useUsageExceededDialogs()
 
-  const composerRegion = () => {
-    const controller = createSessionComposerRegionController({
-      state: composer,
-      sessionKey,
-      sessionID: () => params.id,
-      prompt,
-      ready: () => !store.deferRender && messagesReady(),
-      centered,
-      todo: {
-        collapsed: () => view().todoCollapsed.get(),
-        onToggle: () => view().todoCollapsed.set(!view().todoCollapsed.get()),
-      },
-      followup: () =>
-        params.id && !isChildSession()
-          ? {
-              items: followupDock(),
-              sending: sendingFollowup(),
-              onSend: (id) => void sendFollowup(params.id!, id, { manual: true }),
-              onEdit: editFollowup,
-            }
-          : undefined,
-      revert: () =>
-        rolled().length > 0
-          ? {
-              items: rolled(),
-              restoring: restoring(),
-              disabled: reverting(),
-              onRestore: restore,
-            }
-          : undefined,
-      onResponseSubmit: resumeScroll,
-      openParent: () => {
-        const id = info()?.parentID
-        if (!id) return
-        navigate(
-          params.serverKey
-            ? sessionHref(requireServerKey(params.serverKey), id)
-            : legacySessionHref(sdk().directory, id),
-        )
-      },
-      setPromptRef: (el) => {
-        inputRef = el
-      },
-      setDockRef: (el) => {
-        promptDock = el
-      },
-    })
-    return (
-      <SessionComposerRegion
-        controller={controller}
-        promptInput={
-          <PromptInput
-            controls={inputController()}
-            ref={(el) => {
-              inputRef = el
-            }}
-            newSessionWorktree={newSessionWorktree()}
-            onNewSessionWorktreeReset={() => setStore("newSessionWorktree", "main")}
-            onSubmit={() => {
-              comments.clear()
-              resumeScroll()
-            }}
-            edit={editingFollowup()}
-            onEditLoaded={clearFollowupEdit}
-            shouldQueue={queueEnabled}
-            onQueue={queueFollowup}
-            onAbort={() => {
-              const id = params.id
-              if (!id) return
-              setFollowup("paused", id, true)
-            }}
-          />
-        }
-      />
-    )
-  }
-
   // UPSTREAM-DIVERGENCE: the mobile Session tab hosts the session title and (via this mount,
   // filled by MessageTimeline through a Portal) the overflow actions, replacing the inline title
   // bar to save vertical space; the tab split widens to 75/25 to make room for the title.
@@ -2419,7 +2343,124 @@ export default function Page() {
         </Switch>
       </div>
 
-      <Show when={(params.id || !newSessionDesign()) && !mobileChanges()}>{(_) => composerRegion()}</Show>
+      <Show when={(params.id || !newSessionDesign()) && !mobileChanges()}>
+        {(_) => {
+          const controller = createSessionComposerRegionController({
+            state: composer,
+            sessionKey,
+            sessionID: () => params.id,
+            prompt,
+            ready: () => !store.deferRender && messagesReady(),
+            centered,
+            todo: {
+              collapsed: () => view().todoCollapsed.get(),
+              onToggle: () => view().todoCollapsed.set(!view().todoCollapsed.get()),
+            },
+            followup: () =>
+              params.id && !isChildSession()
+                ? {
+                    items: followupDock(),
+                    sending: sendingFollowup(),
+                    onSend: (id) => void sendFollowup(params.id!, id, { manual: true }),
+                    onEdit: editFollowup,
+                  }
+                : undefined,
+            revert: () =>
+              rolled().length > 0
+                ? {
+                    items: rolled(),
+                    restoring: restoring(),
+                    disabled: reverting(),
+                    onRestore: restore,
+                  }
+                : undefined,
+            onResponseSubmit: resumeScroll,
+            openParent: () => {
+              const id = info()?.parentID
+              if (!id) return
+              navigate(
+                params.serverKey
+                  ? sessionHref(requireServerKey(params.serverKey), id)
+                  : legacySessionHref(sdk().directory, id),
+              )
+            },
+            setPromptRef: (el) => {
+              inputRef = el
+            },
+            setDockRef: (el) => {
+              promptDock = el
+            },
+          })
+          return (
+            <SessionComposerRegion
+              controller={controller}
+              promptInput={
+                <Show
+                  // UPSTREAM-DIVERGENCE: Tandem v2-only composer gate. The Android APK forces the v2
+                  // composer via a build flag, which also lets the legacy branch tree-shake out.
+                  when={import.meta.env.VITE_TANDEM_ANDROID_V2_ONLY === "true" || newSessionDesign()}
+                  fallback={
+                    <PromptInput
+                      controls={inputController()}
+                      ref={(el) => {
+                        inputRef = el
+                      }}
+                      newSessionWorktree={newSessionWorktree()}
+                      onNewSessionWorktreeReset={() => setStore("newSessionWorktree", "main")}
+                      onSubmit={() => {
+                        comments.clear()
+                        resumeScroll()
+                      }}
+                      edit={editingFollowup()}
+                      onEditLoaded={clearFollowupEdit}
+                      shouldQueue={queueEnabled}
+                      onQueue={queueFollowup}
+                      onAbort={() => {
+                        const id = params.id
+                        if (!id) return
+                        setFollowup("paused", id, true)
+                      }}
+                    />
+                  }
+                >
+                  {(_) => {
+                    const controller = usePromptInputV2Controller({
+                      get controls() {
+                        return inputController()
+                      },
+                      ref: (el) => {
+                        inputRef = el
+                      },
+                      get newSessionWorktree() {
+                        return newSessionWorktree()
+                      },
+                      onNewSessionWorktreeReset: () => setStore("newSessionWorktree", "main"),
+                      onSubmit: () => {
+                        comments.clear()
+                        resumeScroll()
+                      },
+                      shouldQueue: queueEnabled,
+                      onQueue: queueFollowup,
+                      onAbort: () => {
+                        const id = params.id
+                        if (!id) return
+                        setFollowup("paused", id, true)
+                      },
+                    })
+                    return (
+                      <PromptInputV2Composer
+                        controller={controller}
+                        edit={editingFollowup()}
+                        onEditLoaded={clearFollowupEdit}
+                      />
+                    )
+                  }}
+                </Show>
+              }
+            />
+          )
+        }}
+      </Show>
       <Show when={!!params.id && mobileTabsBottom()}>{mobileTabs(true, true)}</Show>
     </>
   )
