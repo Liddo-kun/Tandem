@@ -5,6 +5,7 @@ import { produce, reconcile, type SetStoreFunction } from "solid-js/store"
 import type { createServerSdkContext } from "./server-sdk"
 import type { createServerSyncContextInner } from "./server-sync"
 import type { State } from "./global-sync/types"
+import { normalizeSessionInfo } from "@/utils/session"
 
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 const sessionFields = new Set([
@@ -15,6 +16,7 @@ const sessionFields = new Set([
   "permission",
   "question",
   "message",
+  "session_message",
   "part",
   "part_text_accum_delta",
 ])
@@ -117,7 +119,6 @@ export const createDirSyncContext = (
       // UPSTREAM-DIVERGENCE: mobile resume pulls a fresh status refresh because SSE is suspended
       // in the background; upstream only updates session status from live events.
       status: serverSync.session.status,
-      diff: serverSync.session.diff,
       todo: serverSync.session.todo,
       history: serverSync.session.history,
       evict(sessionID: string) {
@@ -126,9 +127,9 @@ export const createDirSyncContext = (
       fetch: async (count = 10) => {
         const [store, setStore] = current()
         setStore("limit", (value) => value + count)
-        const response = await client.session.list()
-        const sessions = (response.data ?? [])
-          .filter((session) => !!session?.id)
+        const response = await serverSDK.api.session.list({ directory, limit: store.limit, order: "desc" })
+        const sessions = response.data
+          .map(normalizeSessionInfo)
           .sort((a, b) => cmp(a.id, b.id))
           .slice(0, store.limit)
         sessions.forEach(serverSync.session.remember)
@@ -136,7 +137,7 @@ export const createDirSyncContext = (
       },
       more: createMemo(() => current()[0].session.length >= current()[0].limit),
       archive: async (sessionID: string) => {
-        await serverSDK.client.session.update({ sessionID, time: { archived: Date.now() } })
+        await serverSDK.api.session.archive({ sessionID, directory })
         current()[1](
           "session",
           produce((draft) => {

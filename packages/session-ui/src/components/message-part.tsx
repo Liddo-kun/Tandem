@@ -495,6 +495,7 @@ export function getToolInfo(
       }
     }
     case "bash":
+    case "shell":
       return {
         icon: "console",
         title: "Bash", // UPSTREAM-DIVERGENCE: Claude Code shaping (bash presented as Bash)
@@ -512,6 +513,7 @@ export function getToolInfo(
         title: i18n.t("ui.messagePart.title.write"),
         subtitle: input.filePath ? getFilename(input.filePath) : undefined,
       }
+    case "patch":
     case "apply_patch":
       return {
         icon: "code-lines",
@@ -770,8 +772,8 @@ export function renderable(part: PartType, showReasoningSummaries = true) {
 }
 
 function toolDefaultOpen(tool: string, shell = false, edit = false) {
-  if (tool === "bash") return shell
-  if (tool === "edit" || tool === "write" || tool === "apply_patch") return edit
+  if (tool === "bash" || tool === "shell") return shell
+  if (tool === "edit" || tool === "write" || tool === "patch" || tool === "apply_patch") return edit
 }
 
 export function partDefaultOpen(part: PartType, shell = false, edit = false) {
@@ -1550,7 +1552,7 @@ export function registerTool(input: { name: string; render?: ToolComponent }) {
 }
 
 export function getTool(name: string) {
-  return state[name]?.render
+  return state[name === "apply_patch" ? "patch" : name === "bash" ? "shell" : name]?.render
 }
 
 export const ToolRegistry = {
@@ -2229,7 +2231,7 @@ ToolRegistry.register({
 })
 
 ToolRegistry.register({
-  name: "bash",
+  name: "shell",
   render(props) {
     const i18n = useI18n()
     const command = createMemo(() => stringValue(props.input.command) ?? stringValue(props.metadata.command) ?? "")
@@ -2466,7 +2468,7 @@ ToolRegistry.register({
 })
 
 ToolRegistry.register({
-  name: "apply_patch",
+  name: "patch",
   render(props) {
     const i18n = useI18n()
     const fileComponent = useFileComponent()

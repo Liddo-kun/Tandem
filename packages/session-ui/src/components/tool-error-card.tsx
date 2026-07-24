@@ -50,7 +50,11 @@ export function ToolErrorCard(props: ToolErrorCardProps) {
       task: "ui.tool.task",
       webfetch: "ui.tool.webfetch",
       websearch: "ui.tool.websearch",
+      // UPSTREAM-DIVERGENCE: Tandem labels these "Bash"/"apply_patch" to match its compact tool
+      // summary triggers instead of upstream's localized Shell/Patch wording.
       bash: "Bash",
+      shell: "Bash",
+      patch: "apply_patch",
       apply_patch: "apply_patch",
       question: "ui.tool.questions",
     }
