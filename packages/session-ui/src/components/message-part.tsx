@@ -2256,6 +2256,9 @@ ToolRegistry.register({
         {...props}
         icon="console"
         multilineTrigger
+        // UPSTREAM-DIVERGENCE: Tandem renders the compact multiline Bash summary; upstream's
+        // allowOpenWhilePending is kept so a running command can still be expanded.
+        allowOpenWhilePending
         trigger={
           <ToolSummaryTrigger
             title="Bash"
