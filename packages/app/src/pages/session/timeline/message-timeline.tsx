@@ -360,6 +360,7 @@ export function MessageTimeline(props: {
   })
   const projection = createTimelineProjection({
     messages: sessionMessages,
+    userMessages: () => props.userMessages,
     sessionMessages: projectedMessages,
     parts: getMsgParts,
     status: sessionStatus,

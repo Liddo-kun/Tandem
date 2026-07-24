@@ -1,8 +1,9 @@
 import type { SnapshotFileDiff, VcsFileDiff } from "@opencode-ai/sdk/v2"
+import type { FileDiffInfo } from "@opencode-ai/client/promise"
 import type { Message } from "@opencode-ai/sdk/v2/client"
 import { formatPatch, structuredPatch } from "diff"
 
-type Diff = SnapshotFileDiff | VcsFileDiff
+type Diff = FileDiffInfo | SnapshotFileDiff | VcsFileDiff
 
 function status(value: unknown): value is Diff["status"] {
   return value === undefined || value === "added" || value === "deleted" || value === "modified"
