@@ -41,6 +41,7 @@ import {
 export type PromptInputV2ComposerProps = {
   class?: string
   controller: PromptInputV2ComposerController
+  borderUnderlay?: boolean
   edit?: PromptInputProps["edit"]
   onEditLoaded?: PromptInputProps["onEditLoaded"]
 }
@@ -76,6 +77,7 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
     <div class="flex flex-col gap-3">
       <PromptInputV2
         controller={props.controller}
+        borderUnderlay={props.borderUnderlay}
         class={props.class}
         leadingControls={
           // UPSTREAM-DIVERGENCE: native mobile voice input (iOS provides startVoiceInput).
