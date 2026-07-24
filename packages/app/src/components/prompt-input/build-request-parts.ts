@@ -94,21 +94,24 @@ const toOptimisticPart = (part: PromptRequestPart, sessionID: string, messageID:
 }
 
 export function buildRequestParts(input: BuildRequestPartsInput) {
-  const requestParts: PromptRequestPart[] = [
-    {
-      id: Identifier.ascending("part"),
-      type: "text",
-      text: input.text,
-      ...(input.repromptDisabled || input.correctionDisabled
-        ? {
-            metadata: {
-              ...(input.repromptDisabled ? { tandemRepromptDisabled: true } : {}),
-              ...(input.correctionDisabled ? { tandemCorrectorDisabled: true } : {}),
-            },
-          }
-        : {}),
-    },
-  ]
+  const requestParts: PromptRequestPart[] = input.text.trim()
+    ? [
+        {
+          id: Identifier.ascending("part"),
+          type: "text",
+          text: input.text,
+          // UPSTREAM-DIVERGENCE: Tandem prompt-enhance opt-out markers for the prompt-corrector plugin.
+          ...(input.repromptDisabled || input.correctionDisabled
+            ? {
+                metadata: {
+                  ...(input.repromptDisabled ? { tandemRepromptDisabled: true } : {}),
+                  ...(input.correctionDisabled ? { tandemCorrectorDisabled: true } : {}),
+                },
+              }
+            : {}),
+        },
+      ]
+    : []
 
   const files = input.prompt.filter(isFileAttachment).map((attachment) => {
     const path = absolute(input.sessionDirectory, attachment.path)
