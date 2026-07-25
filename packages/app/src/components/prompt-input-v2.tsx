@@ -63,7 +63,8 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
   const language = useLanguage()
   const sync = useSync()
   const platform = usePlatform()
-  const providers = useProviders()
+  const sdk = useSDK()
+  const providers = useProviders(() => sdk().directory)
 
   useCommands(props)
   useEditHandler(props)
