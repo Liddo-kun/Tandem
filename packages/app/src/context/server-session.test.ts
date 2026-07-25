@@ -305,6 +305,38 @@ describe("server session", () => {
     expect(assistants.map((item) => store.data.part[item.id]?.[0]?.type)).toEqual(["text", "text", "text"])
   })
 
+  // UPSTREAM-DIVERGENCE: upstream's v2 todo() resets to [] and relies purely on events, which
+  // empties the dock on cold load and on Tandem's forced resume/manual refresh of idle sessions.
+  // Tandem keeps the DB-backed pull on v2; events still project on top of it.
+  test("pulls V2 todos on cold load and forced refresh", async () => {
+    const initial = [{ id: "todo-1", content: "task", status: "pending", priority: "medium" }]
+    const updated = [{ id: "todo-1", content: "task", status: "completed", priority: "medium" }]
+    let served = initial
+    const requests: unknown[] = []
+    const client = {
+      session: {
+        todo: async (input: unknown) => {
+          requests.push(input)
+          return { data: served }
+        },
+      },
+    } as unknown as OpencodeClient
+    const store = createServerSession(client, { protocol: Promise.resolve("v2") })
+    store.remember(session("root"))
+
+    await store.todo("root")
+    expect(requests).toEqual([{ sessionID: "root" }])
+    expect(store.data.todo.root).toMatchObject(initial)
+
+    store.apply({ type: "todo.updated", properties: { sessionID: "root", todos: updated } })
+    expect(store.data.todo.root).toMatchObject(updated)
+
+    served = updated
+    await store.todo("root", { force: true })
+    expect(requests).toHaveLength(2)
+    expect(store.data.todo.root).toMatchObject(updated)
+  })
+
   test("indexes V1 messages for the current timeline projection", async () => {
     const user = userMessage("message-1", { sessionID: "root" })
     const assistant = assistantMessage("message-2", user.id, { sessionID: "root" })

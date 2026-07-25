@@ -546,6 +546,9 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
         if (mode() !== "normal") return
         event.preventDefault()
         controller.addPart({ type: "text", content: "\n", start: 0, end: 0 })
+        // The store update re-renders the editor and collapses the selection to the end, so
+        // restore the caret to the store cursor (right after the inserted newline).
+        controller.restoreFocus()
       },
     },
   })

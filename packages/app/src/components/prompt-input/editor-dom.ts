@@ -64,6 +64,14 @@ export function createTextFragment(content: string): DocumentFragment {
   return fragment
 }
 
+// Mention pills: the legacy editor tags them with data-type="file"|"agent", the v2 editor
+// with data-mention="file"|"agent"|"reference". Both are atomic for cursor placement.
+function isPillElement(node: Node): boolean {
+  if (node.nodeType !== Node.ELEMENT_NODE) return false
+  const element = node as HTMLElement
+  return !!element.dataset.mention || element.dataset.type === "file" || element.dataset.type === "agent"
+}
+
 export function getNodeLength(node: Node): number {
   if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === "BR") return 1
   return (node.textContent ?? "").replace(/\u200B/g, "").length
@@ -136,9 +144,7 @@ export function setCursorPosition(parent: HTMLElement, position: number) {
   while (node) {
     const length = getNodeLength(node)
     const isText = node.nodeType === Node.TEXT_NODE
-    const isPill =
-      node.nodeType === Node.ELEMENT_NODE &&
-      ((node as HTMLElement).dataset.type === "file" || (node as HTMLElement).dataset.type === "agent")
+    const isPill = isPillElement(node)
     const isBreak = node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === "BR"
 
     if (isText && remaining <= length) {
@@ -212,9 +218,7 @@ export function setRangeEdge(parent: HTMLElement, range: Range, edge: "start" | 
   for (const node of nodes) {
     const length = getNodeLength(node)
     const isText = node.nodeType === Node.TEXT_NODE
-    const isPill =
-      node.nodeType === Node.ELEMENT_NODE &&
-      ((node as HTMLElement).dataset.type === "file" || (node as HTMLElement).dataset.type === "agent")
+    const isPill = isPillElement(node)
     const isBreak = node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === "BR"
 
     if (isText && remaining <= length) {

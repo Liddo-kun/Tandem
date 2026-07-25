@@ -1387,10 +1387,10 @@ export function createServerSession(
     async todo(sessionID: string, request?: { force?: boolean }) {
       touch(sessionID)
       if (data.todo[sessionID] !== undefined && !request?.force) return
-      if ((await options?.protocol) === "v2") {
-        setData("todo", sessionID, [])
-        return
-      }
+      // UPSTREAM-DIVERGENCE: upstream's v2 branch resets todos to [] and relies purely on
+      // `todo.updated` events, but idle sessions emit none — a cold load, cache eviction, or
+      // Tandem's forced resume/manual refresh would leave the dock empty or stale. The todo
+      // endpoint is DB-backed on v2 servers too, so keep the pull; live events take over after.
       return runInflight(inflightTodo, sessionID, () => {
         const active = generation(sessionID)
         return (options?.retry ?? retry)(() => client.session.todo({ sessionID })).then((result) => {
