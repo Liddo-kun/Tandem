@@ -256,6 +256,24 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
   let run: Promise<void> | undefined
   let started = false
   let generation = 0
+  // UPSTREAM-DIVERGENCE: SSE heartbeat watchdog (upstream #13973, dropped by the #38464 transport
+  // rework). The server emits `server.heartbeat` every 10s on both event transports; if nothing
+  // arrives within the timeout the connection is silently dead (typical after Android/iOS background
+  // suspension, where the stalled fetch stream never errors), so abort the attempt to trigger the
+  // reconnect loop.
+  const HEARTBEAT_TIMEOUT_MS = 15_000
+  let heartbeat: ReturnType<typeof setTimeout> | undefined
+  const resetHeartbeat = () => {
+    if (heartbeat) clearTimeout(heartbeat)
+    heartbeat = setTimeout(() => {
+      attempt?.abort()
+    }, HEARTBEAT_TIMEOUT_MS)
+  }
+  const clearHeartbeat = () => {
+    if (!heartbeat) return
+    clearTimeout(heartbeat)
+    heartbeat = undefined
+  }
 
   const start = () => {
     if (started) return run
@@ -278,7 +296,9 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
               ? (await eventSdk.global.event({ signal: attempt.signal })).stream
               : eventApi.event.subscribe({ signal: attempt.signal })
           let yielded = Date.now()
+          resetHeartbeat()
           for await (const event of events) {
+            resetHeartbeat()
             streamErrorLogged = false
             const legacy = "payload" in event
             if (legacy && event.payload.type === "sync") continue
@@ -302,6 +322,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
         } finally {
           abort.signal.removeEventListener("abort", onAbort)
           attempt = undefined
+          clearHeartbeat()
         }
 
         if (abort.signal.aborted || !started || generation !== active) return
