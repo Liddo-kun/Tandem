@@ -4,9 +4,9 @@ Use this as the recurring startup context when working in `Tandem` from Windows.
 
 ## Goal
 
-Build and maintain one personal repo, `Tandem`, based on current official OpenCode, with selected Whispercode mobile/iOS/Android features and personal enhancements, while staying easy to update from OpenCode.
+Build and maintain one personal repo, `Tandem`, based on current official OpenCode, with the Tandem-owned iOS/Android mobile apps (inherited from the discontinued Whispercode project) and personal enhancements, while staying easy to update from OpenCode.
 
-Use `log.md` as the exhaustive final-state inventory of Tandem changes relative to official OpenCode. `context.md` explains how to work in this repo; it should not become a skipped-commit ledger or merge-history log.
+Use `log.md` as the exhaustive final-state inventory of Tandem changes relative to official OpenCode; the Tandem-owned mobile app packages (`packages/android`, `packages/ios`) are documented separately in `tandem-changelog.md` (current-state baseline plus dated history). App-package-only changes are recorded there, not in `log.md`. `context.md` explains how to work in this repo; it should not become a skipped-commit ledger or merge-history log.
 
 `log.md` is a final-state inventory of Tandem's *divergence from upstream*, not a per-change changelog. Update it only when a change alters that divergence surface: it modifies an upstream-shared file, or adds/removes/retargets a fork-owned file a future merge must account for. When it applies, revise the existing entry to describe the new current state — do not append changelog-style "also changed X" bullets. A change confined to already fork-owned code that leaves the divergence surface unchanged (e.g. tuning an existing Tandem-only plugin or tool) is documented in that feature's own doc (e.g. `PromptEnhance.md`), not `log.md`. Always read `log.md` before changing opencode, the web UI, or the mobile apps.
 
@@ -17,9 +17,9 @@ Before changing `packages/opencode` backend source, first check whether OpenCode
 ## Source Priorities
 
 - Official OpenCode is the long-term source of truth and default conflict winner.
-- Whispercode is only a feature donor, mainly for mobile wrappers and shared web UI improvements.
-- Tandem is the product: current OpenCode plus deliberately selected Whispercode mobile features and personal enhancements.
-- Future updates must primarily come from official OpenCode; do not blindly merge Whispercode.
+- Whispercode is discontinued. It was the original donor of the mobile wrappers; Tandem now owns and maintains those apps outright.
+- Tandem is the product: current OpenCode plus the Tandem-owned mobile apps and personal enhancements.
+- Future updates come from official OpenCode; there is no Whispercode upstream to merge from anymore.
 - New divergence from OpenCode needs a clear compatibility or personal-product reason.
 
 ## Repo And Branch Model
@@ -29,7 +29,6 @@ Expected remotes:
 ```text
 origin   = personal Tandem repo / fork
 upstream = official OpenCode
-whisper  = Whispercode
 ```
 
 - The default branch is `dev`; local `main` may not exist. Use `dev` or `origin/dev` for comparisons unless remotes show otherwise.
@@ -40,9 +39,8 @@ whisper  = Whispercode
 ## Merge And Update Rules
 
 - For normal OpenCode syncs, fetch `upstream`, switch to `dev`, then merge `upstream/dev`. Use merge, not rebase, and do not force-push normal sync work.
-- For Whispercode after the initial import, fetch `whisper`, then cherry-pick or manually port only specific useful commits/features.
 - Core OpenCode/server files: default to current OpenCode; keep fork behavior only when an explicit mobile compatibility reason exists.
-- iOS/Android/mobile-specific files: prefer the Tandem mobile behavior already documented in `log.md`.
+- iOS/Android/mobile-specific files: prefer the Tandem mobile behavior documented in `tandem-changelog.md` (the shared-file seams the apps depend on are in `log.md`).
 - Shared web UI mobile changes: inspect manually and keep the smallest useful behavior. Preserve Tandem-added features that still serve the mobile/product contract, and import compatible OpenCode improvements.
 - Preserve `UPSTREAM-DIVERGENCE` comments. They mark Tandem-specific code that should survive upstream merges.
 - Do not treat `PUSH_NOTIFICATIONS.md` notes as implemented source unless the referenced files exist in Tandem.
@@ -117,7 +115,7 @@ Enhanced-only features should be additive or feature-detected where possible.
 - `packages/app/src/context/platform.tsx` is the app-to-native contract. Preserve optional mobile methods/types for push state, push pairing, relay preferences, voice input, speech locale, haptics, share, default server storage, and native async storage when merging upstream.
 - Android/iOS wrappers dispatch `opencode:transcription`; `PromptInput` consumes it. Preserve native voice input compatibility when refactoring prompt input or platform code.
 - Preserve platform-backed persistence for non-web apps. Do not replace native iOS/Android storage with browser-only `localStorage`.
-- Preserve existing Tandem/Whispercode mobile i18n keys during upstream merges.
+- Preserve existing Tandem mobile i18n keys during upstream merges.
 
 ## Mobile Session Behavior
 
@@ -221,7 +219,6 @@ Enhanced-only features should be additive or feature-detected where possible.
 - `dev`: personal combined working build.
 - `mobile/*`: Android/iOS/mobile compatibility work.
 - `personal/*`: personal enhancements.
-- `whisper/*`: clean branches for possible Whispercode PRs.
 - `sync/*`: OpenCode update work if a separate branch is useful.
 
 Use commit prefixes:
@@ -229,7 +226,6 @@ Use commit prefixes:
 ```text
 personal:      only for Tandem-specific enhancements
 mobile:        APK/mobile compatibility or mobile UI behavior
-whisper:       possible Whispercode PR work
 opencode-sync: upstream OpenCode merge/update
 wip:           temporary messy work
 ```
