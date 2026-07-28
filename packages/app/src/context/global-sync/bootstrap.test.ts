@@ -279,6 +279,25 @@ describe("query keys", () => {
     expect(result.connected).toEqual(["openai"])
   })
 
+  test("tolerates servers without the default-model endpoint", async () => {
+    const api = {
+      provider: {
+        list: async () => ({ location: {}, data: [{ id: "openai", name: "OpenAI", package: "@ai-sdk/openai" }] }),
+      },
+      model: {
+        list: async () => ({ location: {}, data: [] }),
+        default: async () => {
+          throw new Error("UnsupportedContentType")
+        },
+      },
+    } as unknown as CatalogApi
+
+    const result = await new QueryClient().fetchQuery(loadProvidersQuery(ServerScope.local, "/repo", api))
+
+    expect(result.connected).toEqual(["openai"])
+    expect(result.default).toEqual({})
+  })
+
   test("loads agents from the current location-scoped endpoint", async () => {
     const calls: unknown[] = []
     const api = {

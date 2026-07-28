@@ -245,12 +245,17 @@ export const loadProvidersQuery = (
           return normalizeProviderList(result.data!)
         }
         const location = directory ? { location: { directory } } : undefined
+        // UPSTREAM-DIVERGENCE: current servers removed GET /api/model/default (added in
+        // f016392368, later dropped) but the vendored 1.17.13-v2 client still calls it, so
+        // the server answers with the HTML UI fallback and the whole providers bootstrap
+        // fails with UnsupportedContentType. Treat a failed default-model lookup as "no
+        // default" instead; upstream's own e2e mocks the route the same way.
         const [providers, models, defaultModel] = await Promise.all([
           sdk.provider.list(location),
           sdk.model.list(location),
-          sdk.model.default(location),
+          sdk.model.default(location).catch(() => undefined),
         ])
-        return normalizeProviderList(providers.data, models.data, defaultModel.data)
+        return normalizeProviderList(providers.data, models.data, defaultModel?.data)
       }),
   })
 
