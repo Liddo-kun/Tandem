@@ -760,6 +760,14 @@ function index<T extends { id: string }>(items: readonly T[]) {
   return new Map(items.map((item) => [item.id, item] as const))
 }
 
+// UPSTREAM-DIVERGENCE(tandem): Anthropic narration blocks (user-addressed
+// mid-turn status updates) are stored as reasoning parts tagged by the server
+// (`metadata.tandem.narration`); they render as visible assistant text and are
+// never hidden by the reasoning-summaries setting.
+export function isNarrationPart(part: PartType): boolean {
+  return part.type === "reasoning" && (part.metadata as Record<string, any> | undefined)?.tandem?.narration === true
+}
+
 export function renderable(part: PartType, showReasoningSummaries = true) {
   if (part.type === "tool") {
     if (HIDDEN_TOOLS.has(part.tool)) return false
@@ -767,7 +775,7 @@ export function renderable(part: PartType, showReasoningSummaries = true) {
     return true
   }
   if (part.type === "text") return !!part.text?.trim()
-  if (part.type === "reasoning") return showReasoningSummaries && !!part.text?.trim()
+  if (part.type === "reasoning") return (showReasoningSummaries || isNarrationPart(part)) && !!part.text?.trim()
   return !!PART_MAPPING[part.type]
 }
 
@@ -1822,13 +1830,22 @@ PART_MAPPING["reasoning"] = function ReasoningPartDisplay(props) {
     () => props.message.role === "assistant" && typeof (props.message as AssistantMessage).time.completed !== "number",
   )
   const text = () => readPartText(data.store.part_text_accum_delta, part())
+  // UPSTREAM-DIVERGENCE(tandem): narration renders as visible assistant text
+  // (text-part styling); real thinking keeps the muted reasoning styling.
+  const narration = createMemo(() => isNarrationPart(part()))
 
   return (
     <Show when={text()}>
-      <div data-component="reasoning-part" data-timeline-part-id={part().id}>
-        <Show when={streaming()} fallback={<Markdown text={text()} cacheKey={part().id} streaming={false} />}>
-          <PacedMarkdown text={text()} cacheKey={part().id} streaming={streaming()} />
-        </Show>
+      <div
+        data-component={narration() ? "text-part" : "reasoning-part"}
+        data-narration={narration() ? "" : undefined}
+        data-timeline-part-id={part().id}
+      >
+        <div data-slot={narration() ? "text-part-body" : undefined}>
+          <Show when={streaming()} fallback={<Markdown text={text()} cacheKey={part().id} streaming={false} />}>
+            <PacedMarkdown text={text()} cacheKey={part().id} streaming={streaming()} />
+          </Show>
+        </div>
       </div>
     </Show>
   )

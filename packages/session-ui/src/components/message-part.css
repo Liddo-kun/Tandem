@@ -303,6 +303,15 @@
   }
 }
 
+/* UPSTREAM-DIVERGENCE(tandem): narration blocks — Anthropic mid-turn
+   user-addressed updates surfaced from thinking-typed narration blocks
+   (see provider/anthropic-narration.ts). Accent bar distinguishes them
+   from ordinary assistant text while keeping full text readability. */
+[data-component="text-part"][data-narration] {
+  padding-left: 10px;
+  border-left: 2px solid var(--v2-text-text-accent);
+}
+
 [data-component="compaction-part"] {
   width: 100%;
   display: flex;

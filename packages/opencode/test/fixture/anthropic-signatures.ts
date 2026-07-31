@@ -1,0 +1,10 @@
+// UPSTREAM-DIVERGENCE(tandem): fork-owned fixture. Real thinking-block
+// signatures captured live from the Anthropic API (adaptive thinking,
+// claude-fable-5): one genuine thinking block and one narration block, both
+// streamed on the wire as `thinking` content blocks — the block type is
+// recorded only inside the signature protobuf.
+export const THINKING_SIGNATURE =
+  "CAIShgIKiAEIEBgCKkDxa/M2pvVA0U+eiSyoRlZlyXN/ldIEFtQX4nGLs1t3nyNBWAt9aNAvztrIdIxTpkRM0BqNv2shi0LAWw6o6LxuMg5jbGF1ZGUtZmFibGUtNTgBQgh0aGlua2luZ1okNmE1MzAwYjAtOTJiNy00N2U3LThmMzAtNWY5NGQyOGI2ZWZiEgxx6Yq/6b31l4N6ThQaDFta0anjbOIjRfmTqyIw9XGbSqp2CnIslluNTzDCMNSZu1/D2AWBz07CAu6s0o7W1SC7iQwYlLc2OI+xKgFfKiupz+T/EhO45MpYm1XleKk31O+b2lSj9Vz1UBZGSuw1t/pAR32V4GQIC3orGAE="
+
+export const NARRATION_SIGNATURE =
+  "CAIS1QMKiQEIEBgCKkCWkVXyE7zvVcP6tjnb8rQHUz69e39agbIir8BKmrEt+WlNIDfz1zvYOljH9gl9z3SnCJPfdwq7yqnHC1viTEGaMg5jbGF1ZGUtZmFibGUtNTgBQgluYXJyYXRpb25aJDZhNTMwMGIwLTkyYjctNDdlNy04ZjMwLTVmOTRkMjhiNmVmYhIMB3WX9iG1swaYDbQIGgzYIGbqdzo/mp13YKYiMGrnfI22I3j0HTT/yLszCsPVFo20S/U4vZ1CU8H5RWl6X+5So5sEw4my6KM2olA8QSr4AZ5URy6WQI2inNRnzJTZ8CgBlLN57XonYF4E02cQU+rf/PlvkHAlUKgJBLJwuExqsW204a0aa1+cMLV2uccFb9ErVVh718toOUatfEz1MRVB0m4/cTwzaieCe6XVlePpAZEOjHIyGfbz4GM4tF2TEE29ZdDryz5lx+i3IVa2+b09Rx5MtftlthO67mbqTLzfPC1HKDWB49SueFoKoEWYADoxleW4xXCWte/TQulfwEC4TouyslwxHN/B7en/sDFg5BblBSsoyy/HTdLkig5TSXm+jSqDe19BXDiLXVx+XuAHcom981H/Ly/dMI46gTjgIi/UGUgHVqREGAE="

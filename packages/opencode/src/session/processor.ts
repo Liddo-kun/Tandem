@@ -19,6 +19,8 @@ import { SessionRetry } from "./retry"
 import { SessionStatus } from "./status"
 import { SessionSummary } from "./summary"
 import type { Provider } from "@/provider/provider"
+// UPSTREAM-DIVERGENCE(tandem): narration-block detection for visible rendering.
+import { AnthropicNarration } from "@/provider/anthropic-narration"
 import { Question } from "@/question"
 import { errorMessage } from "@/util/error"
 import { isRecord } from "@/util/record"
@@ -208,6 +210,16 @@ const layer = Layer.effect(
         if (!(reasoningID in ctx.reasoningMap)) return
         // oxlint-disable-next-line no-self-assign -- reactivity trigger
         ctx.reasoningMap[reasoningID].text = ctx.reasoningMap[reasoningID].text
+        // UPSTREAM-DIVERGENCE(tandem): Anthropic narration blocks (user-addressed
+        // mid-turn updates) arrive as signed thinking blocks; tag them so the UI
+        // renders them as visible text. Metadata gains a `tandem` namespace the
+        // provider SDK ignores, so the signature round-trip is unchanged.
+        if (AnthropicNarration.isNarration(ctx.reasoningMap[reasoningID].metadata)) {
+          ctx.reasoningMap[reasoningID].metadata = {
+            ...ctx.reasoningMap[reasoningID].metadata,
+            tandem: { narration: true },
+          }
+        }
         ctx.reasoningMap[reasoningID].time = { ...ctx.reasoningMap[reasoningID].time, end: Date.now() }
         yield* session.updatePart(ctx.reasoningMap[reasoningID])
         delete ctx.reasoningMap[reasoningID]
