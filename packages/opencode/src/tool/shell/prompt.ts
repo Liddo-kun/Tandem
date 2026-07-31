@@ -64,51 +64,20 @@ function powershellNotes(name: string) {
 
 function chainGuidance(name: string) {
   if (name === "powershell") {
-    return "If the commands depend on each other and must run sequentially, avoid '&&' in this shell because Windows PowerShell (5.1) does not support it. Use PowerShell conditionals such as `cmd1; if ($?) { cmd2 }` when later commands must depend on earlier success."
-  }
-  if (PS.has(name)) {
-    return "If the commands depend on each other and must run sequentially, use a single bash tool call with '&&' to chain them together (e.g., `git add . && git commit -m \"message\" && git push`). For instance, if one operation must complete before another starts (like New-Item before Copy-Item, Write before bash for git operations, or git add before git commit), run these operations sequentially instead."
+    return "Chain dependent commands with `cmd1; if ($?) { cmd2 }` — Windows PowerShell (5.1) does not support `&&`."
   }
   if (CMD.has(name)) {
-    return "If the commands depend on each other and must run sequentially, use a single bash tool call with `&&` to chain them together (e.g., `mkdir out && dir out`). For instance, if one operation must complete before another starts, run these operations sequentially instead."
+    return "Chain dependent commands with `&&`; use `&` only when a later command should run regardless of earlier failure."
   }
-  return "If the commands depend on each other and must run sequentially, use a single Bash call with '&&' to chain them together (e.g., `git add . && git commit -m \"message\" && git push`). For instance, if one operation must complete before another starts (like mkdir before cp, Write before Bash for git operations, or git add before git commit), run these operations sequentially instead."
+  return "Chain dependent commands with `&&`; use `;` only when a later command should run regardless of earlier failure."
 }
 
 function bashCommandSection(chain: string, limits: Limits, defaultTimeoutMs: number) {
-  return `Before executing the command, please follow these steps:
-
-1. Directory Verification:
-   - If the command will create new directories or files, first use \`ls\` to verify the parent directory exists and is the correct location
-   - For example, before running "mkdir foo/bar", first use \`ls foo\` to check that "foo" exists and is the intended parent directory
-
-2. Command Execution:
-   - Always quote file paths that contain spaces with double quotes (e.g., rm "path with spaces/file.txt")
-   - Examples of proper quoting:
-     - mkdir "/Users/name/My Documents" (correct)
-     - mkdir /Users/name/My Documents (incorrect - will fail)
-     - python "/path/with spaces/script.py" (correct)
-     - python /path/with spaces/script.py (incorrect - will fail)
-   - After ensuring proper quoting, execute the command.
-   - Capture the output of the command.
-
-Usage notes:
-  - The command argument is required.
-  - You can specify an optional timeout in milliseconds. If not specified, commands will time out after ${defaultTimeoutMs}ms.
+  return `Usage notes:
+  - Optional \`timeout\` in milliseconds (default ${defaultTimeoutMs}ms).
+  - Always double-quote file paths that contain spaces.
   - If output is expected to be very long, such as repetitive build logs, limit it with \`head\`, \`tail\`, or a focused filter like \`2>&1 | tee <tmp-log> | rg -i "error|fail|exception|warning"\` to avoid polluting context while keeping likely errors visible. When full output may be needed for diagnosis, pipe it to a temporary log file.
-
-  - When issuing multiple commands:
-    - If the commands are independent and can run in parallel, make multiple bash tool calls in a single message. For example, if you need to run "git status" and "git diff", send a single message with two bash tool calls in parallel.
-    - ${chain}
-    - Use ';' only when you need to run commands sequentially but don't care if earlier commands fail
-    - DO NOT use newlines to separate commands (newlines are ok in quoted strings)
-  - AVOID using \`cd <directory> && <command>\`. Use the \`workdir\` parameter to change directories instead.
-    <good-example>
-    Use workdir="/foo/bar" with command: pytest tests
-    </good-example>
-    <bad-example>
-    cd /foo/bar && pytest tests
-    </bad-example>`
+  - ${chain}`
 }
 
 function powershellCommandSection(
@@ -120,39 +89,11 @@ function powershellCommandSection(
 ) {
   return `${powershellNotes(name)}
 
-Before executing the command, please follow these steps:
-
-1. Directory Verification:
-   - If the command will create new directories or files, first use \`Test-Path -LiteralPath <parent>\` to verify the parent directory exists and is the correct location
-   - For example, before creating \`foo${pathSep}bar\`, first use \`Test-Path -LiteralPath "foo"\` to check that \`foo\` exists and is the intended parent directory
-
-2. Command Execution:
-   - Always quote file paths that contain spaces with double quotes (e.g., Remove-Item -LiteralPath "path with spaces${pathSep}file.txt")
-   - Examples of proper quoting:
-     - New-Item -ItemType Directory -Path "My Documents" (correct)
-     - New-Item -ItemType Directory -Path My Documents (incorrect - path is split)
-     - & "path with spaces${pathSep}script.ps1" (correct)
-     - path with spaces${pathSep}script.ps1 (incorrect - path is split and not invoked)
-   - After ensuring proper quoting, execute the command.
-   - Capture the output of the command.
-
 Usage notes:
-  - The command argument is required.
-  - You can specify an optional timeout in milliseconds. If not specified, commands will time out after ${defaultTimeoutMs}ms.
+  - Optional \`timeout\` in milliseconds (default ${defaultTimeoutMs}ms).
+  - Always double-quote file paths that contain spaces (e.g., & "path with spaces${pathSep}script.ps1").
   - If output is expected to be very long, such as repetitive build logs, limit it with \`Select-Object -First\`, \`Select-Object -Last\`, or a focused filter like \`2>&1 | Tee-Object -FilePath <tmp-log> | rg -i "error|fail|exception|warning"\` to avoid polluting context while keeping likely errors visible. When full output may be needed for diagnosis, pipe it to a temporary log file.
-
-  - When issuing multiple commands:
-    - If the commands are independent and can run in parallel, make multiple bash tool calls in a single message. For example, if you need to run "git status" and "git diff", send a single message with two bash tool calls in parallel.
-    - ${chain}
-    - Use \`;\` only when you need to run commands sequentially but don't care if earlier commands fail
-    - DO NOT use newlines to separate commands (newlines are ok in quoted strings)
-  - AVOID changing directories inside the command. Use the \`workdir\` parameter to change directories instead.
-    <good-example>
-    Use workdir="project${pathSep}subdir" with command: pytest tests
-    </good-example>
-    <bad-example>
-    ${name === "powershell" ? `Set-Location -LiteralPath "project${pathSep}subdir"; if ($?) { pytest tests }` : `Set-Location -LiteralPath "project${pathSep}subdir" && pytest tests`}
-    </bad-example>`
+  - ${chain}`
 }
 
 function cmdCommandSection(chain: string, limits: Limits, defaultTimeoutMs: number) {
@@ -162,39 +103,11 @@ function cmdCommandSection(chain: string, limits: Limits, defaultTimeoutMs: numb
 - Use \`if exist\` for existence checks.
 - Use \`call\` when invoking batch files from another batch-style command.
 
-Before executing the command, please follow these steps:
-
-1. Directory Verification:
-   - If the command will create new directories or files, first use \`if exist\` to verify the parent directory exists and is the correct location
-   - For example, before creating \`foo\\bar\`, first use \`if exist "foo\\" dir "foo"\` to check that \`foo\` exists and is the intended parent directory
-
-2. Command Execution:
-   - Always quote file paths that contain spaces with double quotes (e.g., del "path with spaces\\file.txt")
-   - Examples of proper quoting:
-     - mkdir "My Documents" (correct)
-     - mkdir My Documents (incorrect - path is split)
-     - call "path with spaces\\script.bat" (correct)
-     - path with spaces\\script.bat (incorrect - path is split and not invoked correctly)
-   - After ensuring proper quoting, execute the command.
-   - Capture the output of the command.
-
 Usage notes:
-  - The command argument is required.
-  - You can specify an optional timeout in milliseconds. If not specified, commands will time out after ${defaultTimeoutMs}ms.
+  - Optional \`timeout\` in milliseconds (default ${defaultTimeoutMs}ms).
+  - Always double-quote file paths that contain spaces (e.g., call "path with spaces\\script.bat").
   - If output is expected to be very long, such as repetitive build logs, limit it with \`more\` or a focused filter like \`2>&1 | rg -i "error|fail|exception|warning"\` to avoid polluting context while keeping likely errors visible. When full output may be needed for diagnosis, redirect it to a temporary log file.
-
-  - When issuing multiple commands:
-    - If the commands are independent and can run in parallel, make multiple bash tool calls in a single message. For example, if you need to run "dir" and "where cmd", send a single message with two bash tool calls in parallel.
-    - ${chain}
-    - Use \`&\` only when you need to run commands sequentially but don't care if earlier commands fail
-    - DO NOT use newlines to separate commands (newlines are ok in quoted strings)
-  - AVOID changing directories inside the command. Use the \`workdir\` parameter to change directories instead.
-    <good-example>
-    Use workdir="project\\subdir" with command: dir
-    </good-example>
-    <bad-example>
-    cd /d "project\\subdir" && dir
-    </bad-example>`
+  - ${chain}`
 }
 
 function profile(name: string, platform: NodeJS.Platform, limits: Limits, defaultTimeoutMs: number) {
