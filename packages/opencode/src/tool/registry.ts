@@ -5,6 +5,7 @@ import { PlanExitTool } from "./plan"
 import { Session } from "@/session/session"
 import { QuestionTool } from "./question"
 import { ShellTool } from "./shell"
+import { ShellID } from "./shell/id"
 import { EditTool } from "./edit"
 import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
@@ -23,6 +24,8 @@ import type { JSONSchema7, JSONSchema7Definition } from "@ai-sdk/provider"
 import { Schema } from "effect"
 import z from "zod"
 import { Plugin } from "../plugin"
+// UPSTREAM-DIVERGENCE: Tandem claude bash-search gate (see filter in tools() below).
+import { BashSearch } from "@/plugin/bash-search/bash-search"
 import { Provider } from "@/provider/provider"
 
 import { WebSearchTool } from "./websearch"
@@ -284,6 +287,9 @@ const layer = Layer.effect(
     })
 
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
+      // UPSTREAM-DIVERGENCE: Tandem claude bash-search — when the grep/find shell shims are
+      // active, Claude models search via Bash like real CC (TANDEM_CLAUDE_BASH_SEARCH; see plugin/bash-search/).
+      const bashSearch = BashSearch.isActive() && input.modelID.includes("claude")
       const filtered = (yield* all()).filter((tool) => {
         if (tool.id === WebSearchTool.id) {
           return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel })
@@ -293,6 +299,8 @@ const layer = Layer.effect(
           input.modelID.includes("gpt-") && !input.modelID.includes("oss") && !input.modelID.includes("gpt-4")
         if (tool.id === ApplyPatchTool.id) return usePatch
         if (tool.id === EditTool.id || tool.id === WriteTool.id) return !usePatch
+
+        if (bashSearch && (tool.id === GlobTool.id || tool.id === GrepTool.id)) return false
 
         return true
       })
@@ -310,6 +318,9 @@ const layer = Layer.effect(
             parameters: tool.parameters,
             jsonSchema: tool.jsonSchema,
           }
+          // UPSTREAM-DIVERGENCE: Tandem claude bash-search — with Glob/Grep removed, drop the
+          // stale search bullets from the shell description.
+          if (bashSearch && tool.id === ShellID.ToolID) output.description = BashSearch.stripSearchBullets(output.description)
           yield* plugin.trigger("tool.definition", { toolID: tool.id }, output)
           const jsonSchema =
             output.parameters === tool.parameters || output.jsonSchema !== tool.jsonSchema

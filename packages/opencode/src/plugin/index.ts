@@ -24,6 +24,8 @@ import { SnowflakeCortexAuthPlugin } from "./snowflake-cortex"
 import { PromptCorrectorPlugin } from "./prompt-corrector"
 // UPSTREAM-DIVERGENCE: Tandem-only OpenAI image generation tool. See openai/imagegen/.
 import { ImagegenPlugin } from "./openai/imagegen/plugin"
+// UPSTREAM-DIVERGENCE: Tandem-only CC-style bash search shims. See bash-search/.
+import { BashSearchPlugin } from "./bash-search/plugin"
 import { Effect, Layer, Context } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
@@ -86,6 +88,8 @@ function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
     PromptCorrectorPlugin,
     // UPSTREAM-DIVERGENCE: Tandem-only OpenAI image generation tool (hidden unless OpenAI creds exist; opt out with TANDEM_IMAGEGEN=0).
     ImagegenPlugin,
+    // UPSTREAM-DIVERGENCE: Tandem-only CC-style bash search shims (opt in with TANDEM_CLAUDE_BASH_SEARCH=1; inert without ugrep+bfs).
+    BashSearchPlugin,
   ]
 }
 
