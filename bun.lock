@@ -32,6 +32,7 @@
       "version": "1.2.6",
       "dependencies": {
         "@opencode-ai/app": "workspace:*",
+        "@opencode-ai/session-ui": "workspace:*",
         "@opencode-ai/ui": "workspace:*",
         "@solid-primitives/storage": "catalog:",
         "@tauri-apps/api": "^2",

@@ -8,6 +8,10 @@
     "haptics:default",
     "notification:default",
     "opener:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "taobao://item.taobao.com/item.htm?id=*" }]
+    },
     "store:default",
     "mobile-bridge:default"
   ]

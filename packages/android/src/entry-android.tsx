@@ -2,6 +2,7 @@
 import { render } from "solid-js/web"
 import { createResource, createSignal, onCleanup, onMount, Show } from "solid-js"
 import { AppBaseProviders, AppInterface, PlatformProvider, ServerConnection, type Platform } from "@opencode-ai/app"
+import { allowMarkdownLinkProtocol } from "@opencode-ai/session-ui/markdown-cache"
 import { impactFeedback, notificationFeedback } from "@tauri-apps/plugin-haptics"
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification"
 import { openUrl } from "@tauri-apps/plugin-opener"
@@ -10,6 +11,8 @@ import { bridge } from "./bridge"
 import { createTauriStorage } from "./storage"
 import { Onboarding } from "./onboarding"
 import pkg from "../package.json"
+
+allowMarkdownLinkProtocol("taobao")
 
 const SETTINGS_STORE = "opencode.settings.dat"
 const DEFAULT_SERVER_URL_KEY = "defaultServerUrl"

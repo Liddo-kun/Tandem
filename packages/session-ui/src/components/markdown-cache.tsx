@@ -10,6 +10,7 @@ export type MarkdownCacheEntry = {
 
 const max = 200
 const cache = new Map<string, MarkdownCacheEntry>()
+const allowedLinkProtocols = new Set<string>()
 const config = {
   USE_PROFILES: { html: true, mathMl: true },
   SANITIZE_NAMED_PROPS: true,
@@ -20,6 +21,14 @@ const config = {
 }
 
 if (typeof window !== "undefined" && DOMPurify.isSupported) {
+  DOMPurify.addHook("uponSanitizeAttribute", (node, data) => {
+    if (!(node instanceof HTMLAnchorElement)) return
+    if (data.attrName !== "href") return
+    const protocol = /^([a-z][a-z\d+.-]*):/i.exec(data.attrValue)?.[1]?.toLowerCase()
+    if (!protocol || !allowedLinkProtocols.has(protocol)) return
+    data.forceKeepAttr = true
+  })
+
   DOMPurify.addHook("afterSanitizeAttributes", (node: Element) => {
     if (!(node instanceof HTMLAnchorElement)) return
     if (node.target !== "_blank") return
@@ -30,6 +39,13 @@ if (typeof window !== "undefined" && DOMPurify.isSupported) {
     set.add("noreferrer")
     node.setAttribute("rel", Array.from(set).join(" "))
   })
+}
+
+// UPSTREAM-DIVERGENCE: Native wrappers can opt into app-link protocols without weakening web sanitization.
+export function allowMarkdownLinkProtocol(protocol: string) {
+  const normalized = protocol.toLowerCase()
+  if (!/^[a-z][a-z\d+.-]*$/.test(normalized)) return
+  allowedLinkProtocols.add(normalized)
 }
 
 export function sanitizeMarkdown(html: string) {
