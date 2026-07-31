@@ -4,8 +4,6 @@ Be aware: OS: ${os}, Shell: ${shell}
 
 ${workdirSection}
 
-Use `${tmp}` for temporary work outside the workspace. This directory has already been created, already exists, and is pre-approved for external directory access.
-
 IMPORTANT: This tool is for terminal operations like git, npm, docker, etc. Prefer dedicated tools for file and communication tasks. Use the bash tool for these operations only when explicitly requested, necessary, or more efficient for ungainly or repetitive work:
 - File search: use Glob instead of shell directory traversal
 - Content search: use Grep instead of shell search commands

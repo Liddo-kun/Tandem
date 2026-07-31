@@ -1,4 +1,5 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { Global } from "@opencode-ai/core/global"
 import { Context, Effect, Layer } from "effect"
 
 import { InstanceState } from "@/effect/instance-state"
@@ -78,6 +79,14 @@ const layer = Layer.effect(
             `  Platform: ${process.platform}`,
             `  Today's date: ${new Date().toDateString()}`,
             `</env>`,
+          ].join("\n"),
+          // UPSTREAM-DIVERGENCE: dedicated scratchpad section (moved out of the bash tool
+          // description, where only shell commands saw it) so temp-file guidance reaches
+          // Write/Edit and every provider.
+          [
+            `# Scratchpad directory`,
+            ``,
+            `Use \`${Global.Path.tmp}\` for ALL temporary files — intermediate results, throwaway scripts, working files during analysis, anything that doesn't belong in the user's project. It already exists and is pre-approved for external directory access. Only use \`/tmp\` directly if the user explicitly requests it.`,
           ].join("\n"),
           references.length === 0
             ? undefined
