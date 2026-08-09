@@ -26,11 +26,48 @@ export function SessionComposerRegion(props: {
   // UPSTREAM-DIVERGENCE: on iOS/Android WebViews, contain the composer dock's touchmove with a
   // non-passive listener so dragging within the dock does not scroll/bounce the page while the
   // keyboard is open. Wraps controller.setDockRef so the shared controller stays platform-agnostic.
+  // A horizontal drag that starts inside a horizontally scrollable child (the attachment strip)
+  // is let through, otherwise containment would block that strip from ever scrolling.
   const setDock = (el: HTMLDivElement) => {
     controller.setDockRef(el)
     if (platform.platform !== "ios" && platform.platform !== "android") return
-    const stop = makeEventListener(el, "touchmove", (event) => event.preventDefault(), { passive: false })
-    onCleanup(stop)
+
+    // Resolved once per gesture on touchstart so touchmove stays a few numeric comparisons.
+    let scrollable = false
+    let startX = 0
+    let startY = 0
+
+    const start = makeEventListener(el, "touchstart", (event) => {
+      const touch = event.touches[0]
+      startX = touch?.clientX ?? 0
+      startY = touch?.clientY ?? 0
+      scrollable = false
+      let node = event.target instanceof HTMLElement ? event.target : null
+      for (; node && node !== el; node = node.parentElement) {
+        if (node.scrollWidth > node.clientWidth) {
+          scrollable = true
+          return
+        }
+      }
+    })
+
+    const stop = makeEventListener(
+      el,
+      "touchmove",
+      (event) => {
+        if (scrollable) {
+          const touch = event.touches[0]
+          if (touch && Math.abs(touch.clientX - startX) > Math.abs(touch.clientY - startY)) return
+        }
+        event.preventDefault()
+      },
+      { passive: false },
+    )
+
+    onCleanup(() => {
+      start()
+      stop()
+    })
   }
 
   return (
