@@ -47,6 +47,7 @@ This file has two parts: a current-state baseline of the apps, and a dated histo
 
 ## History
 
+- 2026-08-10 — Followed upstream's platform-contract rename during an OpenCode sync: both wrappers expose `openExternal` instead of `openLink` (the native bridge message name stays `openLink`), and they drop `back`/`forward`, which upstream removed from the contract. iOS `notify` no longer forwards an `href` — upstream replaced it with an `onClick` callback and the native `notify` handler was already a no-op, so nothing is lost.
 - 2026-07-29 — Added direct Taobao item-link handling on Android: the Android bundle opts into sanitized `taobao://` Markdown links and the native opener permits only item-detail URLs.
 - 2026-07-19 — Y700 side-by-side variants now build as release-signed, optimized APKs; existing debug-signed variants migrate via one-time `-Overwrite` (`mobile: release-sign Y700 variants`).
 - 2026-07-04 — Removed Android voice input entirely (SpeechRecognizer stack, `RECORD_AUDIO`, voice overlay); external keyboard speech-to-text replaces it. Tuned wrapper viewport/storage and finished Tandem branding. Tablet builds gained `--release` and `tandem:tablet` now defaults to the signed release APK.
