@@ -36,4 +36,3 @@ export {
   type WslServersState,
 } from "./wsl/types"
 export { ServerConnection } from "./context/server"
-export { handleNotificationClick } from "./utils/notification-click"

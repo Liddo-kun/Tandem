@@ -74,6 +74,7 @@ export function DirectoryDataProvider(
           data={sync().data}
           directory={directory}
           readFile={readFile}
+          sessionID={params.id}
           onNavigateToSession={(sessionID: string) => navigate(href(sessionID))}
           onSessionHref={href}
         >

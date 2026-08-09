@@ -59,6 +59,7 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
     // renderers (e.g. imagegen) use it to fetch an image by path for a thumbnail without
     // routing the bytes through the model's context. Omitted in contexts without an SDK.
     readFile?: (path: string) => Promise<FileContent | undefined>
+    sessionID?: string
     onNavigateToSession?: NavigateToSessionFn
     onSessionHref?: SessionHrefFn
   }) => {
@@ -71,6 +72,9 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
       },
       get readFile() {
         return props.readFile
+      },
+      get sessionID() {
+        return props.sessionID
       },
       navigateToSession: props.onNavigateToSession,
       sessionHref: props.onSessionHref,

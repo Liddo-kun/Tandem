@@ -154,12 +154,10 @@ const App = () => {
     platform: "ios",
     os: "ios",
     version: pkg.version,
-    openLink: (url: string) => bridge.send("openLink", { url }),
-    notify: async (title: string, description?: string, href?: string) => {
-      await bridge.sendAsync("notify", { title, description, href })
+    openExternal: (url: string) => bridge.send("openLink", { url }),
+    notify: async (title: string, description?: string) => {
+      await bridge.sendAsync("notify", { title, description })
     },
-    back: () => window.history.back(),
-    forward: () => window.history.forward(),
     restart: async () => {
       await bridge.sendAsync("reload")
     },
@@ -243,7 +241,7 @@ const App = () => {
       const link = (event.target as HTMLElement | null)?.closest("a.external-link") as HTMLAnchorElement | null
       if (!link?.href) return
       event.preventDefault()
-      platform.openLink(link.href)
+      platform.openExternal(link.href)
     }
 
     const onVisible = () => {
