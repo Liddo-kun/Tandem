@@ -3,78 +3,41 @@ import { createEffect, createMemo, createResource } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { Brand } from "@opencode-ai/core/brand"
+import { pluralCategory, type UiI18nPluralKey } from "@opencode-ai/ui/context/i18n"
 import { Persist, persisted } from "@/utils/persist"
 import { dict as en } from "@/i18n/en"
 import { dict as uiEn } from "@opencode-ai/ui/i18n/en"
+import {
+  createDesktopNativeBundle,
+  DESKTOP_NATIVE_ENGLISH,
+  DESKTOP_NATIVE_LOCALES,
+  type DesktopNativeBundle,
+  type DesktopNativeLocale,
+} from "@/i18n/desktop-native"
 
-export type Locale =
-  | "en"
-  | "zh"
-  | "zht"
-  | "ko"
-  | "de"
-  | "es"
-  | "fr"
-  | "da"
-  | "ja"
-  | "pl"
-  | "ru"
-  | "uk"
-  | "ar"
-  | "no"
-  | "br"
-  | "th"
-  | "bs"
-  | "tr"
-  | "hi"
-  | "nl"
-  | "id"
-  | "vi"
-  | "it"
-  | "ur"
-  | "pa"
-  | "az"
-  | "fi"
-  | "sv"
+export type Locale = DesktopNativeLocale
+export type Direction = "ltr" | "rtl"
+
+const RTL_LOCALES: ReadonlySet<Locale> = new Set(["ar", "ur", "pa"])
+
+function localeDirection(locale: Locale): Direction {
+  return RTL_LOCALES.has(locale) ? "rtl" : "ltr"
+}
 
 type RawDictionary = typeof en & typeof uiEn
 type Dictionary = i18n.Flatten<RawDictionary>
+type PluralKey =
+  | UiI18nPluralKey
+  | "session.question.pending"
+  | "session.followupDock.summary"
+  | "session.revertDock.summary"
 type Source = { dict: Record<string, string> }
 
 function cookie(locale: Locale) {
   return `oc_locale=${encodeURIComponent(locale)}; Path=/; Max-Age=31536000; SameSite=Lax`
 }
 
-const LOCALES: readonly Locale[] = [
-  "en",
-  "zh",
-  "zht",
-  "ko",
-  "de",
-  "es",
-  "fr",
-  "da",
-  "ja",
-  "pl",
-  "ru",
-  "uk",
-  "bs",
-  "ar",
-  "no",
-  "br",
-  "th",
-  "tr",
-  "hi",
-  "nl",
-  "id",
-  "vi",
-  "it",
-  "ur",
-  "pa",
-  "az",
-  "fi",
-  "sv",
-]
+const LOCALES: readonly Locale[] = DESKTOP_NATIVE_LOCALES
 
 const INTL: Record<Locale, string> = {
   en: "en",
@@ -294,7 +257,7 @@ if (warm !== "en") void loadDict(warm)
 export const { use: useLanguage, provider: LanguageProvider } = createSimpleContext({
   name: "Language",
   gate: false,
-  init: (props: { locale?: Locale }) => {
+  init: (props: { locale?: Locale; onNativeTranslations?: (bundle: DesktopNativeBundle) => void }) => {
     const initial = props.locale ?? readStoredLocale() ?? detectLocale()
     const [store, setStore, _, ready] = persisted(
       Persist.global("language", ["language.v1"]),
@@ -305,6 +268,13 @@ export const { use: useLanguage, provider: LanguageProvider } = createSimpleCont
 
     const locale = createMemo<Locale>(() => normalizeLocale(store.locale))
     const intl = createMemo(() => INTL[locale()])
+    const [layout, setLayout] = createStore({ direction: undefined as Direction | undefined })
+    const direction = createMemo(() => layout.direction ?? localeDirection(locale()))
+    const layoutLocale = createMemo(() => {
+      if (!layout.direction) return intl()
+      // Kobalte derives menu direction from locale rather than accepting a direction override.
+      return layout.direction === "rtl" ? "ar" : "en"
+    })
 
     const [dict] = createResource(locale, loadDict, {
       initialValue: dicts.get(initial) ?? base,
@@ -315,6 +285,14 @@ export const { use: useLanguage, provider: LanguageProvider } = createSimpleCont
       params?: Record<string, string | number | boolean>,
     ) => string
 
+    const plural = (key: PluralKey, count: number, params?: Record<string, string | number | boolean>) => {
+      const category = pluralCategory(intl(), count)
+      const current = (dict.loading ? base : (dict() ?? base)) as Record<string, string>
+      const candidate = `${key}.${category}`
+      const fallback = `${key}.other`
+      return i18n.resolveTemplate(current[candidate] ?? current[fallback] ?? fallback, { ...params, count })
+    }
+
     const label = (value: Locale) => {
       const key = LABEL_KEY[value]
       if (key) return t(key)
@@ -323,19 +301,36 @@ export const { use: useLanguage, provider: LanguageProvider } = createSimpleCont
 
     createEffect(() => {
       if (typeof document !== "object") return
-      document.documentElement.lang = locale()
-      document.cookie = cookie(locale())
+      const value = locale()
+      document.documentElement.lang = value
+      document.documentElement.dir = direction()
+      document.cookie = cookie(value)
+    })
+
+    createEffect(() => {
+      if (!props.onNativeTranslations || dict.loading) return
+      const current = dict()
+      if (!current) return
+      props.onNativeTranslations(
+        createDesktopNativeBundle(locale(), (key) => current[key] ?? DESKTOP_NATIVE_ENGLISH[key]),
+      )
     })
 
     return {
       ready,
       locale,
       intl,
+      direction,
+      layoutLocale,
       locales: LOCALES,
       label,
       t,
+      plural,
       setLocale(next: Locale) {
         setStore("locale", normalizeLocale(next))
+      },
+      setDirection(next: Direction) {
+        setLayout("direction", next === localeDirection(locale()) ? undefined : next)
       },
     }
   },
