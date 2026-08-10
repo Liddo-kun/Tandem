@@ -26,6 +26,16 @@ export type Locale =
   | "th"
   | "bs"
   | "tr"
+  | "hi"
+  | "nl"
+  | "id"
+  | "vi"
+  | "it"
+  | "ur"
+  | "pa"
+  | "az"
+  | "fi"
+  | "sv"
 
 type RawDictionary = typeof en & typeof uiEn
 type Dictionary = i18n.Flatten<RawDictionary>
@@ -54,6 +64,16 @@ const LOCALES: readonly Locale[] = [
   "br",
   "th",
   "tr",
+  "hi",
+  "nl",
+  "id",
+  "vi",
+  "it",
+  "ur",
+  "pa",
+  "az",
+  "fi",
+  "sv",
 ]
 
 const INTL: Record<Locale, string> = {
@@ -75,9 +95,19 @@ const INTL: Record<Locale, string> = {
   th: "th",
   bs: "bs",
   tr: "tr",
+  hi: "hi-IN",
+  nl: "nl-NL",
+  id: "id-ID",
+  vi: "vi-VN",
+  it: "it-IT",
+  ur: "ur-PK",
+  pa: "pa-Arab-PK",
+  az: "az-Latn-AZ",
+  fi: "fi-FI",
+  sv: "sv-SE",
 }
 
-const LABEL_KEY: Record<Locale, keyof Dictionary> = {
+const LABEL_KEY: Partial<Record<Locale, keyof Dictionary>> = {
   en: "language.en",
   zh: "language.zh",
   zht: "language.zht",
@@ -96,6 +126,19 @@ const LABEL_KEY: Record<Locale, keyof Dictionary> = {
   th: "language.th",
   bs: "language.bs",
   tr: "language.tr",
+}
+
+const LABEL: Partial<Record<Locale, string>> = {
+  hi: "हिन्दी",
+  nl: "Nederlands",
+  id: "Bahasa Indonesia",
+  vi: "Tiếng Việt",
+  it: "Italiano",
+  ur: "اردو",
+  pa: "پنجابی",
+  az: "Azərbaycanca",
+  fi: "Suomi",
+  sv: "Svenska",
 }
 
 // UPSTREAM-DIVERGENCE: Apply Tandem product copy centrally so locale files stay close to upstream.
@@ -142,6 +185,16 @@ const loaders: Record<Exclude<Locale, "en">, () => Promise<Dictionary>> = {
   th: () => merge(import("@/i18n/th"), import("@opencode-ai/ui/i18n/th")),
   bs: () => merge(import("@/i18n/bs"), import("@opencode-ai/ui/i18n/bs")),
   tr: () => merge(import("@/i18n/tr"), import("@opencode-ai/ui/i18n/tr")),
+  hi: () => merge(import("@/i18n/hi"), import("@opencode-ai/ui/i18n/hi")),
+  nl: () => merge(import("@/i18n/nl"), import("@opencode-ai/ui/i18n/nl")),
+  id: () => merge(import("@/i18n/id"), import("@opencode-ai/ui/i18n/id")),
+  vi: () => merge(import("@/i18n/vi"), import("@opencode-ai/ui/i18n/vi")),
+  it: () => merge(import("@/i18n/it"), import("@opencode-ai/ui/i18n/it")),
+  ur: () => merge(import("@/i18n/ur"), import("@opencode-ai/ui/i18n/ur")),
+  pa: () => merge(import("@/i18n/pa"), import("@opencode-ai/ui/i18n/pa")),
+  az: () => merge(import("@/i18n/az"), import("@opencode-ai/ui/i18n/az")),
+  fi: () => merge(import("@/i18n/fi"), import("@opencode-ai/ui/i18n/fi")),
+  sv: () => merge(import("@/i18n/sv"), import("@opencode-ai/ui/i18n/sv")),
 }
 
 function loadDict(locale: Locale) {
@@ -161,7 +214,12 @@ export function loadLocaleDict(locale: Locale) {
 
 const localeMatchers: Array<{ locale: Locale; match: (language: string) => boolean }> = [
   { locale: "en", match: (language) => language.startsWith("en") },
-  { locale: "zht", match: (language) => language.startsWith("zh") && language.includes("hant") },
+  {
+    locale: "zht",
+    match: (language) =>
+      language.startsWith("zh") &&
+      (language.includes("hant") || language.includes("-tw") || language.includes("-hk") || language.includes("-mo")),
+  },
   { locale: "zh", match: (language) => language.startsWith("zh") },
   { locale: "ko", match: (language) => language.startsWith("ko") },
   { locale: "de", match: (language) => language.startsWith("de") },
@@ -181,6 +239,22 @@ const localeMatchers: Array<{ locale: Locale; match: (language: string) => boole
   { locale: "th", match: (language) => language.startsWith("th") },
   { locale: "bs", match: (language) => language.startsWith("bs") },
   { locale: "tr", match: (language) => language.startsWith("tr") },
+  { locale: "hi", match: (language) => language.startsWith("hi") },
+  { locale: "nl", match: (language) => language.startsWith("nl") },
+  { locale: "id", match: (language) => language.startsWith("id") },
+  { locale: "vi", match: (language) => language.startsWith("vi") },
+  { locale: "it", match: (language) => language.startsWith("it") },
+  { locale: "ur", match: (language) => language.startsWith("ur") },
+  {
+    locale: "pa",
+    match: (language) => language.startsWith("pa") && (language.includes("arab") || language.includes("-pk")),
+  },
+  {
+    locale: "az",
+    match: (language) => language.startsWith("az") && !language.includes("arab") && !language.includes("cyrl"),
+  },
+  { locale: "fi", match: (language) => language.startsWith("fi") },
+  { locale: "sv", match: (language) => language.startsWith("sv") },
 ]
 
 function detectLocale(): Locale {
@@ -241,7 +315,11 @@ export const { use: useLanguage, provider: LanguageProvider } = createSimpleCont
       params?: Record<string, string | number | boolean>,
     ) => string
 
-    const label = (value: Locale) => t(LABEL_KEY[value])
+    const label = (value: Locale) => {
+      const key = LABEL_KEY[value]
+      if (key) return t(key)
+      return LABEL[value] ?? value
+    }
 
     createEffect(() => {
       if (typeof document !== "object") return
