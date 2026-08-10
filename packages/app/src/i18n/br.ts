@@ -1185,4 +1185,13 @@ export const dict = {
   "error.childStore.persistedProjectIconCreateFailed": "Falha ao criar ícone de projeto persistente",
   "error.childStore.storeCreateFailed": "Falha ao criar armazenamento",
   "terminal.connectionLost.abnormalClose": "WebSocket fechado anormalmente: {{code}}",
+  "session.action.refresh": "Refresh session",
+  "prompt.enhance.state.on": "Prompt correction + RePrompt on",
+  "prompt.enhance.state.noReprompt": "RePrompt off (correction still on)",
+  "prompt.enhance.state.off": "Prompt correction + RePrompt off",
+  "session.review.tooManyFilesMobile": "This change set has {{count}} files. Mobile review is limited to {{limit}} files to keep the app responsive.",
+  "settings.general.row.pageZoom.title": "Page zoom",
+  "settings.general.row.pageZoom.description": "Scale the mobile app display like browser page zoom",
+  "settings.general.row.pageZoom.decrease": "Decrease page zoom",
+  "settings.general.row.pageZoom.increase": "Increase page zoom",
 }

@@ -1227,4 +1227,13 @@ export const dict = {
   "error.childStore.persistedProjectIconCreateFailed": "建立持續性專案圖示失敗",
   "error.childStore.storeCreateFailed": "建立儲存區失敗",
   "terminal.connectionLost.abnormalClose": "WebSocket 異常關閉：{{code}}",
+  "session.action.refresh": "Refresh session",
+  "prompt.enhance.state.on": "Prompt correction + RePrompt on",
+  "prompt.enhance.state.noReprompt": "RePrompt off (correction still on)",
+  "prompt.enhance.state.off": "Prompt correction + RePrompt off",
+  "session.review.tooManyFilesMobile": "This change set has {{count}} files. Mobile review is limited to {{limit}} files to keep the app responsive.",
+  "settings.general.row.pageZoom.title": "Page zoom",
+  "settings.general.row.pageZoom.description": "Scale the mobile app display like browser page zoom",
+  "settings.general.row.pageZoom.decrease": "Decrease page zoom",
+  "settings.general.row.pageZoom.increase": "Increase page zoom",
 } satisfies Partial<Record<Keys, string>>

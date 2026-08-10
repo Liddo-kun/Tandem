@@ -1189,4 +1189,13 @@ export const dict = {
   "help.tabs.persistence": "Wenn Sie die App erneut öffnen, sind Ihre Tabs weiterhin geöffnet.",
   "help.tabs.worktrees":
     "Das neue Design unterstützt Git-Worktrees noch nicht. Diese Funktion folgt in Kürze. Wenn Sie das bisherige Layout vorerst weiterverwenden möchten, können Sie in den Einstellungen zwischen den Layouts wechseln. Beachten Sie jedoch, dass das neue Layout in einigen Wochen dauerhaft verwendet wird.",
+  "session.action.refresh": "Refresh session",
+  "prompt.enhance.state.on": "Prompt correction + RePrompt on",
+  "prompt.enhance.state.noReprompt": "RePrompt off (correction still on)",
+  "prompt.enhance.state.off": "Prompt correction + RePrompt off",
+  "session.review.tooManyFilesMobile": "This change set has {{count}} files. Mobile review is limited to {{limit}} files to keep the app responsive.",
+  "settings.general.row.pageZoom.title": "Page zoom",
+  "settings.general.row.pageZoom.description": "Scale the mobile app display like browser page zoom",
+  "settings.general.row.pageZoom.decrease": "Decrease page zoom",
+  "settings.general.row.pageZoom.increase": "Increase page zoom",
 } satisfies Partial<Record<Keys, string>>

@@ -25,7 +25,7 @@ The mobile app packages (`packages/android`, `packages/ios`) are Tandem-owned pr
 - Adds mobile default-server handling through current OpenCode `ServerConnection.Key` and `AppInterface` server entries. Files: `packages/app/src/context/platform.tsx`, `packages/ios/src/entry-ios.tsx`, `packages/android/src/entry-android.tsx`.
 - Adds mobile connection helper text for server setup. Files: `packages/app/src/components/dialog-select-server.tsx`.
 - Adds speech locale settings persisted under `settings.v3`, platform pushdown of selected locale, and a mobile-only General settings selector. Files: `packages/app/src/context/settings.tsx`, `packages/app/src/components/settings-general.tsx`, `packages/app/src/context/platform.tsx`.
-- Adds English fallback text for mobile, voice, speech-locale, delete-word, review-limit, and onboarding strings across locale dictionaries. Files: `packages/app/src/i18n/*.ts`.
+- Adds English fallback text for mobile, voice, speech-locale, delete-word, review-limit, onboarding, session-refresh, prompt-enhance-state, and page-zoom strings across every locale dictionary, so upstream's i18n parity test stays green as Tandem adds keys and upstream adds locales. Files: `packages/app/src/i18n/*.ts`.
 - Adds persisted mobile page zoom to shared appearance settings and the platform contract, with a mobile-only General settings control; the native zoom application (Android CSS-root zoom, iOS `WKWebView.pageZoom`, volume-key stepping) lives in the app wrappers (see `tandem-changelog.md`). Files: `packages/app/src/context/settings.tsx`, `packages/app/src/context/platform.tsx`, `packages/app/src/components/settings-general.tsx`.
 
 ## Shared Mobile UI And Session Behavior

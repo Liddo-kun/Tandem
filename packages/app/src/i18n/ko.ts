@@ -1171,4 +1171,13 @@ export const dict = {
 
   "desktop.picker.error.notSelected": "선택기에서 파일을 선택하지 않았습니다",
   "desktop.picker.error.sizeLimit": "선택한 첨부 파일이 {{limit}} MB 제한을 초과합니다",
+  "session.action.refresh": "Refresh session",
+  "prompt.enhance.state.on": "Prompt correction + RePrompt on",
+  "prompt.enhance.state.noReprompt": "RePrompt off (correction still on)",
+  "prompt.enhance.state.off": "Prompt correction + RePrompt off",
+  "session.review.tooManyFilesMobile": "This change set has {{count}} files. Mobile review is limited to {{limit}} files to keep the app responsive.",
+  "settings.general.row.pageZoom.title": "Page zoom",
+  "settings.general.row.pageZoom.description": "Scale the mobile app display like browser page zoom",
+  "settings.general.row.pageZoom.decrease": "Decrease page zoom",
+  "settings.general.row.pageZoom.increase": "Increase page zoom",
 }
