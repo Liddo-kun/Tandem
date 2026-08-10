@@ -1,7 +1,14 @@
 // @refresh reload
 import { render } from "solid-js/web"
 import { createMemo, createResource, createSignal, onCleanup, onMount, Show } from "solid-js"
-import { AppBaseProviders, AppInterface, PlatformProvider, ServerConnection, type Platform } from "@opencode-ai/app"
+import {
+  AppBaseProviders,
+  AppInterface,
+  createBrowserDraftStore,
+  PlatformProvider,
+  ServerConnection,
+  type Platform,
+} from "@opencode-ai/app"
 import { showToast } from "@opencode-ai/ui/toast"
 import { bridge } from "./bridge"
 import { createBridgeStorage } from "./ios-storage"
@@ -196,6 +203,11 @@ const App = () => {
       await credentialStorage.removeItem("password")
     },
     storage: (name?: string) => createBridgeStorage(name),
+    // UPSTREAM-DIVERGENCE: upstream registers a draft store for web and desktop only. Mobile
+    // reuses the browser (IndexedDB) implementation so composer image attachments stay out of
+    // the persisted draft -- otherwise every keystroke re-serializes the base64 data URL -- and
+    // still survive an app restart instead of leaving a dead blob: URL behind.
+    draftStore: createBrowserDraftStore(),
   }
 
   const [defaultServer] = createResource(async () => {

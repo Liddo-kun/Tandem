@@ -36,4 +36,6 @@ export {
   type WslServersState,
 } from "./wsl/types"
 export { ServerConnection } from "./context/server"
-export { createDraftStore, type DraftStore } from "./utils/draft-store"
+// UPSTREAM-DIVERGENCE: also re-export createBrowserDraftStore so the Android/iOS wrapper
+// packages can register the same IndexedDB draft store upstream's web entry uses.
+export { createBrowserDraftStore, createDraftStore, type DraftStore } from "./utils/draft-store"
