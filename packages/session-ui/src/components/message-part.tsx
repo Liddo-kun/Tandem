@@ -7,6 +7,7 @@ import {
   For,
   Match,
   Show,
+  Suspense,
   Switch,
   onCleanup,
   Index,
@@ -2062,19 +2063,24 @@ function ImagegenThumb(props: { path: string; alt?: string; onOpen: (src: string
     },
   )
   return (
-    <Show when={src()}>
-      {(url) => (
-        <button
-          type="button"
-          data-slot="imagegen-thumb"
-          data-clickable="true"
-          title={props.alt}
-          onClick={() => props.onOpen(url())}
-        >
-          <img src={url()} alt={props.alt} loading="lazy" />
-        </button>
-      )}
-    </Show>
+    // The local Suspense boundary keeps the pending readFile resource from suspending the
+    // route-level boundary: suspending that far up detaches the timeline DOM, which makes the
+    // virtualizer drop its rows, which cancels this fetch — an infinite remount/refetch loop.
+    <Suspense>
+      <Show when={src()}>
+        {(url) => (
+          <button
+            type="button"
+            data-slot="imagegen-thumb"
+            data-clickable="true"
+            title={props.alt}
+            onClick={() => props.onOpen(url())}
+          >
+            <img src={url()} alt={props.alt} loading="lazy" />
+          </button>
+        )}
+      </Show>
+    </Suspense>
   )
 }
 
