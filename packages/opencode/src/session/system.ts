@@ -5,6 +5,7 @@ import { Context, Effect, Layer } from "effect"
 import { InstanceState } from "@/effect/instance-state"
 
 import PROMPT_ANTHROPIC from "./prompt/anthropic.txt"
+import PROMPT_ANTHROPIC_OPUS_5 from "./prompt/anthropic-opus-5.txt"
 import PROMPT_DEFAULT from "./prompt/default.txt"
 import PROMPT_BEAST from "./prompt/beast.txt"
 import PROMPT_GEMINI from "./prompt/gemini.txt"
@@ -36,6 +37,9 @@ export function provider(model: Provider.Model) {
     return [PROMPT_GPT]
   }
   if (model.api.id.includes("gemini-")) return [PROMPT_GEMINI]
+  // UPSTREAM-DIVERGENCE: Opus 5 has its own fork-owned prompt, forked from anthropic.txt.
+  // Shared Anthropic prose edits need applying to both files.
+  if (model.api.id.includes("opus-5")) return [PROMPT_ANTHROPIC_OPUS_5]
   if (model.api.id.includes("claude")) return [PROMPT_ANTHROPIC]
   if (model.api.id.toLowerCase().includes("trinity")) return [PROMPT_TRINITY]
   if (model.api.id.toLowerCase().includes("kimi")) return [PROMPT_KIMI]

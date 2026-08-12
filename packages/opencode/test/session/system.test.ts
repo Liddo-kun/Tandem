@@ -90,6 +90,16 @@ describe("session.system", () => {
     )
   })
 
+  test("selects the Opus 5 prompt only for Opus 5 model IDs", () => {
+    const opus5 = SystemPrompt.provider({ api: { id: "claude-opus-5" } } as Provider.Model)
+    expect(opus5[0]).toContain("You are Claude Code")
+    expect(opus5[0]).toContain("A follow-up question about your earlier work")
+
+    const opus45 = SystemPrompt.provider({ api: { id: "claude-opus-4-5" } } as Provider.Model)
+    expect(opus45[0]).toContain("You are Claude Code")
+    expect(opus45[0]).not.toContain("A follow-up question about your earlier work")
+  })
+
   it.effect("skills output is sorted by name and stable across calls", () =>
     Effect.gen(function* () {
       const prompt = yield* SystemPrompt.Service
