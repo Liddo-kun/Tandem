@@ -14,33 +14,26 @@ export const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
 export function normalizeAgentList(input: AgentListOutput["data"] | Agent[]): Agent[] {
   if (input.every((agent) => !("request" in agent))) return input as Agent[]
-  return (input as AgentListOutput["data"]).map((agent) => {
-    // UPSTREAM-DIVERGENCE(temporary): current v2 servers dropped `settings` from Provider.Request
-    // ({headers, body} only), but the vendored @opencode-ai/client 1.17.13-v2 types still declare
-    // it, so the unguarded reads below crash every agents refresh ("Cannot read properties of
-    // undefined (reading 'temperature')" -> "Failed to reload {project}" toasts + blank sessions).
-    // Drop the fallback when upstream re-vendors the client or restores settings on the wire.
-    const settings = agent.request.settings ?? {}
-    return {
-      name: agent.id,
-      description: agent.description,
-      mode: agent.mode,
-      hidden: agent.hidden,
-      temperature: typeof settings.temperature === "number" ? settings.temperature : undefined,
-      topP: typeof settings.topP === "number" ? settings.topP : undefined,
-      color: agent.color,
-      permission: agent.permissions.map((rule) => ({
-        permission: rule.action,
-        pattern: rule.resource,
-        action: rule.effect,
-      })),
-      model: agent.model && { providerID: agent.model.providerID, modelID: agent.model.id },
-      variant: agent.model?.variant,
-      prompt: agent.system,
-      options: settings,
-      steps: agent.steps,
-    }
-  })
+  return (input as AgentListOutput["data"]).map((agent) => ({
+    name: agent.id,
+    description: agent.description,
+    mode: agent.mode,
+    hidden: agent.hidden,
+    temperature:
+      typeof agent.request.settings.temperature === "number" ? agent.request.settings.temperature : undefined,
+    topP: typeof agent.request.settings.topP === "number" ? agent.request.settings.topP : undefined,
+    color: agent.color,
+    permission: agent.permissions.map((rule) => ({
+      permission: rule.action,
+      pattern: rule.resource,
+      action: rule.effect,
+    })),
+    model: agent.model && { providerID: agent.model.providerID, modelID: agent.model.id },
+    variant: agent.model?.variant,
+    prompt: agent.system,
+    options: agent.request.settings,
+    steps: agent.steps,
+  }))
 }
 
 export function normalizePermissionRequest(input: PermissionV2Request | PermissionRequest): PermissionRequest {
