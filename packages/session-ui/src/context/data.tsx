@@ -13,6 +13,10 @@ import { PreloadMultiFileDiffResult } from "@pierre/diffs/ssr"
 
 export type NormalizedProviderListResponse = {
   all: Map<string, Provider>
+  defaultModel?: {
+    providerID: string
+    modelID: string
+  } | null
   default: {
     [key: string]: string
   }
