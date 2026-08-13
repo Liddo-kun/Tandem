@@ -41,6 +41,25 @@ describe("normalizeAgentList", () => {
       },
     ])
   })
+
+  test("tolerates agents whose request has no settings", () => {
+    const result = normalizeAgentList([
+      {
+        id: "build",
+        name: "Build",
+        mode: "primary",
+        hidden: false,
+        request: { headers: {}, body: {} },
+        permissions: [],
+      },
+    ] as unknown as AgentListOutput["data"])
+
+    expect(result).toHaveLength(1)
+    expect(result[0].name).toBe("build")
+    expect(result[0].temperature).toBeUndefined()
+    expect(result[0].topP).toBeUndefined()
+    expect(result[0].options).toEqual({})
+  })
 })
 
 describe("normalizePermissionRequest", () => {
