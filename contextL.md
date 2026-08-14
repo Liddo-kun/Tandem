@@ -21,6 +21,7 @@ Before changing `packages/opencode` backend source, first check whether OpenCode
 - Tandem is the product: current OpenCode plus the Tandem-owned mobile apps and personal enhancements.
 - Future updates come from official OpenCode; there is no Whispercode upstream to merge from anymore.
 - New divergence from OpenCode needs a clear compatibility or personal-product reason.
+- Never suggest upstreaming Tandem changes as PRs to OpenCode. Their open-PR backlog is enormous and outside PRs rot; keep fixes as marked local divergences documented in `log.md` and move on.
 
 ## Repo And Branch Model
 
