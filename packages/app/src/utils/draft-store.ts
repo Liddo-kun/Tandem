@@ -21,11 +21,30 @@ function blobUrl(id: string, blob: Blob) {
   return url
 }
 
+// UPSTREAM-DIVERGENCE: crypto.subtle is unavailable in insecure (plain-HTTP) contexts, which made
+// every attach path (picker, paste, drop) reject silently; fall back to a non-crypto content hash.
+function fallbackBlobID(bytes: Uint8Array) {
+  let h1 = 0x811c9dc5
+  let h2 = 0x2fd7f272
+  for (const byte of bytes) {
+    h1 = Math.imul(h1 ^ byte, 0x01000193) >>> 0
+    h2 = Math.imul(h2 ^ byte, 0x01000193) >>> 0
+  }
+  const hex = (value: number) => value.toString(16).padStart(8, "0")
+  return `fnv-${bytes.length.toString(16)}-${hex(h1)}${hex(h2)}`
+}
+
 async function blobID(blob: Blob) {
-  const id = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await blob.arrayBuffer())))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("")
-  return id
+  const buffer = await blob.arrayBuffer()
+  const subtle = globalThis.crypto?.subtle
+  if (!subtle) return fallbackBlobID(new Uint8Array(buffer))
+  try {
+    return Array.from(new Uint8Array(await subtle.digest("SHA-256", buffer)))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("")
+  } catch {
+    return fallbackBlobID(new Uint8Array(buffer))
+  }
 }
 
 export async function createBlobReference(blob: Blob): Promise<BlobReference> {
