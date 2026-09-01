@@ -17,7 +17,7 @@ import { mergeDeep } from "remeda"
 import { createHash } from "node:crypto"
 
 const USER_AGENT = `opencode/${InstallationVersion}`
-const CLAUDE_CODE_VERSION = "2.1.159"
+const CLAUDE_CODE_VERSION = "2.1.257"
 const CLAUDE_CODE_ENTRYPOINT = "cli"
 const CCH_SALT = "59cf53e54c78"
 const CCH_POSITIONS = [4, 7, 20]

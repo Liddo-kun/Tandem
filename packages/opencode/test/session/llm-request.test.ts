@@ -50,7 +50,7 @@ describe("LLMRequestPrep.prepare - Claude Code system shaping", () => {
       } as any),
     )
 
-    expect(prepared.system[0]).toBe("x-anthropic-billing-header: cc_version=2.1.159.a3f; cc_entrypoint=cli; cch=4ffc3;")
+    expect(prepared.system[0]).toBe("x-anthropic-billing-header: cc_version=2.1.257.500; cc_entrypoint=cli; cch=4ffc3;")
     expect(prepared.system[1]).toStartWith("You are Claude Code, Anthropic's official CLI for Claude.")
     expect(prepared.system[1]).toContain("Environment context you are running in:")
   })
