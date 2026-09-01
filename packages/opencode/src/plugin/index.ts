@@ -20,6 +20,7 @@ import { CloudflareAIGatewayAuthPlugin, CloudflareWorkersAuthPlugin } from "./cl
 import { AzureAuthPlugin } from "./azure"
 import { DigitalOceanAuthPlugin } from "./digitalocean"
 import { XaiAuthPlugin } from "./xai"
+import { CerebrasPlugin } from "./cerebras"
 import { SnowflakeCortexAuthPlugin } from "./snowflake-cortex"
 // UPSTREAM-DIVERGENCE: Tandem-only prompt corrector. See prompt-corrector.ts.
 import { PromptCorrectorPlugin } from "./prompt-corrector"
@@ -86,6 +87,7 @@ function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
     DigitalOceanAuthPlugin,
     SnowflakeCortexAuthPlugin,
     XaiAuthPlugin,
+    CerebrasPlugin,
     // UPSTREAM-DIVERGENCE: Tandem-only prompt corrector (enabled by default; opt out with TANDEM_PROMPT_CORRECTOR=0).
     PromptCorrectorPlugin,
     // UPSTREAM-DIVERGENCE: Tandem-only OpenAI image generation tool (hidden unless OpenAI creds exist; opt out with TANDEM_IMAGEGEN=0).
