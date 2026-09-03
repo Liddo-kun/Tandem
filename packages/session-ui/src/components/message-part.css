@@ -472,6 +472,63 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
+
+  /* UPSTREAM-DIVERGENCE: Tandem webfetch reuses the Bash box for its markdown answer.
+     The URL header and body wrap in the box's width instead of overflowing it. */
+  &[data-variant="webfetch"] {
+    direction: inherit;
+    unicode-bidi: normal;
+
+    [data-slot="webfetch-url"] {
+      padding: 8px 40px 8px 12px;
+      border-bottom: 0.5px solid var(--v2-border-border-base);
+      font-family: var(--font-family-mono);
+      font-feature-settings: var(--font-family-mono--font-feature-settings);
+      font-size: 12px;
+      line-height: var(--line-height-large);
+      color: var(--text-weak);
+      overflow-wrap: anywhere;
+      word-break: break-all;
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+    }
+
+    [data-slot="bash-scroll"] {
+      max-height: 400px;
+    }
+
+    [data-slot="webfetch-body"] {
+      padding: 12px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+
+      [data-component="markdown"] {
+        width: 100%;
+        min-width: 0;
+        white-space: normal;
+        font-size: 13px;
+        line-height: var(--line-height-large);
+      }
+
+      [data-component="markdown"] > :first-child {
+        margin-top: 0;
+      }
+      [data-component="markdown"] > :last-child {
+        margin-bottom: 0;
+      }
+
+      [data-component="markdown"] a {
+        overflow-wrap: anywhere;
+        word-break: break-all;
+      }
+    }
+  }
 }
 
 [data-component="edit-trigger"],

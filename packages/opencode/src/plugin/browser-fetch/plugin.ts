@@ -51,7 +51,7 @@ const AGENT = {
   permission: { "*": "deny", webfetch: "allow", read: "allow" },
 } as const
 
-type Fetched = { ok: true; content: string; via: string } | { ok: false; error: string }
+type Fetched = { ok: true; content: string; via: string; file?: string } | { ok: false; error: string }
 
 function render(page: Awaited<ReturnType<typeof fetchPage>>): string {
   const stateNote =
@@ -117,7 +117,7 @@ async function fetchWithRetries(url: string, html: boolean, timeout: number, sig
       ok: false,
       error: "the site never delivered real content; both desktop and Android Chrome only saw a placeholder page",
     }
-  if (r.page) return { ok: true, content: render(r.page), via }
+  if (r.page) return { ok: true, content: render(r.page), via, file: r.page.file }
   if (r.error!.code === 3) return { ok: false, error: `timed out after ${MAX_TIMEOUT}s` }
   return { ok: false, error: r.error!.message }
 }
@@ -231,7 +231,9 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
             )?.trim()
 
             if (!answer) throw new Error(`no answer came back for ${args.url}`)
-            return answer
+            // A downloaded document outlives the answer: the caller may want the
+            // file itself (read it, convert it, move it out of /tmp).
+            return fetched.file ? `${answer}\n\n[Downloaded file saved to ${fetched.file}]` : answer
           } finally {
             context.abort.removeEventListener("abort", onAbort)
           }

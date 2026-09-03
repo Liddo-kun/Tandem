@@ -8,5 +8,6 @@ Usage notes:
   - The URL must be a fully-formed valid URL
   - Give a prompt when you only need part of a page (a price, a section, specific fields); it keeps the response small
   - Format options: "markdown" (default), "text", or "html"
-  - This tool is read-only and does not modify any files or interact with the page
+  - URLs that are documents (PDF etc.) are downloaded with the browser's session, text-extracted, and the file is kept under /tmp/tandem/webfetch/; the saved path is appended to the result so you can read, convert, or move the file
+  - This tool does not interact with the page beyond loading it
   - Results may be summarized if the content is very large
