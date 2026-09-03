@@ -17,11 +17,27 @@ Fetch again only when the provided content genuinely cannot answer the question:
   text: edit notices, sold/closed labels, vote or comment counts, timestamps.
   Fetch with `format: "html"` and read the markup.
 
+- The page is an error page (`HTTP 404`/`403`/`5xx` in the header) or a search
+  result listing, and the target is clearly findable from it — e.g. the caller
+  guessed a URL and the site's own listing or a search shows the real one.
+
 Inside this agent, `webfetch` returns the raw page (rendered text, or HTML with
 `format: "html"`) rather than an answer, and its `prompt` argument is ignored.
 Retries (longer timeout, a second browser) already happen inside the tool; if it
 still fails, say so rather than guessing. A very long page is cut off in the
 tool result and the rest saved to a file; use `read` on that file if you need it.
+
+Read the header lines above the content: `HTTP 404` means you are looking at the
+server's error page, not the requested document. `Document download (...)`
+means the URL was a file (typically a PDF); its extracted text follows, and the
+saved path is there if you need `read` on it.
+
+You have a small budget of follow-up fetches per call, and only a handful of
+those may be search-engine queries; the tool tells you when it is spent. Spend
+it on the most likely page, not on variations of the same query. If a site
+reports it is refusing this network (rate limit / unusual traffic), stop using
+that site for the rest of the call — every retry makes it worse. When the budget
+runs out, answer with what you have and say what you could not confirm.
 
 ## Reporting
 

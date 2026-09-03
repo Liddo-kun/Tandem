@@ -21,15 +21,21 @@
  *   --keep-tab         leave the tab open after extraction
  *   --json             emit {title,url,text,links?,pageState} as JSON
  *
- * Exit codes: 0 ok, 1 error, 2 usage, 3 hard timeout, 4 only ever saw a placeholder page.
+ * Exit codes: 0 ok, 1 error, 2 usage, 3 hard timeout, 4 only ever saw a placeholder page,
+ * 5 the site is refusing this network (rate limit / "unusual traffic").
  */
 
 const LINUX_EP = "127.0.0.1:9223"
 const ANDROID_EP = "127.0.0.1:9222"
 // Placeholder text shown while a site is still handing over the real page.
-const PENDING_RE = /just a moment|checking your browser|attention required|verify you are human|enable javascript and cookies/i
+const PENDING_RE =
+  /just a moment|checking your browser|attention required|verify you are human|enable javascript and cookies|you are being redirected|automatic(?:ally)? redirect|redirecting (?:you|to|in)/i
+// The site is refusing this network for now; polling or a second browser on the
+// same IP will not change that, so report it instead of hammering.
+const BLOCKED_RE = /unusual traffic from your computer network|\/sorry\/index|too many requests|rate limit(?:ed)?/i
+const DOWNLOAD_DIR = "/tmp/tandem/webfetch"
 
-export type PageState = "ready" | "ready-after-wait" | "never-ready"
+export type PageState = "ready" | "ready-after-wait" | "never-ready" | "blocked"
 
 export interface FetchOptions {
   url: string
@@ -52,6 +58,11 @@ export interface FetchResult {
   text: string
   links: { text: string; href: string }[] | null
   pageState: PageState
+  /** HTTP status of the main document, when the browser reported one */
+  status?: number
+  /** set when the URL was a document download (PDF etc.) rather than a page: where the bytes went */
+  file?: string
+  mime?: string
 }
 
 /** `code` mirrors the CLI exit codes: 1 error, 3 hard timeout. */
@@ -197,6 +208,50 @@ async function evalJson(cdp: Cdp, expr: string, tries = 3): Promise<any> {
   }
 }
 
+// A navigation that turned out to be a document (PDF etc.): the browser would
+// either show a viewer with no useful innerText or save it to Downloads, so pull
+// the bytes ourselves — with the browser's cookies, so logged-in documents work —
+// and turn PDFs into text with pdftotext.
+async function downloadDocument(
+  cdp: Cdp,
+  r: { status: number; mimeType: string; url: string; headers: Record<string, string> },
+  timeLeft: () => number,
+): Promise<FetchResult> {
+  const { cookies } = await cdp.send("Network.getCookies", { urls: [r.url] }).catch(() => ({ cookies: [] }))
+  const ua = await cdp
+    .send("Runtime.evaluate", { expression: "navigator.userAgent", returnByValue: true })
+    .then((x) => x.result?.value as string)
+    .catch(() => undefined)
+  const headers: Record<string, string> = {}
+  if (cookies?.length) headers.cookie = cookies.map((c: any) => `${c.name}=${c.value}`).join("; ")
+  if (ua) headers["user-agent"] = ua
+  const res = await fetch(r.url, { headers, signal: AbortSignal.timeout(Math.max(timeLeft() - 2000, 5000)) })
+  if (!res.ok) throw new FetchError(`download failed: HTTP ${res.status}`, 1)
+  const bytes = new Uint8Array(await res.arrayBuffer())
+
+  const { mkdirSync } = await import("node:fs")
+  mkdirSync(DOWNLOAD_DIR, { recursive: true })
+  const disp = Object.entries(r.headers).find(([k]) => k.toLowerCase() === "content-disposition")?.[1] ?? ""
+  const fromDisp = /filename\*?=(?:UTF-8'')?"?([^";]+)/i.exec(disp)?.[1]
+  const fromUrl = decodeURIComponent(new URL(r.url).pathname.split("/").pop() || "")
+  const isPdf = /pdf/i.test(r.mimeType) || /\.pdf$/i.test(fromUrl)
+  const name = (fromDisp || fromUrl || "download").replace(/[^\w.-]+/g, "_").slice(-80) || "download"
+  const file = `${DOWNLOAD_DIR}/${Date.now()}-${name}${isPdf && !/\.pdf$/i.test(name) ? ".pdf" : ""}`
+  await Bun.write(file, bytes)
+
+  let text = `(binary document, ${Math.round(bytes.length / 1024)} KB, saved to ${file})`
+  if (isPdf) {
+    const p = Bun.spawn(["pdftotext", "-layout", file, "-"], { stdout: "pipe", stderr: "pipe" })
+    const out = await new Response(p.stdout).text()
+    await p.exited
+    text =
+      p.exitCode === 0 && out.trim()
+        ? out.replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n")
+        : `(PDF saved to ${file}; pdftotext ${p.exitCode === 0 ? "found no text layer" : "is unavailable or failed"} — use the read tool on the file)`
+  }
+  return { title: name, url: r.url, text, links: null, pageState: "ready", status: r.status, file, mime: r.mimeType }
+}
+
 // ---------- engine ----------
 export async function fetchPage(opt: FetchOptions): Promise<FetchResult> {
   const url = /^[a-z]+:\/\//i.test(opt.url) ? opt.url : "https://" + opt.url
@@ -235,32 +290,99 @@ export async function fetchPage(opt: FetchOptions): Promise<FetchResult> {
     }
 
     cdp = await Cdp.connect(`ws://${ep}/devtools/page/${targetId}`, timeLeft)
-    let loadFired = false
+
+    // Navigation tracking. `loading` flips on every main-frame navigation, so a
+    // redirect that starts *after* the first load (meta refresh, JS
+    // `location=`, "please wait while we forward you") is waited out instead
+    // of captured as the page. Scheduled navigations carry their delay.
+    let mainFrame = ""
+    let loading = true
+    let lastLoad = 0
+    let scheduledNav: number | undefined
+    let mainResponse: { status: number; mimeType: string; url: string; headers: Record<string, string> } | undefined
+    const isMain = (m: any) => !mainFrame || m.params?.frameId === mainFrame
     cdp.onEvent((m) => {
-      if (m.method === "Page.loadEventFired") loadFired = true
+      if (m.method === "Page.frameStartedLoading" && isMain(m)) {
+        loading = true
+        scheduledNav = undefined
+      } else if (m.method === "Page.loadEventFired" || (m.method === "Page.frameStoppedLoading" && isMain(m))) {
+        loading = false
+        lastLoad = Date.now()
+      } else if (m.method === "Page.frameScheduledNavigation" && isMain(m)) {
+        const delay = Number(m.params.delay ?? 0)
+        if (delay <= 15) scheduledNav = Date.now() + delay * 1000
+      } else if (m.method === "Page.frameClearedScheduledNavigation" && isMain(m)) {
+        scheduledNav = undefined
+      } else if (m.method === "Network.responseReceived" && m.params.type === "Document" && isMain(m)) {
+        const r = m.params.response
+        mainResponse = { status: r.status, mimeType: r.mimeType ?? "", url: r.url, headers: r.headers ?? {} }
+      }
     })
     await cdp.send("Page.enable")
     await cdp.send("Runtime.enable")
-    await cdp.send("Page.navigate", { url })
+    await cdp.send("Network.enable")
+    // Downloads are fetched by us (below) rather than saved by the browser. The
+    // browser-level call ignores the default context, so set it per page too.
+    await browser.send("Browser.setDownloadBehavior", { behavior: "deny" }).catch(() => {})
+    await cdp.send("Page.setDownloadBehavior", { behavior: "deny" }).catch(() => {})
+    // Slow first byte is the common way a page is slow; give navigate a real share of the budget.
+    const nav = await cdp.send("Page.navigate", { url }, Math.max(timeLeft() * 0.6, 15000))
+    mainFrame = nav.frameId ?? ""
 
-    // Wait for load (or give up at ~60% of remaining budget and take what we have).
+    const isDownload = () => {
+      const r = mainResponse
+      if (!r) return false
+      const disp = Object.entries(r.headers).find(([k]) => k.toLowerCase() === "content-disposition")?.[1] ?? ""
+      return /pdf|octet-stream|zip/i.test(r.mimeType) || /attachment/i.test(disp)
+    }
+
+    // A navigation that turns into a download is reported as ERR_ABORTED; the
+    // document response that tells us so can land a beat after navigate returns.
+    if (nav.errorText === "net::ERR_ABORTED") {
+      for (let i = 0; i < 15 && !mainResponse; i++) await sleep(200)
+      if (!isDownload()) throw new FetchError("navigation was aborted by the browser", 1)
+    } else if (nav.errorText) throw new FetchError(`navigation failed: ${nav.errorText}`, 1)
+
+    // Wait until the main frame has loaded and stayed put for `settle` seconds
+    // (or give up at ~60% of remaining budget and take what we have).
     const loadBudget = Date.now() + Math.max(timeLeft() * 0.6, 5000)
-    while (!loadFired && Date.now() < loadBudget) await sleep(200)
-    await sleep(settle * 1000)
+    while (Date.now() < loadBudget) {
+      if (isDownload()) break
+      if (loading) {
+        await sleep(200)
+        continue
+      }
+      if (scheduledNav !== undefined && Date.now() < scheduledNav + 2000) {
+        await sleep(200)
+        continue
+      }
+      if (Date.now() - lastLoad < settle * 1000) {
+        await sleep(200)
+        continue
+      }
+      break
+    }
+
+    if (isDownload()) return await downloadDocument(cdp, mainResponse!, timeLeft)
 
     // Some sites serve a short-lived placeholder page and swap in the real content a
     // moment later. Poll until the placeholder text is gone; each pass re-fires load
     // on whatever replaced it.
-    const probe = `JSON.stringify({t: document.title, h: (document.body?.innerText ?? "").slice(0, 2000)})`
+    const probe = `JSON.stringify({t: document.title, h: (document.body?.innerText ?? "").slice(0, 2000), u: location.href})`
     let pageState: PageState = "ready"
     for (let i = 0; i < 30 && timeLeft() > 3000; i++) {
       let t = ""
       let h = ""
+      let u = ""
       try {
-        ;({ t, h } = JSON.parse(await evalJson(cdp, probe)))
+        ;({ t, h, u } = JSON.parse(await evalJson(cdp, probe)))
       } catch {
         await sleep(1000) // context torn down by a reload; look again
         continue
+      }
+      if (BLOCKED_RE.test(u) || BLOCKED_RE.test(t) || BLOCKED_RE.test(h)) {
+        pageState = "blocked"
+        break
       }
       const hit = PENDING_RE.test(t) || PENDING_RE.test(h)
       if (!hit) {
@@ -297,7 +419,7 @@ export async function fetchPage(opt: FetchOptions): Promise<FetchResult> {
       await Bun.write(opt.screenshot, Buffer.from(shot.data, "base64"))
     }
 
-    return { ...page, pageState } as FetchResult
+    return { ...page, pageState, status: mainResponse?.status } as FetchResult
   })()
 
   const hardTimeout = new Promise<never>((_, reject) => {
@@ -378,12 +500,16 @@ async function main() {
       ? "   (real content arrived after a placeholder page)"
       : page.pageState === "never-ready"
         ? "   (WARNING: page never delivered real content — text below is the placeholder)"
-        : ""
+        : page.pageState === "blocked"
+          ? "   (BLOCKED: the site is refusing this network right now)"
+          : ""
   if (opt.json) {
     console.log(JSON.stringify(page, null, 2))
   } else {
     console.log(`# ${page.title}`)
     console.log(`URL: ${page.url}${stateNote}`)
+    if (page.status && page.status >= 400) console.log(`HTTP ${page.status}`)
+    if (page.file) console.log(`Saved: ${page.file} (${page.mime})`)
     if (opt.screenshot) console.log(`Screenshot: ${opt.screenshot}`)
     console.log("")
     console.log(page.text)
@@ -393,7 +519,7 @@ async function main() {
     }
   }
   // Exit 4 when only the placeholder was ever seen, so wrappers can retry via --android.
-  process.exit(page.pageState === "never-ready" ? 4 : 0)
+  process.exit(page.pageState === "never-ready" ? 4 : page.pageState === "blocked" ? 5 : 0)
 }
 
 if (import.meta.main) main()

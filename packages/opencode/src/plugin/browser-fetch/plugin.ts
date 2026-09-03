@@ -31,6 +31,12 @@ import { fetchPage, FetchError } from "./cdp-fetch"
 const SUBAGENT = "web-fetcher"
 const MAX_CONTENT_BYTES = 100_000
 const MAX_TIMEOUT = 120
+// Follow-up fetches the subagent may make per webfetch call. Without a ceiling
+// a bad starting URL turned into 68 fetches (46 of them Google searches) and got
+// the network's IP put on Google's "unusual traffic" page.
+const MAX_FOLLOWUPS = 12
+const MAX_SEARCHES = 5
+const SEARCH_RE = /^https?:\/\/(?:www\.)?(?:google\.[a-z.]+|bing\.com|duckduckgo\.com|search\.yahoo\.com|yandex\.[a-z]+|baidu\.com)\/(?:search|html)?/i
 
 const AGENT = {
   description:
@@ -54,7 +60,29 @@ function render(page: Awaited<ReturnType<typeof fetchPage>>): string {
       : page.pageState === "never-ready"
         ? "   (WARNING: page never delivered real content — text below is the placeholder)"
         : ""
-  return `# ${page.title}\nURL: ${page.url}${stateNote}\n\n${page.text}`
+  const lines = [`# ${page.title}`, `URL: ${page.url}${stateNote}`]
+  if (page.status && page.status >= 400) lines.push(`HTTP ${page.status} — this is the server's error page, not the requested content`)
+  if (page.file) lines.push(`Document download (${page.mime}); saved to ${page.file}. Text below is extracted from it.`)
+  return `${lines.join("\n")}\n\n${page.text}`
+}
+
+// Per child session follow-up budget, keyed by session id. Sessions are short
+// and never reused, so the map is simply kept bounded.
+const budgets = new Map<string, { total: number; searches: number }>()
+function spend(sessionID: string, url: string) {
+  let b = budgets.get(sessionID)
+  if (!b) {
+    if (budgets.size > 500) budgets.delete(budgets.keys().next().value!)
+    b = { total: 0, searches: 0 }
+    budgets.set(sessionID, b)
+  }
+  const search = SEARCH_RE.test(url)
+  if (b.total >= MAX_FOLLOWUPS)
+    throw new Error(`follow-up budget for this webfetch call is used up (${MAX_FOLLOWUPS} fetches). Answer from what you already have.`)
+  if (search && b.searches >= MAX_SEARCHES)
+    throw new Error(`search budget for this webfetch call is used up (${MAX_SEARCHES} searches). Answer from what you already have.`)
+  b.total++
+  if (search) b.searches++
 }
 
 // One fetch with the deterministic retries: a hard timeout gets the maximum
@@ -72,12 +100,18 @@ async function fetchWithRetries(url: string, html: boolean, timeout: number, sig
   let r = await attempt(false, timeout)
   let via = "desktop Chromium"
   if (r.error?.code === 3 && timeout < MAX_TIMEOUT) r = await attempt(false, MAX_TIMEOUT)
+  // A second browser on the same IP will not get past a network-level refusal.
   if (r.page?.pageState === "never-ready") {
     r = await attempt(true, timeout)
     via = "Android Chrome"
   }
 
   if (signal.aborted) return { ok: false, error: "aborted" }
+  if (r.page?.pageState === "blocked")
+    return {
+      ok: false,
+      error: `${new URL(url).hostname} is refusing requests from this network right now (rate limit / "unusual traffic" page). Do not retry it or other searches on that site in this call.`,
+    }
   if (r.page?.pageState === "never-ready")
     return {
       ok: false,
@@ -129,6 +163,7 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
 
           const timeout = Math.min(Math.max(args.timeout ?? 60, 5), MAX_TIMEOUT)
           const format = args.format ?? "markdown"
+          if (context.agent === SUBAGENT) spend(context.sessionID, args.url)
           const fetched = await fetchWithRetries(args.url, format === "html", timeout, context.abort)
           // A failed fetch is reported straight back; no point spending a
           // subagent turn to say the same thing.
