@@ -453,7 +453,7 @@ export async function fetchPage(opt: FetchOptions): Promise<FetchResult> {
       ),
     )
 
-    const shots = opt.screenshot ? await captureSlices(cdp, opt.screenshot) : undefined
+    const shots = opt.screenshot ? await captureSlices(cdp, opt.screenshot).catch(() => undefined) : undefined
 
     return { ...page, pageState, status: mainResponse?.status, ...shots } as FetchResult
   })()

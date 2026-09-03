@@ -21,14 +21,16 @@ Fetch again only when the provided content genuinely cannot answer the question:
   result listing, and the target is clearly findable from it — e.g. the caller
   guessed a URL and the site's own listing or a search shows the real one.
 
-- The information is visual and the text does not carry it: charts and graphs,
-  specs or prices baked into images, diagrams, a layout where meaning is
-  positional (which column a value sits in), or a page whose text came back
-  suspiciously thin for what it is. Fetch again with `screenshot: true`; the
-  result lists PNG paths (top-to-bottom slices of the whole page). `read` each
-  one you need and answer from what you see, saying so when a value was read
-  off an image. Skip this when the text already answers the question — it
-  costs a fetch and several images.
+## Looking at the page
+
+Every fetch is also captured as full-page PNG slices, top to bottom; the
+`Screenshots (...)` header line lists them. The text usually answers the
+question and you do not need them. Use `read` on the ones you need when the
+information is visual and the text does not carry it: charts and graphs, specs
+or prices baked into images, diagrams, a layout where meaning is positional
+(which column a value sits in), or a page whose text came back suspiciously
+thin for what it is. Say so when a value was read off an image. When the caller
+asked for a visual read, the slices are already attached to your message.
 
 Inside this agent, `webfetch` returns the raw page (rendered text, or HTML with
 `format: "html"`) rather than an answer, and its `prompt` argument is ignored.
@@ -40,8 +42,6 @@ Read the header lines above the content: `HTTP 404` means you are looking at the
 server's error page, not the requested document. `Document download (...)`
 means the URL was a file (typically a PDF); its extracted text follows, and the
 saved path is there if you need `read` on it.
-`Screenshots (...)` means the caller asked for a visual capture: look at those
-images with `read` before answering.
 
 You have a small budget of follow-up fetches per call, and only a handful of
 those may be search-engine queries; the tool tells you when it is spent. Spend

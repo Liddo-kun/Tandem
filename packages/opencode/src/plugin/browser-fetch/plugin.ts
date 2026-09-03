@@ -1,6 +1,7 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { tool } from "@opencode-ai/plugin"
 import DESCRIPTION from "./webfetch.txt"
+import { readdirSync, unlinkSync } from "node:fs"
 import AGENT_PROMPT from "./web-fetcher.md" with { type: "text" }
 import { fetchPage, FetchError } from "./cdp-fetch"
 
@@ -66,10 +67,22 @@ function render(page: Awaited<ReturnType<typeof fetchPage>>): string {
   if (page.file) lines.push(`Document download (${page.mime}); saved to ${page.file}. Text below is extracted from it.`)
   if (page.screenshots)
     lines.push(
-      `Screenshots (top to bottom, use \`read\` to view): ${page.screenshots.join(", ")}` +
+      `Screenshots (top to bottom): ${page.screenshots.join(", ")}` +
         (page.screenshotCut ? ` — page continues ${page.screenshotCut}px below the last one` : ""),
     )
   return `${lines.join("\n")}\n\n${page.text}`
+}
+
+// Every fetch leaves PNG slices behind; keep the directory to the newest few
+// hundred so a long session does not fill /tmp.
+const MAX_SHOTS = 300
+function pruneShots() {
+  try {
+    const files = readdirSync(SHOT_DIR)
+      .filter((f) => f.endsWith(".png"))
+      .sort()
+    for (const f of files.slice(0, Math.max(0, files.length - MAX_SHOTS))) unlinkSync(`${SHOT_DIR}/${f}`)
+  } catch {}
 }
 
 // Per child session follow-up budget, keyed by session id. Sessions are short
@@ -99,7 +112,7 @@ async function fetchWithRetries(
   html: boolean,
   timeout: number,
   signal: AbortSignal,
-  screenshot?: string,
+  screenshot: string,
 ): Promise<Fetched> {
   const attempt = async (android: boolean, t: number) => {
     try {
@@ -159,8 +172,8 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
             .boolean()
             .optional()
             .describe(
-              "Also capture the rendered page as PNG image(s) and return their paths, for when the information " +
-                "is visual: charts, diagrams, text inside images, layouts, product pages whose specs are pictures.",
+              "Have the reader look at the rendered page as well as its text, for when the information is visual: " +
+                "charts, diagrams, text inside images, layouts, product pages whose specs are pictures.",
             ),
           prompt: tool.schema
             .string()
@@ -183,7 +196,9 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
           const timeout = Math.min(Math.max(args.timeout ?? 60, 5), MAX_TIMEOUT)
           const format = args.format ?? "markdown"
           if (context.agent === SUBAGENT) spend(context.sessionID, args.url)
-          const shotBase = args.screenshot ? `${SHOT_DIR}/${Date.now()}-${host.replace(/[^\w.-]+/g, "_")}` : undefined
+          // Every fetch is captured; whether the subagent looks is decided below.
+          const shotBase = `${SHOT_DIR}/${Date.now()}-${host.replace(/[^\w.-]+/g, "_")}`
+          pruneShots()
           const fetched = await fetchWithRetries(args.url, format === "html", timeout, context.abort, shotBase)
           // A failed fetch is reported straight back; no point spending a
           // subagent turn to say the same thing.
@@ -228,8 +243,8 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
                         args.prompt
                           ? `What the caller needs: ${args.prompt}`
                           : "No prompt given: return the full main content of the page.",
-                        ...(fetched.screenshots
-                          ? ["The caller asked for screenshots: look at them with `read` before answering."]
+                        ...(args.screenshot && fetched.screenshots
+                          ? [`The caller asked you to look at the page: its ${fetched.screenshots.length} screenshot slice(s) are attached.`]
                           : []),
                         "",
                         `The page has already been fetched (via ${fetched.via}${format === "html" ? ", as HTML" : ""}). Content follows.`,
@@ -239,6 +254,16 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
                         "</page>",
                       ].join("\n"),
                     },
+                    // Caller asked for a look: attach the slices up front rather
+                    // than spending a turn on the subagent `read`ing them.
+                    ...(args.screenshot && fetched.screenshots
+                      ? fetched.screenshots.map((file) => ({
+                          type: "file" as const,
+                          mime: "image/png",
+                          filename: file.slice(file.lastIndexOf("/") + 1),
+                          url: `file://${file}`,
+                        }))
+                      : []),
                   ],
                 },
               })
@@ -258,7 +283,7 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
             // file itself (read it, convert it, move it out of /tmp).
             const trailer = [
               fetched.file ? `[Downloaded file saved to ${fetched.file}]` : "",
-              fetched.screenshots ? `[Screenshots saved to ${fetched.screenshots.join(", ")}]` : "",
+              fetched.screenshots ? `[Screenshots: ${fetched.screenshots.join(", ")}]` : "",
             ]
               .filter(Boolean)
               .join("\n")

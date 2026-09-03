@@ -9,6 +9,6 @@ Usage notes:
   - Give a prompt when you only need part of a page (a price, a section, specific fields); it keeps the response small
   - Format options: "markdown" (default), "text", or "html"
   - URLs that are documents (PDF etc.) are downloaded with the browser's session, text-extracted, and the file is kept under /tmp/tandem/webfetch/; the saved path is appended to the result so you can read, convert, or move the file
-  - Pass screenshot: true when the answer is visual (charts, text inside images, layouts, product pages whose specs are pictures); the reader looks at full-page PNG slices as well as the text, and the paths are appended to the result so you can view them yourself
+  - Pass screenshot: true when the answer is visual (charts, text inside images, layouts, product pages whose specs are pictures): the reader then sees full-page PNG slices of the page as well as its text. The slices are captured on every fetch and their paths appended to the result, so you can view them yourself either way
   - This tool does not interact with the page beyond loading it
   - Results may be summarized if the content is very large
