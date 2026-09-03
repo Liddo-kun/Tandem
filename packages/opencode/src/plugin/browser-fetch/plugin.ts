@@ -31,6 +31,7 @@ import { fetchPage, FetchError } from "./cdp-fetch"
 const SUBAGENT = "web-fetcher"
 const MAX_CONTENT_BYTES = 100_000
 const MAX_TIMEOUT = 120
+const SHOT_DIR = "/tmp/tandem/webfetch"
 // Follow-up fetches the subagent may make per webfetch call. Without a ceiling
 // a bad starting URL turned into 68 fetches (46 of them Google searches) and got
 // the network's IP put on Google's "unusual traffic" page.
@@ -51,7 +52,7 @@ const AGENT = {
   permission: { "*": "deny", webfetch: "allow", read: "allow" },
 } as const
 
-type Fetched = { ok: true; content: string; via: string; file?: string } | { ok: false; error: string }
+type Fetched = { ok: true; content: string; via: string; file?: string; screenshots?: string[] } | { ok: false; error: string }
 
 function render(page: Awaited<ReturnType<typeof fetchPage>>): string {
   const stateNote =
@@ -63,6 +64,11 @@ function render(page: Awaited<ReturnType<typeof fetchPage>>): string {
   const lines = [`# ${page.title}`, `URL: ${page.url}${stateNote}`]
   if (page.status && page.status >= 400) lines.push(`HTTP ${page.status} — this is the server's error page, not the requested content`)
   if (page.file) lines.push(`Document download (${page.mime}); saved to ${page.file}. Text below is extracted from it.`)
+  if (page.screenshots)
+    lines.push(
+      `Screenshots (top to bottom, use \`read\` to view): ${page.screenshots.join(", ")}` +
+        (page.screenshotCut ? ` — page continues ${page.screenshotCut}px below the last one` : ""),
+    )
   return `${lines.join("\n")}\n\n${page.text}`
 }
 
@@ -88,10 +94,16 @@ function spend(sessionID: string, url: string) {
 // One fetch with the deterministic retries: a hard timeout gets the maximum
 // budget once; a placeholder that never resolves on the desktop is retried on the
 // tablet's Chrome, which often gets a different answer from the same site.
-async function fetchWithRetries(url: string, html: boolean, timeout: number, signal: AbortSignal): Promise<Fetched> {
+async function fetchWithRetries(
+  url: string,
+  html: boolean,
+  timeout: number,
+  signal: AbortSignal,
+  screenshot?: string,
+): Promise<Fetched> {
   const attempt = async (android: boolean, t: number) => {
     try {
-      return { page: await fetchPage({ url, html, android, timeout: t, signal }) }
+      return { page: await fetchPage({ url, html, android, timeout: t, signal, screenshot }) }
     } catch (e) {
       return { error: e instanceof FetchError ? e : new FetchError(e instanceof Error ? e.message : String(e), 1) }
     }
@@ -117,7 +129,7 @@ async function fetchWithRetries(url: string, html: boolean, timeout: number, sig
       ok: false,
       error: "the site never delivered real content; both desktop and Android Chrome only saw a placeholder page",
     }
-  if (r.page) return { ok: true, content: render(r.page), via, file: r.page.file }
+  if (r.page) return { ok: true, content: render(r.page), via, file: r.page.file, screenshots: r.page.screenshots }
   if (r.error!.code === 3) return { ok: false, error: `timed out after ${MAX_TIMEOUT}s` }
   return { ok: false, error: r.error!.message }
 }
@@ -143,6 +155,13 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
             .optional()
             .describe("The format to return the content in (text, markdown, or html). Defaults to markdown."),
           timeout: tool.schema.number().optional().describe("Optional timeout in seconds (max 120)"),
+          screenshot: tool.schema
+            .boolean()
+            .optional()
+            .describe(
+              "Also capture the rendered page as PNG image(s) and return their paths, for when the information " +
+                "is visual: charts, diagrams, text inside images, layouts, product pages whose specs are pictures.",
+            ),
           prompt: tool.schema
             .string()
             .optional()
@@ -164,7 +183,8 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
           const timeout = Math.min(Math.max(args.timeout ?? 60, 5), MAX_TIMEOUT)
           const format = args.format ?? "markdown"
           if (context.agent === SUBAGENT) spend(context.sessionID, args.url)
-          const fetched = await fetchWithRetries(args.url, format === "html", timeout, context.abort)
+          const shotBase = args.screenshot ? `${SHOT_DIR}/${Date.now()}-${host.replace(/[^\w.-]+/g, "_")}` : undefined
+          const fetched = await fetchWithRetries(args.url, format === "html", timeout, context.abort, shotBase)
           // A failed fetch is reported straight back; no point spending a
           // subagent turn to say the same thing.
           if (!fetched.ok) throw new Error(`Fetch failed for ${args.url}: ${fetched.error}`)
@@ -208,6 +228,9 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
                         args.prompt
                           ? `What the caller needs: ${args.prompt}`
                           : "No prompt given: return the full main content of the page.",
+                        ...(fetched.screenshots
+                          ? ["The caller asked for screenshots: look at them with `read` before answering."]
+                          : []),
                         "",
                         `The page has already been fetched (via ${fetched.via}${format === "html" ? ", as HTML" : ""}). Content follows.`,
                         "",
@@ -233,7 +256,13 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
             if (!answer) throw new Error(`no answer came back for ${args.url}`)
             // A downloaded document outlives the answer: the caller may want the
             // file itself (read it, convert it, move it out of /tmp).
-            return fetched.file ? `${answer}\n\n[Downloaded file saved to ${fetched.file}]` : answer
+            const trailer = [
+              fetched.file ? `[Downloaded file saved to ${fetched.file}]` : "",
+              fetched.screenshots ? `[Screenshots saved to ${fetched.screenshots.join(", ")}]` : "",
+            ]
+              .filter(Boolean)
+              .join("\n")
+            return trailer ? `${answer}\n\n${trailer}` : answer
           } finally {
             context.abort.removeEventListener("abort", onAbort)
           }

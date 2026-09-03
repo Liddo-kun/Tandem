@@ -13,7 +13,8 @@
  * Usage: cdp-fetch [options] <url>
  *   --html             output raw outerHTML instead of readable text
  *   --links            append a de-duplicated list of links on the page
- *   --screenshot [f]   save a PNG screenshot (default /tmp/tandem/cdp-<ts>.png)
+ *   --screenshot [f]   save full-page PNG screenshot(s), top-to-bottom slices
+ *                      f-1.png, f-2.png, ... (default /tmp/tandem/cdp-<ts>)
  *   --android          drive Android Chrome instead of Linux Chromium
  *   --endpoint h:p     explicit CDP endpoint (overrides tier selection)
  *   --timeout N        overall hard timeout, seconds (default 60)
@@ -34,6 +35,10 @@ const PENDING_RE =
 // same IP will not change that, so report it instead of hammering.
 const BLOCKED_RE = /unusual traffic from your computer network|\/sorry\/index|too many requests|rate limit(?:ed)?/i
 const DOWNLOAD_DIR = "/tmp/tandem/webfetch"
+// Full-page screenshots are cut into slices a vision model can read without
+// downscaling into mush; beyond MAX_SLICES the page is reported as cut off.
+const SLICE_HEIGHT = 1600
+const MAX_SLICES = 4
 
 export type PageState = "ready" | "ready-after-wait" | "never-ready" | "blocked"
 
@@ -48,6 +53,7 @@ export interface FetchOptions {
   /** extra settle time after load, seconds */
   settle?: number
   keepTab?: boolean
+  /** base path (no extension) for full-page screenshot slices */
   screenshot?: string
   signal?: AbortSignal
 }
@@ -63,6 +69,10 @@ export interface FetchResult {
   /** set when the URL was a document download (PDF etc.) rather than a page: where the bytes went */
   file?: string
   mime?: string
+  /** full-page screenshot slices, top to bottom */
+  screenshots?: string[]
+  /** page height in CSS px not covered by the slices */
+  screenshotCut?: number
 }
 
 /** `code` mirrors the CLI exit codes: 1 error, 3 hard timeout. */
@@ -194,6 +204,35 @@ class Cdp {
 // A placeholder page reloads itself mid-flight, which destroys the JS execution
 // context and strands any in-flight Runtime.evaluate. Retry rather than die:
 // that reload is the real content arriving, i.e. exactly the case we care about.
+// Full-page capture as fixed-height slices. `captureBeyondViewport` renders
+// the parts below the fold without scrolling, so lazy content is what it was at
+// extraction time; that matches the text the caller already has.
+async function captureSlices(cdp: Cdp, base: string): Promise<{ screenshots: string[]; screenshotCut?: number }> {
+  const metrics = await cdp.send("Page.getLayoutMetrics")
+  const width = Math.ceil(metrics.cssLayoutViewport?.clientWidth ?? metrics.cssContentSize?.width ?? 1280)
+  const height = Math.ceil(metrics.cssContentSize?.height ?? SLICE_HEIGHT)
+  const slices = Math.max(1, Math.min(MAX_SLICES, Math.ceil(height / SLICE_HEIGHT)))
+  // 1 CSS px per image px: a 2x display would otherwise produce megabyte slices.
+  const dpr = Number(await evalJson(cdp, "window.devicePixelRatio")) || 1
+  const { mkdirSync } = await import("node:fs")
+  const { dirname } = await import("node:path")
+  mkdirSync(dirname(base), { recursive: true })
+  const screenshots: string[] = []
+  for (let i = 0; i < slices; i++) {
+    const y = i * SLICE_HEIGHT
+    const shot = await cdp.send("Page.captureScreenshot", {
+      format: "png",
+      captureBeyondViewport: true,
+      clip: { x: 0, y, width, height: Math.min(SLICE_HEIGHT, height - y), scale: 1 / dpr },
+    })
+    const file = `${base}-${i + 1}.png`
+    await Bun.write(file, Buffer.from(shot.data, "base64"))
+    screenshots.push(file)
+  }
+  const cut = height - slices * SLICE_HEIGHT
+  return cut > 0 ? { screenshots, screenshotCut: cut } : { screenshots }
+}
+
 async function evalJson(cdp: Cdp, expr: string, tries = 3): Promise<any> {
   for (let i = 0; ; i++) {
     try {
@@ -414,12 +453,9 @@ export async function fetchPage(opt: FetchOptions): Promise<FetchResult> {
       ),
     )
 
-    if (opt.screenshot) {
-      const shot = await cdp.send("Page.captureScreenshot", { format: "png" })
-      await Bun.write(opt.screenshot, Buffer.from(shot.data, "base64"))
-    }
+    const shots = opt.screenshot ? await captureSlices(cdp, opt.screenshot) : undefined
 
-    return { ...page, pageState, status: mainResponse?.status } as FetchResult
+    return { ...page, pageState, status: mainResponse?.status, ...shots } as FetchResult
   })()
 
   const hardTimeout = new Promise<never>((_, reject) => {
@@ -469,7 +505,7 @@ async function main() {
       opt.screenshot =
         args[i + 1] && !args[i + 1].startsWith("--") && !/^https?:/.test(args[i + 1])
           ? args[++i]
-          : `/tmp/tandem/cdp-${Date.now()}.png`
+          : `/tmp/tandem/cdp-${Date.now()}`
     } else if (a === "--endpoint") opt.endpoint = args[++i]
     else if (a === "--timeout") opt.timeout = parseFloat(args[++i])
     else if (a === "--settle") opt.settle = parseFloat(args[++i])
@@ -510,7 +546,7 @@ async function main() {
     console.log(`URL: ${page.url}${stateNote}`)
     if (page.status && page.status >= 400) console.log(`HTTP ${page.status}`)
     if (page.file) console.log(`Saved: ${page.file} (${page.mime})`)
-    if (opt.screenshot) console.log(`Screenshot: ${opt.screenshot}`)
+    if (page.screenshots) console.log(`Screenshots: ${page.screenshots.join(", ")}${page.screenshotCut ? ` (page continues ${page.screenshotCut}px further)` : ""}`)
     console.log("")
     console.log(page.text)
     if (page.links) {
