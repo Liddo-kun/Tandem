@@ -18,10 +18,12 @@ import { fetchPage, FetchError } from "./cdp-fetch"
 // The fetch happens HERE, not in the subagent. Letting the subagent issue the
 // fetch cost a full model turn (~4.5K tokens, one round trip) whose entire output
 // was the command we could have written ourselves; retry-on-failure is
-// deterministic and belongs in code. Inside the subagent the same `webfetch` tool
-// runs in raw mode (returns the page, no further subagent) for follow-ups it can
-// only decide on after seeing the page: a different URL, or `html` for
-// markup-only details. That raw mode is also the recursion guard.
+// deterministic and belongs in code. For follow-ups it can only decide on after
+// seeing the page (a different URL, `html` for markup-only details) the subagent
+// has its own `fetch_page` tool: same engine, returns the page, no further
+// subagent. It is denied globally and allowed only for the subagent, so other
+// agents never see it and the subagent never sees `webfetch` — that is the
+// recursion guard, and each tool's description can be honest about what it does.
 //
 // Registering under the name `webfetch` shadows the built-in for every agent
 // (custom tools are applied after built-ins and win on ID collision), so callers
@@ -30,6 +32,7 @@ import { fetchPage, FetchError } from "./cdp-fetch"
 // config entry overrides any of its fields.
 
 const SUBAGENT = "web-fetcher"
+const RAW_TOOL = "fetch_page"
 const MAX_CONTENT_BYTES = 100_000
 const MAX_TIMEOUT = 120
 const SHOT_DIR = "/tmp/tandem/webfetch"
@@ -40,6 +43,12 @@ const MAX_FOLLOWUPS = 12
 const MAX_SEARCHES = 5
 const SEARCH_RE = /^https?:\/\/(?:www\.)?(?:google\.[a-z.]+|bing\.com|duckduckgo\.com|search\.yahoo\.com|yandex\.[a-z]+|baidu\.com)\/(?:search|html)?/i
 
+const RAW_DESCRIPTION = [
+  "Fetch another page through the real browser window and return it as-is: a header with the title, final URL, HTTP status if it was an error, and screenshot paths, then the page text (or markup with format: \"html\").",
+  "This is for follow-ups the page you were given cannot answer. Each call spends one of your follow-up budget; the tool tells you when it is used up.",
+  "The tool already retries (longer timeout, a second browser); if it still fails, report that rather than calling it again.",
+].join("\n")
+
 const AGENT = {
   description:
     "Retrieves a single web page through a real browser window and returns only the information the caller asked for. Invoked by the webfetch tool, not directly.",
@@ -47,10 +56,13 @@ const AGENT = {
   model: "openai/gpt-5.6-sol",
   variant: "medium",
   temperature: 0.1,
+  // gpt-5.x defaults to textVerbosity "low", which fights "return the full main
+  // content" in no-prompt mode; the prompt already says not to pad.
+  options: { textVerbosity: "medium" },
   hidden: true,
   prompt: AGENT_PROMPT,
-  // `webfetch` (raw mode) plus `read` for the overflow file a long page spills into.
-  permission: { "*": "deny", webfetch: "allow", read: "allow" },
+  // `fetch_page` for follow-ups, `read` for screenshots and overflow files.
+  permission: { "*": "deny", [RAW_TOOL]: "allow", read: "allow" } as Record<string, "allow" | "deny">,
 } as const
 
 type Fetched = { ok: true; content: string; via: string; file?: string; screenshots?: string[] } | { ok: false; error: string }
@@ -79,7 +91,7 @@ const MAX_SHOTS = 300
 function pruneShots() {
   try {
     const files = readdirSync(SHOT_DIR)
-      .filter((f) => f.endsWith(".png"))
+      .filter((f) => f.endsWith(".png") || f.endsWith(".txt"))
       .sort()
     for (const f of files.slice(0, Math.max(0, files.length - MAX_SHOTS))) unlinkSync(`${SHOT_DIR}/${f}`)
   } catch {}
@@ -154,8 +166,37 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
     config: async (cfg) => {
       cfg.agent ??= {}
       cfg.agent[SUBAGENT] = { ...AGENT, ...cfg.agent[SUBAGENT] }
+      // Hidden from every agent; the subagent's own rule above re-allows it.
+      Object.assign((cfg.permission ??= {}), { [RAW_TOOL]: "deny" })
     },
     tool: {
+      [RAW_TOOL]: tool({
+        description: RAW_DESCRIPTION,
+        args: {
+          url: tool.schema.string().describe("The URL to fetch"),
+          format: tool.schema
+            .enum(["text", "html"])
+            .optional()
+            .describe("text (default): the page as rendered, like select-all/copy in a browser. html: the page's markup."),
+          timeout: tool.schema.number().optional().describe("Optional timeout in seconds (max 120)"),
+        },
+        async execute(args, context) {
+          let host = args.url
+          try {
+            host = new URL(args.url).hostname
+          } catch {
+            throw new Error(`Not a valid URL: ${args.url}`)
+          }
+          context.metadata({ title: host })
+          spend(context.sessionID, args.url)
+          const timeout = Math.min(Math.max(args.timeout ?? 60, 5), MAX_TIMEOUT)
+          const shotBase = `${SHOT_DIR}/${Date.now()}-${host.replace(/[^\w.-]+/g, "_")}`
+          pruneShots()
+          const fetched = await fetchWithRetries(args.url, args.format === "html", timeout, context.abort, shotBase)
+          if (!fetched.ok) throw new Error(`Fetch failed for ${args.url}: ${fetched.error}`)
+          return fetched.content
+        },
+      }),
       webfetch: tool({
         description: DESCRIPTION,
         args: {
@@ -195,7 +236,6 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
 
           const timeout = Math.min(Math.max(args.timeout ?? 60, 5), MAX_TIMEOUT)
           const format = args.format ?? "markdown"
-          if (context.agent === SUBAGENT) spend(context.sessionID, args.url)
           // Every fetch is captured; whether the subagent looks is decided below.
           const shotBase = `${SHOT_DIR}/${Date.now()}-${host.replace(/[^\w.-]+/g, "_")}`
           pruneShots()
@@ -204,13 +244,12 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
           // subagent turn to say the same thing.
           if (!fetched.ok) throw new Error(`Fetch failed for ${args.url}: ${fetched.error}`)
 
-          // Raw mode for the subagent's own follow-ups (and the recursion guard).
-          if (context.agent === SUBAGENT) return fetched.content
-
           let content = fetched.content
           let note = ""
           if (content.length > MAX_CONTENT_BYTES) {
-            note = `\n\n[page content truncated at ${MAX_CONTENT_BYTES / 1000} KB; ${Math.round((content.length - MAX_CONTENT_BYTES) / 1000)} KB omitted]`
+            const full = `${shotBase}.txt`
+            await Bun.write(full, content)
+            note = `\n\n[page text cut off at ${MAX_CONTENT_BYTES / 1000} KB; the full ${Math.round(content.length / 1000)} KB is saved at ${full}]`
             content = content.slice(0, MAX_CONTENT_BYTES)
           }
 
@@ -236,7 +275,9 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
                       // Opt out of the prompt corrector: this text is generated,
                       // not typed, and the corrector's fallback path for prompts
                       // without a `model` fails and retries for ~70s before giving up.
-                      metadata: { tandemCorrectorDisabled: true },
+                      // tandemBareContext: no AGENTS.md / scratchpad / references
+                      // in the system prompt (see session/prompt.ts).
+                      metadata: { tandemCorrectorDisabled: true, tandemBareContext: true },
                       text: [
                         `URL: ${args.url}`,
                         `Format: ${format}`,

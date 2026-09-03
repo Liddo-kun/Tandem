@@ -113,6 +113,38 @@ const live: Layer.Layer<
         isWorkflow,
       })
 
+      // UPSTREAM-DIVERGENCE (Tandem): TANDEM_DUMP_REQUEST=<dir> writes every
+      // prepared request (system, messages, tool schemas, params) as JSON, one
+      // file per call, for auditing exactly what a model is sent.
+      const dumpDir = process.env["TANDEM_DUMP_REQUEST"]
+      if (dumpDir) {
+        yield* Effect.tryPromise(async () => {
+          const { mkdir, writeFile } = await import("node:fs/promises")
+          await mkdir(dumpDir, { recursive: true })
+          const tools = Object.fromEntries(
+            Object.entries(prepared.tools).map(([name, t]) => [
+              name,
+              { description: t.description, inputSchema: (t.inputSchema as any)?.jsonSchema ?? t.inputSchema },
+            ]),
+          )
+          await writeFile(
+            `${dumpDir}/${Date.now()}-${input.agent.name}-${input.sessionID}.json`,
+            JSON.stringify(
+              {
+                agent: input.agent.name,
+                model: `${input.model.providerID}/${input.model.id}`,
+                system: prepared.system,
+                params: prepared.params,
+                tools,
+                messages: prepared.messages,
+              },
+              null,
+              2,
+            ),
+          )
+        }).pipe(Effect.ignore)
+      }
+
       // Wire up toolExecutor for DWS workflow models so that tool calls
       // from the workflow service are executed via opencode's tool system
       // and results sent back over the WebSocket.

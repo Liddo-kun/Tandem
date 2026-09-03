@@ -1266,16 +1266,21 @@ const layer = Layer.effect(
             // those turns via the part metadata marker it sets and skip the
             // AGENTS.md/instruction injection so the corrector model is not fed
             // (and confused by) project context. See plugin/prompt-corrector.ts.
-            const isInternalPrompt = msgs.some(
-              (m) =>
-                m.info.role === "user" &&
-                m.parts.some(
-                  (p) =>
-                    p.type === "text" &&
-                    (p.metadata as Record<string, unknown> | undefined)?.["tandemPromptCorrector"] === true,
-                ),
-            )
-            if (useInstructionReminder && instructions.length > 0 && !isInternalPrompt) {
+            // `tandemBareContext` is the same idea for single-purpose subagents such
+            // as web-fetcher (plugin/browser-fetch): they get their own prompt plus
+            // the model/date line, but no AGENTS.md, scratchpad, or project
+            // references — none of which apply to their job.
+            const marker = (key: string) =>
+              msgs.some(
+                (m) =>
+                  m.info.role === "user" &&
+                  m.parts.some(
+                    (p) => p.type === "text" && (p.metadata as Record<string, unknown> | undefined)?.[key] === true,
+                  ),
+              )
+            const isInternalPrompt = marker("tandemPromptCorrector")
+            const bareContext = isInternalPrompt || marker("tandemBareContext")
+            if (useInstructionReminder && instructions.length > 0 && !bareContext) {
               const firstUserMsg = msgs.find((m) => m.info.role === "user")
               if (firstUserMsg) {
                 firstUserMsg.parts.unshift({
@@ -1289,12 +1294,14 @@ const layer = Layer.effect(
               }
             }
             const modelMsgs = yield* MessageV2.toModelMessagesEffect(msgs, model)
-            const system = [
-              ...env,
-              ...(useInstructionReminder ? [] : instructions),
-              ...(mcpInstructions ? [mcpInstructions] : []),
-              ...(skills ? [skills] : []),
-            ]
+            const system = bareContext
+              ? env.slice(0, 1)
+              : [
+                  ...env,
+                  ...(useInstructionReminder ? [] : instructions),
+                  ...(mcpInstructions ? [mcpInstructions] : []),
+                  ...(skills ? [skills] : []),
+                ]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
             const result = yield* handle.process({
