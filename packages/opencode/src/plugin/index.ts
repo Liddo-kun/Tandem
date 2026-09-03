@@ -28,6 +28,8 @@ import { PromptCorrectorPlugin } from "./prompt-corrector"
 import { ImagegenPlugin } from "./openai/imagegen/plugin"
 // UPSTREAM-DIVERGENCE: Tandem-only CC-style bash search shims. See bash-search/.
 import { BashSearchPlugin } from "./bash-search/plugin"
+// UPSTREAM-DIVERGENCE: Tandem-only browser-backed webfetch. See browser-fetch/.
+import { BrowserFetchPlugin } from "./browser-fetch/plugin"
 import { Effect, Layer, Context } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
@@ -94,6 +96,8 @@ function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
     ImagegenPlugin,
     // UPSTREAM-DIVERGENCE: Tandem-only CC-style bash search shims (opt in with TANDEM_CLAUDE_BASH_SEARCH=1; inert without ugrep+bfs).
     BashSearchPlugin,
+    // UPSTREAM-DIVERGENCE: Tandem-only browser-backed webfetch (shadows the built-in; opt out with TANDEM_BROWSER_FETCH=0).
+    BrowserFetchPlugin,
   ]
 }
 

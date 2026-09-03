@@ -1,0 +1,12 @@
+- Fetches content from a specified URL using a real browser window, so logged-in pages, JS-rendered sites, and pages that reject plain HTTP clients all work
+- Takes a URL, an optional format, and an optional prompt as input
+- Without a prompt, returns the full main content of the page in the requested format (markdown by default)
+- With a prompt, returns only what the prompt asks for instead of the whole page
+- Use this tool when you need to retrieve and analyze web content
+
+Usage notes:
+  - The URL must be a fully-formed valid URL
+  - Give a prompt when you only need part of a page (a price, a section, specific fields); it keeps the response small
+  - Format options: "markdown" (default), "text", or "html"
+  - This tool is read-only and does not modify any files or interact with the page
+  - Results may be summarized if the content is very large

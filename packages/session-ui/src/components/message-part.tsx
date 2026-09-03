@@ -2000,48 +2000,50 @@ ToolRegistry.register({
   },
 })
 
+// UPSTREAM-DIVERGENCE: upstream hides webfetch output (it was a whole page). Tandem's
+// webfetch is a subagent-distilled answer, so it gets the Bash treatment: first line as
+// a preview under the call, full answer as markdown when expanded. The open-in-browser
+// link moves into the body.
 ToolRegistry.register({
   name: "webfetch",
   render(props) {
     const i18n = useI18n()
-    const pending = createMemo(() => props.status === "pending" || props.status === "running")
-    const url = createMemo(() => {
-      const value = props.input.url
-      if (typeof value !== "string") return ""
-      return value
-    })
+    const url = createMemo(() => stringValue(props.input.url) ?? "")
+    const output = createMemo(() => stringValue(props.output) ?? "")
+    const preview = createMemo(() => firstOutputLine(output()))
+    const failed = createMemo(() => toolFailed(props.status, props.metadata))
     return (
       <BasicTool
         {...props}
-        hideDetails
         icon="window-cursor"
+        multilineTrigger
         trigger={
-          <div data-slot="basic-tool-tool-info-structured">
-            <div data-slot="basic-tool-tool-info-main">
-              <span data-slot="basic-tool-tool-title">
-                <TextShimmer text={i18n.t("ui.tool.webfetch")} active={pending()} />
-              </span>
-              <Show when={!pending() && url()}>
-                <a
-                  data-slot="basic-tool-tool-subtitle"
-                  class="clickable subagent-link"
-                  href={url()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  {url()}
-                </a>
-              </Show>
-            </div>
-            <Show when={!pending() && url()}>
-              <div data-component="tool-action">
-                <Icon name="square-arrow-top-right" size="small" />
-              </div>
-            </Show>
-          </div>
+          <ToolSummaryTrigger
+            title={i18n.t("ui.tool.webfetch")}
+            subject={url()}
+            preview={preview()}
+            status={props.status}
+            failed={failed()}
+          />
         }
-      />
+      >
+        <div data-component="tool-output">
+          <Show when={url()}>
+            <a
+              class="clickable subagent-link"
+              href={url()}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {url()}
+            </a>
+          </Show>
+          <Show when={output()}>
+            <Markdown text={output()} />
+          </Show>
+        </div>
+      </BasicTool>
     )
   },
 })
