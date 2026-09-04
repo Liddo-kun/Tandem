@@ -2084,6 +2084,227 @@ ToolRegistry.register({
 })
 
 ToolRegistry.register({
+  name: "websearch",
+  render(props) {
+    const i18n = useI18n()
+    const query = createMemo(() => {
+      const value = props.input.query
+      if (typeof value !== "string") return ""
+      return value
+    })
+    const title = createMemo(() => webSearchProviderLabel(props.metadata.provider, i18n))
+
+    return (
+      <BasicTool
+        {...props}
+        icon="window-cursor"
+        trigger={{
+          title: title(),
+          subtitle: query(),
+          subtitleClass: "exa-tool-query",
+        }}
+      >
+        <ExaOutput output={props.output} />
+      </BasicTool>
+    )
+  },
+})
+
+// UPSTREAM-DIVERGENCE: Tandem-only thumbnail for an imagegen artifact. The PNG is fetched
+// browser-side via the Data context's worktree-scoped readFile (SDK file.read), so it shows
+// the image WITHOUT the bytes ever entering the model's context. Click opens a lightbox.
+function ImagegenThumb(props: { path: string; alt?: string; onOpen: (src: string) => void }) {
+  const data = useData()
+  const [src] = createResource(
+    () => (data.readFile ? props.path : undefined),
+    async (path) => {
+      const result = await data.readFile!(path)
+      return result ? dataUrlFromMediaValue(result, "image") : undefined
+    },
+  )
+  return (
+    // The local Suspense boundary keeps the pending readFile resource from suspending the
+    // route-level boundary: suspending that far up detaches the timeline DOM, which makes the
+    // virtualizer drop its rows, which cancels this fetch — an infinite remount/refetch loop.
+    <Suspense>
+      <Show when={src()}>
+        {(url) => (
+          <button
+            type="button"
+            data-slot="imagegen-thumb"
+            data-clickable="true"
+            title={props.alt}
+            onClick={() => props.onOpen(url())}
+          >
+            <img src={url()} alt={props.alt} loading="lazy" />
+          </button>
+        )}
+      </Show>
+    </Suspense>
+  )
+}
+
+// UPSTREAM-DIVERGENCE: Tandem-only renderer for the imagegen plugin tool. The image is
+// deliberately NOT loaded into model context (no attachment); the card fetches each saved
+// path on its own to show a click-to-zoom thumbnail, and still lists the path + revised
+// prompt. See packages/opencode/src/plugin/openai/imagegen/.
+ToolRegistry.register({
+  name: "imagegen",
+  render(props) {
+    const dialog = useDialog()
+    const prompt = createMemo(() => (typeof props.input.prompt === "string" ? props.input.prompt : undefined))
+    const path = createMemo(() => (typeof props.metadata.path === "string" ? props.metadata.path : undefined))
+    // The prompt the model reports it used (`revisedPrompt` from the plugin). Shown only
+    // when it differs from the typed prompt, i.e. the model revised it. See plugin.ts
+    // revisedPromptOutput.
+    const revised = createMemo(() => {
+      const value = props.metadata.revisedPrompt
+      if (typeof value !== "string") return undefined
+      const trimmed = value.trim()
+      if (!trimmed || trimmed === (prompt() ?? "").trim()) return undefined
+      return trimmed
+    })
+    const openPreview = (src: string) => dialog.show(() => <ImagePreview src={src} alt={prompt()} />)
+    return (
+      <>
+        <BasicTool
+          {...props}
+          icon="photo"
+          trigger={{
+            title: "Image",
+            subtitle: prompt(),
+          }}
+        />
+        <Show when={path()}>
+          {(filePath) => (
+            <div data-component="imagegen-files">
+              <div data-component="imagegen-file">
+                <ImagegenThumb path={filePath()} alt={revised() ?? prompt()} onOpen={openPreview} />
+                <div data-slot="imagegen-path" class="break-all text-12-regular text-text-weak">
+                  {filePath()}
+                </div>
+                <Show when={revised()}>
+                  <div data-component="imagegen-revised" class="mt-0.5 text-12-regular text-text-weak">
+                    <span class="text-text-muted">Prompt used:</span> {revised()}
+                  </div>
+                </Show>
+              </div>
+            </div>
+          )}
+        </Show>
+      </>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "task",
+  render(props) {
+    const data = useData()
+    const i18n = useI18n()
+    const childSessionId = createMemo(() => {
+      const value = props.metadata.sessionId
+      if (typeof value === "string" && value) return value
+      return taskSession(props.input, data.sessionID, data.store.session, data.store.agent)
+    })
+    const agent = createMemo(() => taskAgent(props.input.subagent_type, data.store.agent))
+    const title = createMemo(() => agent().name ?? i18n.t("ui.tool.agent.default"))
+    const tone = createMemo(() => agent().color)
+    const v2Tone = createMemo(() => agent().v2Color)
+    const subtitle = createMemo(() => {
+      const value =
+        typeof props.input.description === "string" && props.input.description
+          ? props.input.description
+          : childSessionId()
+      if (!value) return value
+      if (props.metadata.background === true) return `${value} (background)`
+      return value
+    })
+    const running = createMemo(() => props.status === "pending" || props.status === "running")
+
+    const href = createMemo(() => sessionLink(childSessionId(), data.sessionHref))
+    const clickable = createMemo(() => !!(childSessionId() && (data.navigateToSession || href())))
+
+    const open = () => {
+      const id = childSessionId()
+      if (!id) return
+      data.navigateToSession?.(id)
+    }
+
+    const navigate = (event: MouseEvent) => {
+      if (!data.navigateToSession) return
+      if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+      event.preventDefault()
+      open()
+    }
+    const navigateKey = (event: KeyboardEvent) => {
+      if (!clickable() || href()) return
+      if (event.key !== "Enter" && event.key !== " ") return
+      event.preventDefault()
+      open()
+    }
+
+    const trigger = () => (
+      <div
+        data-component="task-tool-card"
+        style={{
+          "--task-agent-color": v2Tone(),
+          "--task-agent-legacy-color": tone(),
+        }}
+      >
+        <div data-component="task-tool-surface">
+          <div data-slot="basic-tool-tool-info-structured">
+            <div data-slot="basic-tool-tool-info-main">
+              <Show
+                when={running()}
+                fallback={
+                  <Show when={newLayout()}>
+                    <span data-component="task-tool-icon">
+                      <Icon name="subagent" size="small" />
+                    </span>
+                  </Show>
+                }
+              >
+                <span data-component="task-tool-spinner" style={{ color: tone() ?? "var(--icon-interactive-base)" }}>
+                  <Show when={newLayout()} fallback={<Spinner />}>
+                    <SessionProgressIndicatorV2
+                      style={{ color: v2Tone() ?? "light-dark(var(--v2-text-text-base), #ffffff)" }}
+                    />
+                  </Show>
+                </span>
+              </Show>
+              <span data-component="task-tool-title">{title()}</span>
+              <Show when={subtitle()}>
+                <span data-slot="basic-tool-tool-subtitle">{subtitle()}</span>
+              </Show>
+            </div>
+          </div>
+        </div>
+        <Show when={clickable()}>
+          <div data-component="task-tool-action">
+            <Icon name="square-arrow-top-right" size="small" />
+          </div>
+        </Show>
+      </div>
+    )
+
+    return (
+      <BasicTool
+        icon="task"
+        status={props.status}
+        trigger={trigger()}
+        hideDetails
+        triggerAsLink
+        triggerHref={href()}
+        clickable={clickable()}
+        onTriggerClick={navigate}
+        onTriggerKeyDown={navigateKey}
+      />
+    )
+  },
+})
+
+ToolRegistry.register({
   name: "shell",
   render(props) {
     const i18n = useI18n()
