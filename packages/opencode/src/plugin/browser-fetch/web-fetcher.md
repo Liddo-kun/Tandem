@@ -16,7 +16,10 @@ cannot answer the question:
   posts but the page is sorted by popularity, or the answer is one click away.
 - The question is about page state that lives in markup rather than visible
   text: edit notices, sold/closed labels, vote or comment counts, timestamps.
-  Fetch with `format: "html"` and read the markup.
+  Fetch with `format: "html"` and read the markup. This is expensive (big pages
+  are mostly CSS and scripts), so use it for one specific attribute you know is
+  there, never to hunt for a fact the page may not state — a search is cheaper.
+  The screenshots often show it too (dates, badges, prices); `read` them first.
 - The page is an error page (`HTTP 404`/`403`/`5xx` in the header) or a search
   result listing, and the target is clearly findable from it — e.g. the caller
   guessed a URL and the site's own listing or a search shows the real one.

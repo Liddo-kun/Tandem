@@ -111,22 +111,55 @@ async function run(cmd: string[], timeoutMs = 15000): Promise<{ ok: boolean; out
   }
 }
 
+// Chromium's profile lock is a symlink `<host>-<pid>`; a live owner means a browser is
+// already up (or still booting) and a second launch would only produce "Profile error" windows.
+async function profileOwner(): Promise<number | undefined> {
+  const { readlinkSync, readFileSync } = await import("node:fs")
+  const { homedir } = await import("node:os")
+  try {
+    const pid = Number(readlinkSync(`${homedir()}/.config/chromium/SingletonLock`).split("-").pop())
+    if (!pid) return
+    // PID namespace is shared with Android, so a stale lock could point at any process.
+    if (!readFileSync(`/proc/${pid}/cmdline`, "utf8").includes("chromium")) return
+    return pid
+  } catch {
+    return
+  }
+}
+
+// Parallel webfetch calls all land here at once when the browser is down; only one may launch.
+let linuxBringup: Promise<void> | undefined
+
 async function ensureLinux(ep: string, timeLeft: () => number) {
   if (await alive(ep)) return
+  if (!linuxBringup) {
+    linuxBringup = bringupLinux(ep, timeLeft).finally(() => {
+      linuxBringup = undefined
+    })
+  }
+  return linuxBringup
+}
+
+async function bringupLinux(ep: string, timeLeft: () => number) {
   const { existsSync } = await import("node:fs")
   if (!existsSync("/tmp/.X11-unix/X0"))
     throw new FetchError("X display :0 is not up — start the desktop (ubuntu-desktop widget), then retry", 1)
-  // Detached launch; chromium-x already carries --remote-debugging-port=9223.
-  Bun.spawn(["bash", "-c", "nohup ~/.local/bin/chromium-x >>/tmp/tandem/chromium-x.log 2>&1 &"], {
-    stdout: "ignore",
-    stderr: "ignore",
-  })
+  const owner = await profileOwner()
+  if (!owner) {
+    // Detached launch; chromium-x already carries --remote-debugging-port=9223.
+    Bun.spawn(["bash", "-c", "nohup ~/.local/bin/chromium-x >>/tmp/tandem/chromium-x.log 2>&1 &"], {
+      stdout: "ignore",
+      stderr: "ignore",
+    })
+  }
   for (let i = 0; i < 40 && timeLeft() > 2000; i++) {
     await sleep(500)
     if (await alive(ep)) return
   }
   throw new FetchError(
-    "launched chromium-x but CDP on :9223 never came up (running instance without the flag? see /tmp/tandem/chromium-x.log)",
+    owner
+      ? `Chromium (pid ${owner}) owns the profile but CDP on :9223 is not answering — it was probably started without chromium-x; close it and retry`
+      : "launched chromium-x but CDP on :9223 never came up (see /tmp/tandem/chromium-x.log)",
     1,
   )
 }
