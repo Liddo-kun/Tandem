@@ -12,9 +12,7 @@ const ISSUER = "https://auth.openai.com"
 const CODEX_API_ENDPOINT = "https://chatgpt.com/backend-api/codex/responses"
 const OAUTH_PORT = 1455
 const OAUTH_POLLING_SAFETY_MARGIN_MS = 3000
-// UPSTREAM-DIVERGENCE(temporary): gpt-6-astra has no `N.N` version so the >5.4 regex below never
-// admits it, but the ChatGPT Codex backend serves it (live-verified 2026-09-05). Drop once upstream lists it.
-const ALLOWED_MODELS = new Set(["gpt-5.5", "gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini", "gpt-6-astra"])
+const ALLOWED_MODELS = new Set(["gpt-5.5", "gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini"])
 const DISALLOWED_MODELS = new Set(["gpt-5.5-pro"])
 
 interface PkceCodes {
