@@ -2157,12 +2157,16 @@ export default function Page() {
     const stopPageShow = makeEventListener(window, "pageshow", onResume)
     const stopOnline = makeEventListener(window, "online", onResume)
     const stopResume = makeEventListener(window, "opencode:resume", onResume)
+    // UPSTREAM-DIVERGENCE (Tandem): SSE reconnect (see server-sync.tsx) — events missed while
+    // disconnected are not replayed, so refetch messages/todos/status like a resume.
+    const stopReconnect = makeEventListener(window, "opencode:reconnect", onResume)
     const stopVisibility = makeEventListener(document, "visibilitychange", onVisibility)
 
     onCleanup(() => {
       stopPageShow()
       stopOnline()
       stopResume()
+      stopReconnect()
       stopVisibility()
     })
   })

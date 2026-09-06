@@ -583,6 +583,12 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
       if (eventType === "server.connected" || eventType === "global.disposed") {
         if (recent) return
         queueDirectories(true)
+        // UPSTREAM-DIVERGENCE (Tandem): the event stream has no replay cursor, so everything the
+        // server emitted while a remote client (phone) was disconnected is gone. Directory
+        // bootstrap above refreshes statuses but not the open session's messages, so tell the
+        // session page to pull them; it listens alongside pageshow/visibility resume signals.
+        if (eventType === "server.connected" && typeof window !== "undefined")
+          window.dispatchEvent(new Event("opencode:reconnect"))
       }
       return
     }

@@ -1,5 +1,17 @@
 # Android/PC Timing Bug Notes
 
+> **Status (2026-09-06):** Mostly historical. The server-side code quoted below is outdated: upstream
+> has since switched the loop-exit check to `lastAssistant.parentID === lastUser.id` and made
+> `MessageV2.latest()` / message pagination order by server `time.created` (IDs only break ties), so
+> client clock skew no longer causes duplicate replies on the backend, and the clock-sync script is no
+> longer needed. The remaining skew exposure was in the web UI: optimistic user messages are stamped with
+> the client's `Date.now()` and matched against the server echo by `time.created + id`, which misses on a
+> skewed client (measured ~19 s phone-vs-tablet on 2026-09-05) and could duplicate/mis-order the message.
+> Fixed in Tandem by falling back to `id` in `packages/app/src/context/server-session.ts`
+> (`mergeOptimisticPage` and the `message.updated` reducer); see `log.md`. The separate "compaction
+> re-runs after my follow-up" symptom from that same session was a backend bug unrelated to clocks
+> (cancelled compaction never retired its request) — also fixed, see `log.md` "Temporary Upstream Bug Fixes".
+
 ## Summary
 
 The duplicate assistant replies were caused by clock skew between the Android tablet web UI and the PC running the opencode server.

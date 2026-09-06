@@ -1726,4 +1726,53 @@ describe("session.message-v2.latest", () => {
     expect(state.tasks).toHaveLength(1)
     expect(state.tasks[0]).toMatchObject({ type: "subtask", prompt: "inspect" })
   })
+
+  // UPSTREAM-DIVERGENCE (Tandem): see MessageV2.latest.
+  test("a cancelled compaction summary retires its compaction request", () => {
+    const abortedSummary: SessionV1.WithParts = {
+      info: {
+        ...assistantInfo(
+          SUMMARY_ASSISTANT,
+          COMPACTION_USER,
+          new SessionV1.AbortedError({ message: "Aborted" }).toObject(),
+        ),
+        summary: true,
+        time: { created: 300, completed: 301 },
+      } as SessionV1.Assistant,
+      parts: [],
+    }
+    const followup: SessionV1.WithParts = {
+      info: { ...userInfo(CONTINUE_USER), time: { created: 400 } },
+      parts: [{ ...basePart(CONTINUE_USER, "p1"), type: "text", text: "actual question" }] as SessionV1.Part[],
+    }
+
+    const state = MessageV2.latest([
+      { ...tailUser, info: { ...tailUser.info, time: { created: 100 } } },
+      { ...overflowAssistant, info: { ...overflowAssistant.info, time: { created: 150 } } },
+      { ...compactionUser, info: { ...compactionUser.info, time: { created: 200 } } },
+      abortedSummary,
+      followup,
+    ])
+
+    expect(state.user?.id).toBe(CONTINUE_USER)
+    // the aborted summary has no finish, so it must not be treated as a finished turn for overflow checks
+    expect(state.finished?.id).toBe(OVERFLOW_ASSISTANT)
+    // ...but it does retire the compaction request it was answering
+    expect(state.tasks).toHaveLength(0)
+  })
+
+  test("an errored non-summary assistant does not retire pending work", () => {
+    const errored = {
+      ...assistantInfo("msg_errored", "msg_parent", new SessionV1.AbortedError({ message: "Aborted" }).toObject()),
+      time: { created: 300 },
+    } as SessionV1.Assistant
+    const task: SessionV1.WithParts = {
+      info: { ...userInfo("msg_task"), time: { created: 200 } },
+      parts: [{ ...basePart("msg_task", "p1"), type: "compaction", auto: false }] as SessionV1.Part[],
+    }
+
+    const state = MessageV2.latest([task, { info: errored, parts: [] }])
+
+    expect(state.tasks).toHaveLength(1)
+  })
 })

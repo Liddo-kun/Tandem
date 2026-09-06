@@ -547,6 +547,56 @@ describe("server session", () => {
     expect(store.data.part[stale.id]).toEqual([refreshed, pending])
   })
 
+  // UPSTREAM-DIVERGENCE (Tandem): a remote client's clock (phone) can differ from the server's
+  // (tablet) by many seconds, so the optimistic copy and the server echo carry different
+  // `time.created` values. Both the live event and the fetched page must dedupe by id.
+  test("replaces a clock-skewed optimistic message with the server echo instead of duplicating it", async () => {
+    const skewed = userMessage("message-1", { time: { created: 20_000 } })
+    const echoed = { ...skewed, time: { created: 1 } }
+    const part = textPart(skewed.id)
+    const assistant = assistantMessage("message-2", skewed.id)
+    const client = rootMessageClient(
+      [
+        response([
+          { info: assistant, parts: [] },
+          { info: echoed, parts: [part] },
+        ]),
+      ],
+      [],
+    )
+    const store = createServerSession(client)
+    store.optimistic.add({ sessionID: "child", message: skewed, parts: [part] })
+
+    store.apply({ type: "message.updated", properties: { info: echoed } })
+    expect(store.data.message.child).toEqual([echoed])
+
+    store.apply({ type: "message.updated", properties: { info: assistant } })
+    expect(store.data.message.child).toEqual([echoed, assistant])
+  })
+
+  test("does not duplicate a clock-skewed optimistic message when the page echo arrives", async () => {
+    const skewed = userMessage("message-1", { time: { created: 20_000 } })
+    const echoed = { ...skewed, time: { created: 1 } }
+    const part = textPart(skewed.id)
+    const assistant = assistantMessage("message-2", skewed.id)
+    const client = rootMessageClient(
+      [
+        response([
+          { info: assistant, parts: [] },
+          { info: echoed, parts: [part] },
+        ]),
+      ],
+      [],
+    )
+    const store = createServerSession(client)
+    store.optimistic.add({ sessionID: "child", message: skewed, parts: [part] })
+
+    await store.sync("child")
+
+    expect(store.data.message.child).toEqual([echoed, assistant])
+    expect(store.data.part[skewed.id]).toEqual([part])
+  })
+
   test("uses a parent received by SSE during the replacement load", async () => {
     const pending = deferredResponse()
     const user = userMessage("message-1")

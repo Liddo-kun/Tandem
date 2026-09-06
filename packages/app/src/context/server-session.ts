@@ -111,7 +111,10 @@ function mergeOptimisticPage(page: MessagePage, items: OptimisticItem[]) {
   const observed: { messageID: string; parts: Part[] }[] = []
   for (const item of items) {
     const result = Binary.search(session, messageKey(item.message), messageKey)
-    const found = result.found
+    // UPSTREAM-DIVERGENCE (Tandem): optimistic messages carry the client's clock in `time.created`
+    // while the fetched echo carries the server's, so a key match can miss on a skewed remote
+    // client (phone vs. tablet). Fall back to the id so the echo is not inserted twice.
+    const found = result.found || session.some((message) => message.id === item.message.id)
     if (!found) session.splice(result.index, 0, item.message)
     const current = part.get(item.message.id)
     const confirmed = found ? item.parts.filter((part) => current?.some((value) => value.id === part.id)) : []
@@ -1054,8 +1057,12 @@ export function createServerSession(
         if (result.found) setData("message", info.sessionID, result.index, reconcile(info))
         if (!result.found)
           setData("message", info.sessionID, (value = []) => {
-            const next = value.slice()
-            next.splice(result.index, 0, info)
+            // UPSTREAM-DIVERGENCE (Tandem): the optimistic copy of this message may sit under a
+            // different key because it was stamped with the client's clock. Drop it before
+            // inserting the server's version so a skewed remote client never shows it twice.
+            const next = value.filter((message) => message.id !== info.id)
+            const at = next.length === value.length ? result : Binary.search(next, messageKey(info), messageKey)
+            next.splice(at.index, 0, info)
             return next
           })
         return

@@ -583,14 +583,21 @@ export function latest(msgs: WithParts[]) {
   let user: User | undefined
   let assistant: Assistant | undefined
   let finished: Assistant | undefined
+  // UPSTREAM-DIVERGENCE (Tandem): a compaction summary that was cancelled or errored never gets a
+  // `finish`, so upstream keeps its compaction request "pending" and the next unrelated prompt
+  // silently reruns compaction with that prompt as parent, swallowing it. Treat such summaries as
+  // terminal for pending-task detection only; `finished` keeps its meaning for overflow checks.
+  let terminal: Assistant | undefined
   for (const msg of msgs) {
     const info = msg.info
     if (info.role === "user" && isAfter(info, user)) user = info
     if (info.role === "assistant" && isAfter(info, assistant)) assistant = info
     if (info.role === "assistant" && info.finish && isAfter(info, finished)) finished = info
+    if (info.role === "assistant" && (info.finish || (info.summary && info.error)) && isAfter(info, terminal))
+      terminal = info
   }
   const tasks = msgs.flatMap((m) =>
-    finished && !isAfter(m.info, finished)
+    terminal && !isAfter(m.info, terminal)
       ? []
       : m.parts.filter((p): p is CompactionPart | SubtaskPart => p.type === "compaction" || p.type === "subtask"),
   )

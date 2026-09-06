@@ -279,6 +279,15 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       const defaultAgent = yield* agentSvc.defaultAgent()
       const currentAgent = messages.findLast((message) => message.info.role === "user")?.info.agent ?? defaultAgent
 
+      // UPSTREAM-DIVERGENCE (Tandem): a compaction request that is still pending (typically one
+      // that is running right now) must not be queued a second time; a repeated tap from a laggy
+      // remote client would otherwise produce back-to-back compactions. Just rejoin the loop.
+      const pending = MessageV2.latest(messages).tasks.some((task) => task.type === "compaction")
+      if (pending) {
+        yield* promptSvc.loop({ sessionID: ctx.params.sessionID })
+        return true
+      }
+
       yield* compactSvc.create({
         sessionID: ctx.params.sessionID,
         agent: currentAgent,
