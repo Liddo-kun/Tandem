@@ -1,5 +1,6 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { tool } from "@opencode-ai/plugin"
+import type { ConfigPermissionV1 } from "@opencode-ai/core/v1/config/permission"
 import DESCRIPTION from "./webfetch.txt"
 import { readdirSync, unlinkSync } from "node:fs"
 import AGENT_PROMPT from "./web-fetcher.md" with { type: "text" }
@@ -166,8 +167,14 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
     config: async (cfg) => {
       cfg.agent ??= {}
       cfg.agent[SUBAGENT] = { ...AGENT, ...cfg.agent[SUBAGENT] }
-      // Hidden from every agent; the subagent's own rule above re-allows it.
-      Object.assign((cfg.permission ??= {}), { [RAW_TOOL]: "deny" })
+      const permission: ConfigPermissionV1.Info = (cfg.permission ??= {})
+      const task = typeof permission.task === "string" ? { "*": permission.task } : { ...permission.task }
+      // `hidden` only affects the UI. Task permissions also remove the agent from
+      // the model's catalog; webfetch creates its child directly, without Task.
+      // Append the deny after existing wildcards (permissions are last-match-wins).
+      delete permission.task
+      delete task[SUBAGENT]
+      Object.assign(permission, { task: { ...task, [SUBAGENT]: "deny" }, [RAW_TOOL]: "deny" })
     },
     tool: {
       [RAW_TOOL]: tool({
