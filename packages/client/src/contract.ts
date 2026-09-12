@@ -50,4 +50,5 @@ export const endpointNames = {
   "question.request.list": "listRequests",
 } as const
 
-export const omitEndpoints = new Set(["fs.read", "pty.connect", "pty.connectToken"])
+// UPSTREAM-DIVERGENCE: browser captures use the authenticated binary fetch adapter, like fs.read.
+export const omitEndpoints = new Set(["fs.read", "pty.connect", "pty.connectToken", "browserMedia.read"])

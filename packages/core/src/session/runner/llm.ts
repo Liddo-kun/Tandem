@@ -10,6 +10,9 @@ import {
 } from "@opencode-ai/llm"
 import { Cause, DateTime, Effect, FiberSet, Layer, Option, Semaphore, Stream } from "effect"
 import { AgentV2 } from "../../agent"
+// UPSTREAM-DIVERGENCE: browser leases span the whole local execution, not a provider turn.
+import { Browser } from "../../browser"
+import { SessionMessage } from "../message"
 import { Config } from "../../config"
 import { Database } from "../../database/database"
 import { EventV2 } from "../../event"
@@ -34,7 +37,7 @@ import { SessionStore } from "../store"
 import { type RunError, Service } from "./index"
 import { SessionRunnerModel } from "./model"
 import { createLLMEventPublisher } from "./publish-llm-event"
-import { toLLMMessages } from "./to-llm-message"
+import { toLLMMessagesEffect } from "./to-llm-message"
 import { MAX_STEPS_PROMPT } from "./max-steps"
 import { Snapshot } from "../../snapshot"
 import { makeLocationNode } from "../../effect/app-node"
@@ -100,6 +103,7 @@ const layer = Layer.effect(
     const models = yield* SessionRunnerModel.Service
     const store = yield* SessionStore.Service
     const location = yield* Location.Service
+    const browser = yield* Browser.Service
     const systemContext = yield* SystemContextRegistry.Service
     const skillGuidance = yield* SkillGuidance.Service
     const referenceGuidance = yield* ReferenceGuidance.Service
@@ -215,7 +219,10 @@ const layer = Layer.effect(
         system: [agent.info?.system, system.baseline]
           .filter((part): part is string => part !== undefined && part.length > 0)
           .map(SystemPart.make),
-        messages: [...toLLMMessages(context, model), ...(isLastStep ? [Message.assistant(MAX_STEPS_PROMPT)] : [])],
+        messages: [
+          ...(yield* toLLMMessagesEffect(context, model, session.id)),
+          ...(isLastStep ? [Message.assistant(MAX_STEPS_PROMPT)] : []),
+        ],
         tools: toolMaterialization?.definitions ?? [],
         toolChoice: isLastStep ? "none" : undefined,
       })
@@ -402,6 +409,20 @@ const layer = Layer.effect(
       const hasSteer = yield* SessionInput.hasPending(db, input.sessionID, "steer")
       const hasQueue = hasSteer ? false : yield* SessionInput.hasPending(db, input.sessionID, "queue")
       if (!input.force && !hasSteer && !hasQueue) return
+      // One browser execution spans provider turns, steering, queue delivery and compaction.
+      yield* Browser.beginExecution(
+        browser.owner,
+        { runtime: "v2", location: Browser.locationKey(location, "v2"), sessionID: input.sessionID },
+        (text) =>
+          Effect.gen(function* () {
+            yield* events.publish(SessionEvent.Synthetic, {
+              sessionID: input.sessionID,
+              timestamp: yield* DateTime.now,
+              messageID: SessionMessage.ID.create(),
+              text,
+            })
+          }),
+      )
       yield* failInterruptedTools(input.sessionID)
       let promotion: SessionInput.Delivery | undefined = hasSteer ? "steer" : hasQueue ? "queue" : undefined
       let shouldRun = input.force || hasSteer || hasQueue
@@ -418,7 +439,7 @@ const layer = Layer.effect(
         shouldRun = yield* SessionInput.hasPending(db, input.sessionID, "queue")
         promotion = shouldRun ? "queue" : undefined
       }
-    })
+    }, Effect.scoped)
 
     return Service.of({
       run,
@@ -430,6 +451,8 @@ export const node = makeLocationNode({
   service: Service,
   layer,
   deps: [
+    Browser.node,
+    Browser.locationNode,
     EventV2.node,
     llmClient,
     AgentV2.node,

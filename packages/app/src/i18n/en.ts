@@ -234,6 +234,17 @@ export const dict = {
   "model.tooltip.context": "Context limit {{limit}}",
 
   "common.search.placeholder": "Search",
+  // UPSTREAM-DIVERGENCE: project-scoped browser grant settings; English fallback is inventoried in log.md.
+  "settings.browserGrants.title": "Browser grants",
+  "settings.browserGrants.description": "Saved browser access for this project. Removing an entry revokes that saved grant; configured permissions still apply. Browser names below are configured connection IDs.",
+  "settings.browserGrants.empty": "No saved browser grants for this project.",
+  "settings.browserGrants.error": "Could not load or remove browser grants. Check the server connection and authentication, then retry.",
+  "settings.browserGrants.retry": "Retry",
+  "settings.browserGrants.remove": "Remove grant",
+  "settings.browserGrants.scope": "{{browser}} / {{capability}}",
+  "settings.browserGrants.frame": "Frame origin: {{origin}}",
+  "settings.browserGrants.unknown": "Unrecognized browser grant",
+  "settings.browserGrants.unknownDescription": "This scope cannot be safely summarized. Remove this entry to revoke its saved permission.",
   "common.goBack": "Navigate back",
   "common.goForward": "Navigate forward",
   "common.loading": "Loading",

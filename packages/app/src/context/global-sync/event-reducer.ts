@@ -416,7 +416,9 @@ export function applyDirectoryEvent(input: {
       )
       break
     }
-    case "permission.replied": {
+    // UPSTREAM-DIVERGENCE: cancelled browser approvals must leave the pending UI queue too.
+    case "permission.replied":
+    case "permission.cancelled": {
       const props = event.properties as { sessionID: string; requestID: string }
       const permissions = input.store.permission[props.sessionID]
       if (!permissions) break

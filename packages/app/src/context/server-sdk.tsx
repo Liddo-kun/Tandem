@@ -47,6 +47,16 @@ export function adaptServerEvent(event: OpenCodeEvent): ServerEvent {
   }
   if (event.type === "permission.v2.replied")
     return { id: event.id, type: "permission.replied", properties: event.data, current: event } as ServerEvent
+  // UPSTREAM-DIVERGENCE: adapt V2 browser-approval cancellation for the shared legacy-shaped UI.
+  if ((event as { type: string }).type === "permission.v2.cancelled") {
+    const cancelled = event as unknown as { id: string; data: { sessionID: string; requestID: string } }
+    return {
+      id: cancelled.id,
+      type: "permission.cancelled",
+      properties: cancelled.data,
+      current: event,
+    } as unknown as ServerEvent
+  }
   if (event.type === "question.v2.asked")
     return { id: event.id, type: "question.asked", properties: event.data, current: event } as ServerEvent
   if (event.type === "question.v2.replied")

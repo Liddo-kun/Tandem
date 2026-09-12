@@ -9,6 +9,7 @@ import { makeGlobalNode, makeLocationNode } from "./effect/app-node"
 import { SessionSchema } from "./session/schema"
 import { Identifier } from "./util/identifier"
 import type { ToolOutput } from "@opencode-ai/llm"
+import { BrowserMedia } from "./browser-media"
 
 export const MAX_LINES = 2_000
 export const MAX_BYTES = 50 * 1024
@@ -174,6 +175,8 @@ const layer = Layer.effect(
     })
 
     const cleanup = Effect.fn("ToolOutputStore.cleanup")(function* () {
+      // UPSTREAM-DIVERGENCE: expire owned browser captures alongside retained tool output.
+      yield* BrowserMedia.cleanupEffect
       const entries = yield* fs.readDirectory(directory).pipe(Effect.catch(() => Effect.succeed([])))
       const cutoff = Date.now() - Duration.toMillis(RETENTION)
       for (const entry of entries) {

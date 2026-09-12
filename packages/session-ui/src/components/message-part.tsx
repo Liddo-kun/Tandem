@@ -51,6 +51,7 @@ import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import { dataUrlFromMediaValue } from "../pierre/media"
 import { getDirectory as _getDirectory, getFilename } from "@opencode-ai/core/util/path"
 import { AttachmentCardV2 } from "../v2/components/attachment-card-v2"
+import { BrowserCapture } from "./browser-capture"
 import { CommentCardV2 } from "../v2/components/comment-card-v2"
 import { checksum } from "@opencode-ai/core/util/encode"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
@@ -1651,6 +1652,13 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
   })
 
   const render = createMemo(() => ToolRegistry.render(part().tool) ?? GenericTool)
+  // UPSTREAM-DIVERGENCE: resolve only explicitly owned browser captures, not arbitrary tool media.
+  const browserCaptures = () => {
+    const state = part().state
+    return state.status === "completed"
+      ? state.attachments?.filter((file) => file.url.startsWith("tandem-browser-image:")).map((file) => file.url)
+      : []
+  }
   const controlledOpen = () => (props.onToolOpenChange ? (props.toolOpen ?? props.defaultOpen) : undefined)
   const handleToolOpenChange = (open: boolean) => props.onToolOpenChange?.(open)
 
@@ -1714,6 +1722,11 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
               virtualizeDiff={props.virtualizeDiff}
               onContentRendered={props.onContentRendered}
             />
+            <For each={browserCaptures()}>
+              {(uri) => (
+                <BrowserCapture sessionID={part().sessionID} uri={uri} onLoad={props.onContentRendered} />
+              )}
+            </For>
           </Match>
         </Switch>
       </div>

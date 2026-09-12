@@ -309,6 +309,56 @@ describe("server session", () => {
     expect(assistants.map((item) => store.data.part[item.id]?.[0]?.type)).toEqual(["text", "text", "text"])
   })
 
+  test("current V2 tool completion hydrates its authoritative screenshot attachment", async () => {
+    const uri = "tandem-browser-image:fixture"
+    let reads = 0
+    const message = {
+      id: "msg_capture",
+      type: "assistant",
+      agent: "build",
+      model: { id: "fixture", providerID: "fixture" },
+      time: { created: 2, completed: 3 },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      content: [
+        {
+          type: "tool",
+          id: "capture",
+          name: "browser",
+          time: { created: 2, completed: 3 },
+          state: {
+            status: "completed",
+            input: { action: "screenshot" },
+            metadata: {},
+            content: [{ type: "file", uri, mime: "image/png", name: "browser.png" }],
+          },
+        },
+      ],
+    }
+    const store = createServerSession(
+      {} as OpencodeClient,
+      {
+        message: async () => {
+          reads++
+          return message
+        },
+      } as unknown as SessionApi,
+      {} as MessageApi,
+    )
+    store.remember(session("root"))
+    store.set("session_message", "root", [{ id: "msg_user", type: "user", text: "Capture", time: { created: 1 } }])
+    store.applyV2({
+      type: "session.next.tool.success",
+      data: { sessionID: "root", assistantMessageID: "msg_capture" },
+    } as unknown as OpenCodeEvent)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(reads).toBe(1)
+    const part = store.data.part.msg_capture?.[0]
+    expect(part?.type).toBe("tool")
+    if (part?.type !== "tool" || part.state.status !== "completed") throw new Error("Missing completed tool")
+    expect(part.state.attachments?.[0]?.url).toBe(uri)
+  })
+
   test("V2 refresh requests a bounded page after an empty session or a large requested window", async () => {
     const requests: number[] = []
     const api = {

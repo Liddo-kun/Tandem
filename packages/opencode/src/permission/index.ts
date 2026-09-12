@@ -9,15 +9,21 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 
 export const Event = PermissionV1.Event
 
+// UPSTREAM-DIVERGENCE: abortable browser approvals, request-local dismiss, and terminal cancellation events.
+export type AskInput = PermissionV1.AskInput & { readonly signal?: AbortSignal }
+
 export interface Interface {
-  readonly ask: (input: PermissionV1.AskInput) => Effect.Effect<void, PermissionV1.Error>
+  readonly ask: (input: AskInput) => Effect.Effect<void, PermissionV1.Error>
   readonly reply: (input: PermissionV1.ReplyInput) => Effect.Effect<void, PermissionV1.NotFoundError>
   readonly list: () => Effect.Effect<ReadonlyArray<PermissionV1.Request>>
 }
 
 interface PendingEntry {
   info: PermissionV1.Request
-  deferred: Deferred.Deferred<void, PermissionV1.RejectedError | PermissionV1.CorrectedError>
+  deferred: Deferred.Deferred<
+    void,
+    PermissionV1.RejectedError | PermissionV1.DismissedError | PermissionV1.CorrectedError
+  >
 }
 
 interface State {
@@ -26,9 +32,15 @@ interface State {
 }
 
 export function evaluate(permission: string, pattern: string, ...rulesets: PermissionV1.Ruleset[]): PermissionV1.Rule {
+  // UPSTREAM-DIVERGENCE: browser grants require explicit allow and cannot override configured denial.
+  if (permission === "browser" && rulesets.length > 1) {
+    const configured = evaluate(permission, pattern, ...rulesets.slice(0, -1))
+    if (configured.action === "deny") return configured
+  }
+  const rules = rulesets.flat()
   return (
-    rulesets
-      .flat()
+    rules
+      .filter((rule) => permission !== "browser" || rule.permission === "browser" || rule.action !== "allow")
       .findLast((rule) => Wildcard.match(permission, rule.permission) && Wildcard.match(pattern, rule.pattern)) ?? {
       action: "ask",
       permission,
@@ -54,6 +66,10 @@ const layer = Layer.effect(
         yield* Effect.addFinalizer(() =>
           Effect.gen(function* () {
             for (const item of state.pending.values()) {
+              yield* events.publish(Event.Cancelled, {
+                sessionID: item.info.sessionID,
+                requestID: item.info.id,
+              })
               yield* Deferred.fail(item.deferred, new PermissionV1.RejectedError())
             }
             state.pending.clear()
@@ -64,9 +80,10 @@ const layer = Layer.effect(
       }),
     )
 
-    const ask = Effect.fn("Permission.ask")(function* (input: PermissionV1.AskInput) {
+    const ask = Effect.fn("Permission.ask")(function* (input: AskInput) {
       const { approved, pending } = yield* InstanceState.get(state)
-      const { ruleset, ...request } = input
+      const { ruleset, signal, ...request } = input
+      if (signal?.aborted) return yield* Effect.interrupt
       let needsAsk = false
 
       for (const pattern of request.patterns) {
@@ -95,13 +112,19 @@ const layer = Layer.effect(
       }
       yield* Effect.logInfo("asking", { id, permission: info.permission, patterns: info.patterns })
 
-      const deferred = yield* Deferred.make<void, PermissionV1.RejectedError | PermissionV1.CorrectedError>()
+      const deferred = yield* Deferred.make<
+        void,
+        PermissionV1.RejectedError | PermissionV1.DismissedError | PermissionV1.CorrectedError
+      >()
       pending.set(id, { info, deferred })
       yield* events.publish(Event.Asked, info)
+      const wait = signal ? Effect.raceFirst(Deferred.await(deferred), interrupted(signal)) : Deferred.await(deferred)
       return yield* Effect.ensuring(
-        Deferred.await(deferred),
-        Effect.sync(() => {
+        wait,
+        Effect.gen(function* () {
+          if (pending.get(id)?.deferred !== deferred) return
           pending.delete(id)
+          yield* events.publish(Event.Cancelled, { sessionID: info.sessionID, requestID: id })
         }),
       )
     })
@@ -117,6 +140,11 @@ const layer = Layer.effect(
         requestID: existing.info.id,
         reply: input.reply,
       })
+
+      if (input.reply === "dismiss") {
+        yield* Deferred.fail(existing.deferred, new PermissionV1.DismissedError())
+        return
+      }
 
       if (input.reply === "reject") {
         yield* Deferred.fail(
@@ -174,6 +202,15 @@ const layer = Layer.effect(
     return Service.of({ ask, reply, list })
   }),
 )
+
+function interrupted(signal: AbortSignal) {
+  return Effect.callback<never>((resume) => {
+    if (signal.aborted) return resume(Effect.interrupt)
+    const abort = () => resume(Effect.interrupt)
+    signal.addEventListener("abort", abort, { once: true })
+    return Effect.sync(() => signal.removeEventListener("abort", abort))
+  })
+}
 
 function expand(pattern: string): string {
   if (pattern.startsWith("~/")) return os.homedir() + pattern.slice(1)

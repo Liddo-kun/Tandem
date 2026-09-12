@@ -10,6 +10,7 @@ import type {
 import type { FileDiffInfo } from "@opencode-ai/client/promise"
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { PreloadMultiFileDiffResult } from "@pierre/diffs/ssr"
+import type { BrowserImage } from "../components/browser-capture-pool"
 
 export type NormalizedProviderListResponse = {
   all: Map<string, Provider>
@@ -63,6 +64,8 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
     // renderers (e.g. imagegen) use it to fetch an image by path for a thumbnail without
     // routing the bytes through the model's context. Omitted in contexts without an SDK.
     readFile?: (path: string) => Promise<FileContent | undefined>
+    // UPSTREAM-DIVERGENCE: authenticated, session-owned browser captures; never arbitrary file paths.
+    readBrowserImage?: (sessionID: string, uri: string, signal: AbortSignal) => Promise<BrowserImage | undefined>
     sessionID?: string
     onNavigateToSession?: NavigateToSessionFn
     onSessionHref?: SessionHrefFn
@@ -76,6 +79,9 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
       },
       get readFile() {
         return props.readFile
+      },
+      get readBrowserImage() {
+        return props.readBrowserImage
       },
       get sessionID() {
         return props.sessionID

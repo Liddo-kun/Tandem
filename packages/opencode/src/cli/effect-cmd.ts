@@ -1,5 +1,5 @@
 import type { Argv } from "yargs"
-import { Effect, Schema } from "effect"
+import { Cause, Effect, Exit, Schema } from "effect"
 import type { AppServices } from "@/effect/app-runtime"
 import type { InstanceStore } from "@/project/instance-store"
 import { cmd, type WithDoubleDash } from "./cmd/cmd"
@@ -44,6 +44,8 @@ interface EffectCmdOpts<Args, A> {
    * `serve`, `web`, `account`, `db`, `upgrade`).
    */
   instance?: boolean | ((args: Args) => boolean)
+  /** Own OS-signal interruption and await process resources for serving commands. */
+  signals?: boolean
   /** Defaults to process.cwd(). Override for commands that take a directory positional. */
   directory?: (args: Args) => string
   handler: (args: WithDoubleDash<Args>) => Effect.Effect<A, CliError, AppServices | InstanceStore.Service>
@@ -78,6 +80,29 @@ export const effectCmd = <Args, A>(opts: EffectCmdOpts<Args, A>) =>
       const args = rawArgs as unknown as WithDoubleDash<Args>
       const useInstance = typeof opts.instance === "function" ? opts.instance(args) : opts.instance !== false
       if (!useInstance) {
+        // UPSTREAM-DIVERGENCE: serving commands must finish cleanup before index.ts exits.
+        if (opts.signals) {
+          const controller = new AbortController()
+          const stop = () => controller.abort()
+          process.on("SIGINT", stop)
+          process.on("SIGTERM", stop)
+          try {
+            const exit = await AppRuntime.runPromiseExit(Effect.scoped(opts.handler(args)), {
+              signal: controller.signal,
+            })
+            if (Exit.isFailure(exit) && !Cause.hasInterruptsOnly(exit.cause)) throw Cause.squash(exit.cause)
+          } finally {
+            try {
+              const { InstanceStore } = await import("@/project/instance-store")
+              await AppRuntime.runPromise(InstanceStore.Service.use((store) => store.disposeAll()))
+            } finally {
+              await AppRuntime.dispose()
+              process.off("SIGINT", stop)
+              process.off("SIGTERM", stop)
+            }
+          }
+          return
+        }
         await AppRuntime.runPromise(opts.handler(args))
         return
       }

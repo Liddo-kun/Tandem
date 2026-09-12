@@ -60,3 +60,11 @@ This file has two parts: a current-state baseline of the apps, and a dated histo
 - 2026-05-16..27 — First Tandem mobile passes: display zoom controls, Android viewport gesture-drift fix, Y700 install helper (+hardening), prompt-input layout refinements, Android v2-only composer bundle, reduced resume-refresh work.
 - 2026-05-15/16 — Imported the Whispercode iOS/Android wrappers and mobile updates into Tandem (`mobile: import Whisper ... through 76`, `finish Whisper mobile import`).
 - 2026-02-17..19 — Pre-import iOS work in the Whispercode lineage: WhisperKit preload, keyboard toolbar (arrows, newline, delete word), first-open keyboard race fix, app icon.
+
+### 2026-09-11 — Chrome bridge production rollout
+
+With Jon’s approval, rebuilt and updated the signed normal Android package using
+the canonical tablet installer, preserving app data. Shared browser permission,
+PNG and grant-management behavior was verified first in the signed chrome4
+variant. Production host/server and rollback details are recorded in
+`notes/chrome-extension-phase-4-evidence.md`.

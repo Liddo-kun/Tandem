@@ -1295,7 +1295,8 @@ export function createServerSession(
           )
         return
       }
-      case "permission.replied": {
+      case "permission.replied":
+      case "permission.cancelled": {
         const props = event.properties as { sessionID: string; requestID: string }
         setData(
           "permission",

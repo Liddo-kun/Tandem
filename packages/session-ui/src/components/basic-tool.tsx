@@ -372,13 +372,64 @@ function args(input: Record<string, unknown> | undefined) {
     .slice(0, 3)
 }
 
+function value(input: unknown) {
+  return typeof input === "string" && /^[a-zA-Z0-9_.-]{1,128}$/.test(input) ? input : undefined
+}
+
+// UPSTREAM-DIVERGENCE: never derive browser summaries from typed text, page output or sensitive URLs.
+export function browserToolSummary(
+  input: Record<string, unknown> | undefined,
+  metadata: Record<string, unknown> | undefined,
+) {
+  const subject = value(input?.action) ?? value(metadata?.action)
+  const preview = [
+    ["browser", input?.browser ?? metadata?.browser],
+    ["tab", input?.tab],
+    ["operation", input?.operation ?? metadata?.operation],
+    ["outcome", metadata?.outcome],
+    ["code", metadata?.code],
+  ]
+    .flatMap(([key, item]) => {
+      const text = value(item)
+      return text ? [`${key}=${text}`] : []
+    })
+    .join(" ")
+
+  return {
+    subject,
+    preview: preview || undefined,
+    failed: metadata?.code !== undefined,
+  }
+}
+
 export function GenericTool(props: {
   tool: string
   status?: string
   hideDetails?: boolean
   input?: Record<string, unknown>
+  metadata?: Record<string, unknown>
 }) {
   const i18n = useI18n()
+
+  if (props.tool === "browser") {
+    const summary = () => browserToolSummary(props.input, props.metadata)
+    return (
+      <BasicTool
+        icon="mcp"
+        status={props.status}
+        trigger={
+          <ToolSummaryTrigger
+            title={i18n.t("ui.basicTool.called", { tool: props.tool })}
+            subject={summary().subject}
+            preview={summary().preview}
+            status={props.status}
+            failed={summary().failed}
+          />
+        }
+        hideDetails={props.hideDetails}
+      />
+    )
+  }
 
   return (
     <BasicTool

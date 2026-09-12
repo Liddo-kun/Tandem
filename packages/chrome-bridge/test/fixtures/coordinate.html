@@ -1,0 +1,94 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Coordinate acceptance</title>
+<style>
+  html {
+    overflow-anchor: none;
+    scroll-behavior: auto;
+  }
+  body {
+    margin: 0;
+    width: 1800px;
+    height: 2200px;
+    background: #fff;
+  }
+  button {
+    position: absolute;
+    border: 0;
+    padding: 0;
+    width: 96px;
+    height: 60px;
+  }
+  #top {
+    left: 130px;
+    top: 180px;
+    background: rgb(0, 192, 80);
+  }
+  #lower {
+    left: 230px;
+    top: 680px;
+    background: rgb(0, 192, 80);
+  }
+  #decoy {
+    left: 600px;
+    top: 400px;
+    background: rgb(220, 0, 40);
+  }
+  iframe {
+    position: absolute;
+    left: 350px;
+    top: 100px;
+    width: 220px;
+    height: 180px;
+    border: 3px solid black;
+  }
+</style>
+<button id="top" aria-label="Top target"></button>
+<button id="lower" aria-label="Scrolled target"></button>
+<button id="decoy" aria-label="Decoy"></button>
+<iframe id="child"></iframe>
+<script>
+  const config = __CONFIG__
+  const generation = crypto.randomUUID()
+  const endpoint = (path) => `${path}?token=${config.token}&name=${config.name}`
+  child.src = endpoint("/frame")
+  document.addEventListener("click", (event) => {
+    fetch(endpoint("/event"), {
+      method: "POST",
+      body: JSON.stringify({
+        target: event.target.id,
+        trusted: event.isTrusted,
+        x: event.clientX,
+        y: event.clientY,
+        generation,
+      }),
+    })
+  })
+  let pending = false
+  setInterval(async () => {
+    if (pending) return
+    pending = true
+    try {
+      const response = await fetch(endpoint("/state"), {
+        method: "POST",
+        body: JSON.stringify({
+          generation,
+          dpr: devicePixelRatio,
+          scale: visualViewport.scale,
+          width: visualViewport.width,
+          height: visualViewport.height,
+          x: scrollX,
+          y: scrollY,
+          child: child.contentDocument?.documentElement.dataset.generation,
+        }),
+      })
+      const command = await response.json()
+      if (command?.action === "scroll") scrollTo({ left: command.x, top: command.y, behavior: "instant" })
+      if (command?.action === "child") child.contentWindow.location.reload()
+      if (command?.action === "reload") location.reload()
+      if (command?.action === "cross") child.src = command.url
+    } finally {
+      pending = false
+    }
+  }, 100)
+</script>

@@ -33,19 +33,24 @@ export const description = [
 ].join("\n")
 
 export const toModelOutput = (skill: SkillV2.Info, files: ReadonlyArray<string>) => {
-  const directory = path.dirname(skill.location)
+  // UPSTREAM-DIVERGENCE: embedded skills use virtual locations, not resource directories.
+  const directory = path.basename(skill.location) === "SKILL.md" ? path.dirname(skill.location) : undefined
   return [
     `<skill_content name="${skill.name}">`,
     `# Skill: ${skill.name}`,
     "",
     skill.content.trim(),
     "",
-    `Base directory for this skill: ${directory}`,
-    "Relative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.",
-    "Note: file list is sampled.",
+    ...(directory
+      ? [
+          `Base directory for this skill: ${directory}`,
+          "Relative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.",
+          "Note: file list is sampled.",
+        ]
+      : ["Built-in skill; no filesystem resource directory."]),
     "",
     "<skill_files>",
-    ...files.map((file) => `<file>${file}</file>`),
+    ...(directory ? files.map((file) => `<file>${file}</file>`) : []),
     "</skill_files>",
     "</skill_content>",
   ].join("\n")
@@ -81,7 +86,7 @@ const layer = Layer.effectDiscard(
                   agent: context.agent,
                   source: { type: "tool", messageID: context.assistantMessageID, callID: context.toolCallID },
                 })
-                const directory = path.dirname(skill.location)
+                const directory = path.basename(skill.location) === "SKILL.md" ? path.dirname(skill.location) : ""
                 const files =
                   path.basename(skill.location) === "SKILL.md"
                     ? (yield* fs.glob("**/*", { cwd: directory, absolute: true, include: "file", dot: true }))

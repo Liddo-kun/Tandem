@@ -1,4 +1,5 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { BrowserMedia } from "@opencode-ai/core/browser-media"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Image } from "@/image/image"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
@@ -400,8 +401,9 @@ const layer = Layer.effect(
               return
             }
             const rawOutput = toolResultOutput(value)
+            // UPSTREAM-DIVERGENCE: owned captures are hydrated later without resizing their coordinate mapping.
             const normalized = yield* Effect.forEach(rawOutput.attachments ?? [], (attachment) =>
-              attachment.mime.startsWith("image/")
+              attachment.mime.startsWith("image/") && !BrowserMedia.isReference(attachment.url)
                 ? image.normalize(attachment).pipe(
                     Effect.catchIf(
                       (error) => error instanceof Image.ResizerUnavailableError,

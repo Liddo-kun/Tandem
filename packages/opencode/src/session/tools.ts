@@ -82,6 +82,8 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       permission
         .ask({
           ...req,
+          // UPSTREAM-DIVERGENCE: browser approval uses its operation signal before the generic tool signal.
+          signal: req.signal ?? options.abortSignal,
           sessionID: input.session.id,
           tool: { messageID: input.processor.message.id, callID: options.toolCallId },
           ruleset: Permission.merge(input.agent.permission, input.session.permission ?? []),

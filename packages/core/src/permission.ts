@@ -59,6 +59,9 @@ export const Event = Permission.Event
 
 export class DeclinedError extends Schema.TaggedErrorClass<DeclinedError>()("PermissionV2.DeclinedError", {}) {}
 
+// UPSTREAM-DIVERGENCE: request-local dismissal and cancellation events support browser approval lifecycles.
+export class DismissedError extends Schema.TaggedErrorClass<DismissedError>()("PermissionV2.DismissedError", {}) {}
+
 export class CorrectedError extends Schema.TaggedErrorClass<CorrectedError>()("PermissionV2.CorrectedError", {
   feedback: Schema.String,
 }) {}
@@ -71,12 +74,14 @@ export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("Per
   requestID: ID,
 }) {}
 
-export type Error = BlockedError | CorrectedError
+export type Error = BlockedError | CorrectedError | DismissedError
 
 export function evaluate(action: string, resource: string, ...rulesets: Permission.Ruleset[]): Permission.Rule {
+  // UPSTREAM-DIVERGENCE: browser access must not inherit a generic wildcard allow.
+  const rules = rulesets.flat()
   return (
-    rulesets
-      .flat()
+    rules
+      .filter((rule) => action !== "browser" || rule.action === "browser" || rule.effect !== "allow")
       .findLast((rule) => Wildcard.match(action, rule.action) && Wildcard.match(resource, rule.resource)) ?? {
       action,
       resource: "*",
@@ -103,7 +108,7 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/v2
 interface Pending {
   readonly request: Request
   readonly agent?: AgentV2.ID
-  readonly deferred: Deferred.Deferred<void, DeclinedError | CorrectedError>
+  readonly deferred: Deferred.Deferred<void, DeclinedError | DismissedError | CorrectedError>
 }
 
 const layer = Layer.effect(
@@ -117,9 +122,17 @@ const layer = Layer.effect(
     const pending = new Map<ID, Pending>()
 
     yield* EffectRuntime.addFinalizer(() =>
-      EffectRuntime.forEach(pending.values(), (item) => Deferred.fail(item.deferred, new DeclinedError()), {
-        discard: true,
-      }).pipe(
+      EffectRuntime.forEach(
+        pending.values(),
+        (item) =>
+          events
+            .publish(Event.Cancelled, {
+              sessionID: item.request.sessionID,
+              requestID: item.request.id,
+            })
+            .pipe(EffectRuntime.andThen(Deferred.fail(item.deferred, new DeclinedError()))),
+        { discard: true },
+      ).pipe(
         EffectRuntime.ensuring(
           EffectRuntime.sync(() => {
             pending.clear()
@@ -176,7 +189,7 @@ const layer = Layer.effect(
     const create = (request: Request, agent?: AgentV2.ID) =>
       EffectRuntime.uninterruptible(
         EffectRuntime.gen(function* () {
-          const deferred = yield* Deferred.make<void, DeclinedError | CorrectedError>()
+          const deferred = yield* Deferred.make<void, DeclinedError | DismissedError | CorrectedError>()
           const item = { request, agent, deferred }
           if (pending.has(request.id)) return yield* EffectRuntime.die(`Duplicate pending permission ID: ${request.id}`)
           pending.set(request.id, item)
@@ -208,8 +221,13 @@ const layer = Layer.effect(
           return yield* restore(Deferred.await(item.deferred)).pipe(
             EffectRuntime.catchTag("PermissionV2.DeclinedError", (error) => EffectRuntime.die(error)),
             EffectRuntime.ensuring(
-              EffectRuntime.sync(() => {
+              EffectRuntime.gen(function* () {
+                if (pending.get(item.request.id) !== item) return
                 pending.delete(item.request.id)
+                yield* events.publish(Event.Cancelled, {
+                  sessionID: item.request.sessionID,
+                  requestID: item.request.id,
+                })
               }),
             ),
           )
@@ -227,13 +245,18 @@ const layer = Layer.effect(
             requestID: existing.request.id,
             reply: input.reply,
           })
+          pending.delete(input.requestID)
+
+          if (input.reply === "dismiss") {
+            yield* Deferred.fail(existing.deferred, new DismissedError())
+            return
+          }
 
           if (input.reply === "reject") {
             yield* Deferred.fail(
               existing.deferred,
               input.message ? new CorrectedError({ feedback: input.message }) : new DeclinedError(),
             )
-            pending.delete(input.requestID)
             for (const [id, item] of pending) {
               if (item.request.sessionID !== existing.request.sessionID) continue
               yield* events.publish(Event.Replied, {
@@ -255,7 +278,6 @@ const layer = Layer.effect(
             })
           }
           yield* Deferred.succeed(existing.deferred, undefined)
-          pending.delete(input.requestID)
           if (input.reply !== "always" || !existing.request.save?.length) return
 
           const rememberedRules = yield* savedRules()
@@ -278,8 +300,8 @@ const layer = Layer.effect(
               requestID: item.request.id,
               reply: "always",
             })
-            yield* Deferred.succeed(item.deferred, undefined)
             pending.delete(id)
+            yield* Deferred.succeed(item.deferred, undefined)
           }
         }),
       ),

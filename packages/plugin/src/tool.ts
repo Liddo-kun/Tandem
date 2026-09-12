@@ -24,6 +24,8 @@ type AskInput = {
   patterns: string[]
   always: string[]
   metadata: { [key: string]: any }
+  // UPSTREAM-DIVERGENCE: carry browser operation cancellation into a pending permission request.
+  signal?: AbortSignal
 }
 
 export type ToolAttachment = {

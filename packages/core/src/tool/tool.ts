@@ -5,6 +5,7 @@ import { Effect, JsonSchema, Schema } from "effect"
 import type { AgentV2 } from "../agent"
 import type { SessionMessage } from "../session/message"
 import type { SessionSchema } from "../session/schema"
+import type { BrowserMedia } from "../browser-media"
 
 export interface Context {
   readonly sessionID: SessionSchema.ID
@@ -36,6 +37,8 @@ export class RegistrationError extends Schema.TaggedErrorClass<RegistrationError
 export type Content =
   | { readonly type: "text"; readonly text: string }
   | { readonly type: "file"; readonly data: string; readonly mime: string; readonly name?: string }
+  // UPSTREAM-DIVERGENCE: owned browser captures persist opaque references, not base64.
+  | { readonly type: "file"; readonly uri: BrowserMedia.URI; readonly mime: "image/png"; readonly name?: string }
 
 type Config<
   Input extends SchemaType<any>,
@@ -118,7 +121,7 @@ export function make<
                     ? { type: "text" as const, text: part.text }
                     : {
                         type: "file" as const,
-                        uri: `data:${part.mime};base64,${part.data}`,
+                        uri: "uri" in part ? part.uri : `data:${part.mime};base64,${part.data}`,
                         mime: part.mime,
                         name: part.name,
                       },

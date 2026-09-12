@@ -17,8 +17,13 @@ import { LocationHandler } from "./handlers/location"
 import { IntegrationHandler } from "./handlers/integration"
 import { CredentialHandler } from "./handlers/credential"
 import { ProjectCopyHandler } from "./handlers/project-copy"
+import { BrowserMediaHandler } from "./handlers/browser-media"
+import { BrowserMedia } from "@opencode-ai/core/browser-media"
 
 export const handlers = Layer.mergeAll(
+  // UPSTREAM-DIVERGENCE: serve owned browser captures and scope their cleanup to the server.
+  BrowserMediaHandler,
+  BrowserMedia.cleanupLayer,
   HealthHandler,
   LocationHandler,
   AgentHandler,

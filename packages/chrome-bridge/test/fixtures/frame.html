@@ -1,0 +1,30 @@
+<!doctype html><meta charset="utf-8" /><title>Nested frame</title>
+<style>
+  body {
+    margin: 20px;
+  }
+  iframe {
+    width: 500px;
+    height: 170px;
+    border: 5px solid green;
+  }
+  button {
+    padding: 15px;
+  }
+</style>
+<body></body>
+<script>
+  const q = new URL(location.href).searchParams
+  if (!q.has("inner")) {
+    const f = document.createElement("iframe")
+    f.src = "/frame?" + q.toString() + "&inner=1"
+    document.body.append(f)
+  } else {
+    const b = document.createElement("button")
+    b.textContent = "Nested frame button"
+    b.onclick = (e) => {
+      if (e.isTrusted) top.postMessage("frame-click", location.origin)
+    }
+    document.body.append(b)
+  }
+</script>

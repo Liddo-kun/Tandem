@@ -525,6 +525,16 @@ describe("applyDirectoryEvent", () => {
     expect(store.permission[sessionID]?.map((x) => x.id)).toEqual(["perm_1", "perm_3"])
 
     applyDirectoryEvent({
+      event: { type: "permission.cancelled", properties: { sessionID, requestID: "perm_1" } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    expect(store.permission[sessionID]?.map((x) => x.id)).toEqual(["perm_3"])
+
+    applyDirectoryEvent({
       event: { type: "question.asked", properties: questionRequest("q_2", sessionID) },
       store,
       setStore,

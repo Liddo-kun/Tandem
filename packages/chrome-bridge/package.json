@@ -1,0 +1,30 @@
+{
+  "name": "@tandem/chrome-bridge",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/controller.ts",
+    "./tools": "./src/tools.ts"
+  },
+  "scripts": {
+    "build:host": "bun build src/host.ts --compile --outfile dist/tandem-chrome-host",
+    "build:installer": "bun build script/install.ts --compile --outfile dist/tandem-chrome",
+    "install:host": "bun run script/install.ts",
+    "typecheck": "tsgo --noEmit",
+    "test": "bun test test",
+    "test:controller": "bun test test/controller.test.ts test/page.test.ts",
+    "prepare:isolated": "bun run script/prepare.ts",
+    "smoke": "bun run script/smoke.ts",
+    "smoke:controller": "bun run script/controller-smoke.ts",
+    "verify:controller": "bun run script/controller-evidence.ts",
+    "verify:phase2": "bun run script/controller-acceptance.ts",
+    "verify:evidence": "bun run script/evidence.ts"
+  },
+  "devDependencies": {
+    "@tsconfig/bun": "catalog:",
+    "@types/bun": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:"
+  }
+}

@@ -22,11 +22,26 @@ describe("adaptServerEvent", () => {
       created: 1,
       type: "permission.v2.asked",
       data: { id: "perm_1", sessionID: "ses_1", action: "read", resources: ["src/**"] },
-    } as OpenCodeEvent
+    } as unknown as OpenCodeEvent
 
     expect(adaptServerEvent(current)).toMatchObject({
       type: "permission.asked",
       properties: { id: "perm_1", sessionID: "ses_1", permission: "read", patterns: ["src/**"] },
+      current,
+    })
+  })
+
+  test("adapts V2 permission cancellation for existing reducers", () => {
+    const current = {
+      id: "evt_2",
+      created: 1,
+      type: "permission.v2.cancelled",
+      data: { sessionID: "ses_1", requestID: "perm_1" },
+    } as unknown as OpenCodeEvent
+
+    expect(adaptServerEvent(current)).toMatchObject({
+      type: "permission.cancelled",
+      properties: { sessionID: "ses_1", requestID: "perm_1" },
       current,
     })
   })

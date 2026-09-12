@@ -196,6 +196,36 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
             const permission = props.request.permission
             const data = input()
 
+            // UPSTREAM-DIVERGENCE: show bounded browser capability/origin/tab metadata, not opaque grant keys.
+            if (permission === "browser") {
+              const value = (key: string) => {
+                const item = props.request.metadata?.[key]
+                return typeof item === "string" ? item.replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, 256) : ""
+              }
+              const browser = value("browser")
+              const capability = value("capability")
+              const origin = value("origin")
+              const tabTitle = value("tabTitle")
+              const tabScope = value("tabScope")
+              return {
+                icon: "%",
+                title: `${capability} access in ${browser}`,
+                body: (
+                  <box paddingLeft={1} gap={1}>
+                    <Show when={origin}>
+                      <text fg={theme.textMuted}>{"Origin: " + origin}</text>
+                    </Show>
+                    <Show when={tabTitle}>
+                      <text fg={theme.textMuted}>{"Tab title: " + tabTitle}</text>
+                    </Show>
+                    <Show when={tabScope}>
+                      <text fg={theme.textMuted}>{"Tab: " + tabScope}</text>
+                    </Show>
+                  </box>
+                ),
+              }
+            }
+
             if (permission === "edit") {
               const raw = props.request.metadata?.filepath
               const filepath = typeof raw === "string" ? raw : ""
@@ -402,8 +432,8 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
               title="Permission required"
               header={header()}
               body={current.body}
-              options={{ once: "Allow once", always: "Allow always", reject: "Reject" }}
-              escapeKey="reject"
+              options={{ once: "Allow once", always: "Allow always", reject: "Reject", dismiss: "Dismiss" }}
+              escapeKey="dismiss"
               fullscreen
               onSelect={(option) => {
                 if (option === "always") {
@@ -417,6 +447,16 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
                   }
                   void sdk.client.permission.reply({
                     reply: "reject",
+                    requestID: props.request.id,
+                    directory: props.directory,
+                    workspace: project.workspace.current(),
+                  })
+                  return
+                }
+                // UPSTREAM-DIVERGENCE: dismiss this approval without the session-wide effects of reject.
+                if (option === "dismiss") {
+                  void sdk.client.permission.reply({
+                    reply: "dismiss",
                     requestID: props.request.id,
                     directory: props.directory,
                     workspace: project.workspace.current(),

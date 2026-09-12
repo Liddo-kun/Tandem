@@ -10,6 +10,13 @@ export class RejectedError extends Schema.TaggedErrorClass<RejectedError>()("Per
   }
 }
 
+// UPSTREAM-DIVERGENCE: dismiss one browser/tool approval without rejecting the entire session.
+export class DismissedError extends Schema.TaggedErrorClass<DismissedError>()("PermissionDismissedError", {}) {
+  override get message() {
+    return "The user dismissed permission for this specific tool call."
+  }
+}
+
 export class CorrectedError extends Schema.TaggedErrorClass<CorrectedError>()("PermissionCorrectedError", {
   feedback: Schema.String,
 }) {
@@ -30,4 +37,4 @@ export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("Per
   requestID: ID,
 }) {}
 
-export type Error = DeniedError | RejectedError | CorrectedError
+export type Error = DeniedError | RejectedError | DismissedError | CorrectedError

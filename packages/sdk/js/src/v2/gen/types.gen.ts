@@ -57,6 +57,7 @@ export type Event =
   | EventReferenceUpdated
   | EventPermissionV2Asked
   | EventPermissionV2Replied
+  | EventPermissionV2Cancelled
   | EventPluginAdded
   | EventProjectDirectoriesUpdated
   | EventFileWatcherUpdated
@@ -71,6 +72,7 @@ export type Event =
   | EventLspUpdated
   | EventPermissionAsked
   | EventPermissionReplied
+  | EventPermissionCancelled
   | EventTuiPromptAppend2
   | EventTuiCommandExecute2
   | EventTuiToastShow2
@@ -1279,6 +1281,14 @@ export type GlobalEvent = {
       }
     | {
         id: string
+        type: "permission.v2.cancelled"
+        properties: {
+          sessionID: string
+          requestID: string
+        }
+      }
+    | {
+        id: string
         type: "plugin.added"
         properties: {
           id: string
@@ -1397,7 +1407,15 @@ export type GlobalEvent = {
         properties: {
           sessionID: string
           requestID: string
-          reply: "once" | "always" | "reject"
+          reply: "once" | "always" | "reject" | "dismiss"
+        }
+      }
+    | {
+        id: string
+        type: "permission.cancelled"
+        properties: {
+          sessionID: string
+          requestID: string
         }
       }
     | {
@@ -2685,6 +2703,11 @@ export type UnauthorizedError = {
   message: string
 }
 
+export type BrowserMediaUnavailable = {
+  _tag: "BrowserMediaUnavailable"
+  message: string
+}
+
 export type SessionsResponse = {
   data: Array<SessionV2Info>
   cursor: {
@@ -2908,6 +2931,7 @@ export type V2Event =
   | ReferenceUpdated
   | PermissionV2Asked
   | PermissionV2Replied
+  | PermissionV2Cancelled
   | PluginAdded
   | ProjectDirectoriesUpdated
   | FileWatcherUpdated
@@ -2922,6 +2946,7 @@ export type V2Event =
   | LspUpdated
   | PermissionAsked
   | PermissionReplied
+  | PermissionCancelled
   | TuiPromptAppend
   | TuiCommandExecute
   | TuiToastShow
@@ -3128,7 +3153,7 @@ export type PermissionV2Source = {
   callID: string
 }
 
-export type PermissionV2Reply = "once" | "always" | "reject"
+export type PermissionV2Reply = "once" | "always" | "reject" | "dismiss"
 
 export type QuestionV2Option = {
   /**
@@ -5480,6 +5505,24 @@ export type PermissionV2Replied = {
   }
 }
 
+export type PermissionV2Cancelled = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "permission.v2.cancelled"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    sessionID: string
+    requestID: string
+  }
+}
+
 export type PluginAdded = {
   id: string
   metadata?: {
@@ -5739,7 +5782,25 @@ export type PermissionReplied = {
   data: {
     sessionID: string
     requestID: string
-    reply: "once" | "always" | "reject"
+    reply: "once" | "always" | "reject" | "dismiss"
+  }
+}
+
+export type PermissionCancelled = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "permission.cancelled"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    sessionID: string
+    requestID: string
   }
 }
 
@@ -6751,6 +6812,15 @@ export type EventPermissionV2Replied = {
   }
 }
 
+export type EventPermissionV2Cancelled = {
+  id: string
+  type: "permission.v2.cancelled"
+  properties: {
+    sessionID: string
+    requestID: string
+  }
+}
+
 export type EventPluginAdded = {
   id: string
   type: "plugin.added"
@@ -6884,7 +6954,16 @@ export type EventPermissionReplied = {
   properties: {
     sessionID: string
     requestID: string
-    reply: "once" | "always" | "reject"
+    reply: "once" | "always" | "reject" | "dismiss"
+  }
+}
+
+export type EventPermissionCancelled = {
+  id: string
+  type: "permission.cancelled"
+  properties: {
+    sessionID: string
+    requestID: string
   }
 }
 
@@ -9266,7 +9345,7 @@ export type PermissionListResponse = PermissionListResponses[keyof PermissionLis
 
 export type PermissionReplyData = {
   body?: {
-    reply: "once" | "always" | "reject"
+    reply: "once" | "always" | "reject" | "dismiss"
     message?: string
   }
   path: {
@@ -10372,7 +10451,7 @@ export type SessionUnrevertResponse = SessionUnrevertResponses[keyof SessionUnre
 
 export type PermissionRespondData = {
   body?: {
-    response: "once" | "always" | "reject"
+    response: "once" | "always" | "reject" | "dismiss"
   }
   path: {
     sessionID: string
@@ -11260,6 +11339,44 @@ export type V2HealthGetResponses = {
 }
 
 export type V2HealthGetResponse = V2HealthGetResponses[keyof V2HealthGetResponses]
+
+export type ServerBrowserMediaBrowserMediaReadData = {
+  body?: never
+  path: {
+    sessionID: string
+    id: string
+  }
+  query?: never
+  url: "/api/browser-media/{sessionID}/{id}"
+}
+
+export type ServerBrowserMediaBrowserMediaReadErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * BrowserMediaUnavailable
+   */
+  404: BrowserMediaUnavailable
+}
+
+export type ServerBrowserMediaBrowserMediaReadError =
+  ServerBrowserMediaBrowserMediaReadErrors[keyof ServerBrowserMediaBrowserMediaReadErrors]
+
+export type ServerBrowserMediaBrowserMediaReadResponses = {
+  /**
+   * Success
+   */
+  200: Blob | File
+}
+
+export type ServerBrowserMediaBrowserMediaReadResponse =
+  ServerBrowserMediaBrowserMediaReadResponses[keyof ServerBrowserMediaBrowserMediaReadResponses]
 
 export type V2LocationGetData = {
   body?: never

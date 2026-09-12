@@ -406,7 +406,9 @@ export default function LegacyLayout(props: ParentProps) {
         if (
           e.details?.type === "question.replied" ||
           e.details?.type === "question.rejected" ||
-          e.details?.type === "permission.replied"
+          e.details?.type === "permission.replied" ||
+          // UPSTREAM-DIVERGENCE: clear notifications when a browser approval is cancelled.
+          (e.details as { type: string } | undefined)?.type === "permission.cancelled"
         ) {
           const props = e.details.properties as { sessionID: string }
           const sessionKey = `${e.name}:${props.sessionID}`

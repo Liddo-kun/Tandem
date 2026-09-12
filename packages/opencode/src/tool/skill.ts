@@ -31,16 +31,20 @@ export const SkillTool = Tool.define(
             metadata: {},
           })
 
-          const dir = path.dirname(info.location)
+          // UPSTREAM-DIVERGENCE: embedded skills have no filesystem resources.
+          const builtin = info.location === "<built-in>"
+          const dir = builtin ? "" : path.dirname(info.location)
           const base = dir
-          const files = yield* ripgrep.find({
-            cwd: dir,
-            pattern: "!**/SKILL.md",
-            hidden: true,
-            follow: false,
-            signal: ctx.abort,
-            limit: 10,
-          })
+          const files = builtin
+            ? []
+            : yield* ripgrep.find({
+                cwd: dir,
+                pattern: "!**/SKILL.md",
+                hidden: true,
+                follow: false,
+                signal: ctx.abort,
+                limit: 10,
+              })
 
           return {
             title: `Loaded skill: ${info.name}`,
@@ -50,9 +54,13 @@ export const SkillTool = Tool.define(
               "",
               info.content.trim(),
               "",
-              `Base directory for this skill: ${base}`,
-              "Relative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.",
-              "Note: file list is sampled.",
+              ...(builtin
+                ? ["Built-in skill; no filesystem resource directory."]
+                : [
+                    `Base directory for this skill: ${base}`,
+                    "Relative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.",
+                    "Note: file list is sampled.",
+                  ]),
               "",
               "<skill_files>",
               files.map((file) => `<file>${path.resolve(dir, file.path)}</file>`).join("\n"),

@@ -1,4 +1,6 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+// UPSTREAM-DIVERGENCE: await browser reconciliation at the actual legacy execution boundary.
+import { Browser } from "@opencode-ai/core/browser"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import path from "path"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
@@ -115,6 +117,31 @@ const layer = Layer.effect(
   Effect.gen(function* () {
     const status = yield* SessionStatus.Service
     const sessions = yield* Session.Service
+    const browser = yield* Browser.Service
+    const browserLocations = yield* InstanceState.make(
+      Effect.fnUntraced(function* () {
+        const locations = new Set<string>()
+        const owner = browser.owner
+        if (owner)
+          yield* Effect.addFinalizer(() =>
+            Effect.forEach(
+              locations,
+              (location) =>
+                Effect.promise(() => owner.closeLocation(location)).pipe(
+                  Effect.tap((reports) =>
+                    reports.some((report) => !report.confirmed)
+                      ? Effect.logWarning("Browser project cleanup_unconfirmed")
+                      : Effect.void,
+                  ),
+                ),
+              {
+                discard: true,
+              },
+            ),
+          )
+        return locations
+      }),
+    )
     const agents = yield* Agent.Service
     const provider = yield* Provider.Service
     const processor = yield* SessionProcessor.Service
@@ -1081,6 +1108,27 @@ const layer = Layer.effect(
     const runLoop: (sessionID: SessionID) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.run")(
       function* (sessionID: SessionID) {
         const ctx = yield* InstanceState.context
+        const location = Browser.locationKey(
+          {
+            directory: ctx.directory,
+            workspaceID: yield* InstanceState.workspaceID,
+          },
+          "legacy",
+        )
+        ;(yield* InstanceState.get(browserLocations)).add(location)
+        yield* Browser.beginExecution(browser.owner, { runtime: "legacy", location, sessionID }, (text) =>
+          Effect.gen(function* () {
+            const message = yield* lastAssistant(sessionID)
+            yield* sessions.updatePart({
+              id: PartID.ascending(),
+              sessionID,
+              messageID: message.info.id,
+              type: "text",
+              text,
+              synthetic: true,
+            })
+          }),
+        )
         let structured: unknown
         let step = 0
         const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
@@ -1373,6 +1421,7 @@ const layer = Layer.effect(
         yield* compaction.prune({ sessionID }).pipe(Effect.ignore, Effect.forkIn(scope))
         return yield* lastAssistant(sessionID)
       },
+      Effect.scoped,
     )
 
     const loop: (input: LoopInput) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.loop")(function* (
@@ -1634,6 +1683,7 @@ export const node = LayerNode.make({
   service: Service,
   layer: layer,
   deps: [
+    Browser.node,
     SessionStatus.node,
     Session.node,
     Agent.node,

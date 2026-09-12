@@ -1,4 +1,4 @@
-import { Component, createSignal, startTransition } from "solid-js"
+import { Component, createSignal, startTransition, Show } from "solid-js"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -10,11 +10,16 @@ import { SettingsKeybinds } from "./settings-keybinds"
 import { SettingsProviders } from "./settings-providers"
 import { SettingsModels } from "./settings-models"
 import { SettingsServers } from "./settings-servers"
+// UPSTREAM-DIVERGENCE: share project-scoped browser grant management with the current settings layout.
+import { SettingsBrowserGrants, useSettingsProject } from "./settings-v2/browser-grants"
+import { useServerProtocol } from "@/context/server-sdk"
 
 export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
   const language = useLanguage()
   const platform = usePlatform()
   const dialog = useDialog()
+  const protocol = useServerProtocol()
+  const { directory, projectID } = useSettingsProject()
   const [tab, setTab] = createSignal(props.defaultValue ?? "general")
 
   const showProviders = () => {
@@ -63,6 +68,12 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
                       <Icon name="models" />
                       {language.t("settings.models.title")}
                     </Tabs.Trigger>
+                    <Show when={protocol() === "v2"}>
+                      <Tabs.Trigger value="browser-grants">
+                        <Icon name="sliders" />
+                        {language.t("settings.browserGrants.title")}
+                      </Tabs.Trigger>
+                    </Show>
                   </div>
                 </div>
               </div>
@@ -88,6 +99,11 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
         <Tabs.Content value="models" class="no-scrollbar">
           <SettingsModels />
         </Tabs.Content>
+        <Show when={protocol() === "v2"}>
+          <Tabs.Content value="browser-grants" class="no-scrollbar settings-v2-panel">
+            <SettingsBrowserGrants projectID={projectID()} directory={directory()} />
+          </Tabs.Content>
+        </Show>
       </Tabs>
     </Dialog>
   )

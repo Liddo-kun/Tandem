@@ -6,6 +6,8 @@ import { SessionRunner } from "../runner"
 import { SessionSchema } from "../schema"
 import { SessionStore } from "../store"
 import { SessionExecution } from "../execution"
+// UPSTREAM-DIVERGENCE: awaited deletion interruption shared with the legacy foreground runtime.
+import { SessionInterruption } from "../interruption"
 
 /** Current-process routing for implicit-local Locations. Future remote placement belongs here. */
 const layer = Layer.effect(
@@ -13,6 +15,7 @@ const layer = Layer.effect(
   Effect.gen(function* () {
     const store = yield* SessionStore.Service
     const locations = yield* LocationServiceMap.Service
+    const interruption = yield* SessionInterruption.Service
     const coordinator = yield* SessionRunCoordinator.make<SessionSchema.ID, SessionRunner.RunError>({
       drain: Effect.fnUntraced(function* (sessionID: SessionSchema.ID, force) {
         const session = yield* store.get(sessionID)
@@ -28,6 +31,7 @@ const layer = Layer.effect(
       }),
     })
 
+    yield* interruption.register({ interrupt: coordinator.interrupt })
     return SessionExecution.Service.of({
       active: coordinator.active,
       interrupt: coordinator.interrupt,
@@ -40,7 +44,7 @@ const layer = Layer.effect(
 export const node = makeGlobalNode({
   service: SessionExecution.Service,
   layer,
-  deps: [SessionStore.node, LocationServiceMap.node],
+  deps: [SessionStore.node, LocationServiceMap.node, SessionInterruption.node],
 })
 
 export * as SessionExecutionLocal from "./local"

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tandem Chrome bridge fixture</title>
+    <style>
+      body {
+        font:
+          18px system-ui,
+          sans-serif;
+        margin: 40px;
+      }
+      main {
+        display: grid;
+        gap: 20px;
+        max-width: 620px;
+      }
+      input,
+      button {
+        box-sizing: border-box;
+        font: inherit;
+        height: 48px;
+        padding: 8px 14px;
+      }
+      button {
+        width: 240px;
+      }
+    </style>
+  </head>
+  <body data-ready="true">
+    <main>
+      <h1>Tandem Chrome Bridge Ready</h1>
+      <input id="smoke-input" aria-label="Smoke input" value="original" />
+      <button id="smoke-button" type="button">Trusted coordinate click</button>
+      <output id="click-count">0</output>
+      <output id="click-coordinates">none</output>
+    </main>
+    <script>
+      const button = document.querySelector("#smoke-button")
+      const count = document.querySelector("#click-count")
+      const coordinates = document.querySelector("#click-coordinates")
+      window.smokeClick = { count: 0, x: null, y: null, trusted: false }
+      button.addEventListener("click", (event) => {
+        window.smokeClick = {
+          count: window.smokeClick.count + 1,
+          x: event.clientX,
+          y: event.clientY,
+          trusted: event.isTrusted,
+        }
+        count.value = String(window.smokeClick.count)
+        coordinates.value = `${event.clientX},${event.clientY}`
+      })
+    </script>
+  </body>
+</html>

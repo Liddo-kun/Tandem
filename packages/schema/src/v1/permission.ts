@@ -35,7 +35,8 @@ export const Request = Schema.Struct({
 }).annotate({ identifier: "PermissionRequest" })
 export type Request = typeof Request.Type
 
-export const Reply = Schema.Literals(["once", "always", "reject"])
+// UPSTREAM-DIVERGENCE: legacy browser approvals share request-local dismiss and Cancelled events below.
+export const Reply = Schema.Literals(["once", "always", "reject", "dismiss"])
 export type Reply = typeof Reply.Type
 
 export const ReplyBody = Schema.Struct({ reply: Reply, message: Schema.optional(Schema.String) }).annotate({
@@ -63,4 +64,8 @@ const Replied = define({
   type: "permission.replied",
   schema: { sessionID: SessionID, requestID: ID, reply: Reply },
 })
-export const Event = { Asked, Replied, Definitions: inventory(Asked, Replied) }
+const Cancelled = define({
+  type: "permission.cancelled",
+  schema: { sessionID: SessionID, requestID: ID },
+})
+export const Event = { Asked, Replied, Cancelled, Definitions: inventory(Asked, Replied, Cancelled) }

@@ -35,13 +35,18 @@ export const WebCommand = effectCmd({
   // Server loads instances per-request via x-opencode-directory header — no
   // ambient project InstanceContext needed at startup.
   instance: false,
+  // UPSTREAM-DIVERGENCE: signal-aware scoped server shutdown awaits browser lease cleanup.
+  signals: true,
   handler: Effect.fn("Cli.web")(function* (args) {
     const { Server } = yield* Effect.promise(() => import("../../server/server"))
     if (!Flag.OPENCODE_SERVER_PASSWORD) {
       UI.println(UI.Style.TEXT_WARNING_BOLD + "!  OPENCODE_SERVER_PASSWORD is not set; server is unsecured.")
     }
     const opts = yield* resolveNetworkOptions(args)
-    const server = yield* Effect.promise(() => Server.listen(opts))
+    const server = yield* Effect.acquireRelease(
+      Effect.promise(() => Server.listen(opts)),
+      (server) => Effect.promise(() => server.stop(true)),
+    )
     UI.empty()
     UI.println(UI.logo("  "))
     UI.empty()
@@ -80,5 +85,5 @@ export const WebCommand = effectCmd({
     }
 
     yield* Effect.never
-  }),
+  }, Effect.scoped),
 })

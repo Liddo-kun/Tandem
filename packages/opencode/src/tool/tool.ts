@@ -42,7 +42,9 @@ export type Context<M extends Metadata = Metadata> = {
   extra?: { [key: string]: unknown }
   messages: SessionV1.WithParts[]
   metadata(input: { title?: string; metadata?: M }): Effect.Effect<void>
-  ask(input: Omit<PermissionV1.Request, "id" | "sessionID" | "tool">): Effect.Effect<void>
+  ask(
+    input: Omit<PermissionV1.Request, "id" | "sessionID" | "tool"> & { readonly signal?: AbortSignal },
+  ): Effect.Effect<void>
 }
 
 export interface ExecuteResult<M extends Metadata = Metadata> {
@@ -132,7 +134,8 @@ function wrap<Parameters extends Schema.Decoder<unknown>, Result extends Metadat
             return result
           }
           const agent = yield* agents.get(ctx.agent)
-          const truncated = yield* truncate.output(result.output, {}, agent)
+          // UPSTREAM-DIVERGENCE: browser overflow stays with its owning agent, not a mandatory helper.
+          const truncated = yield* truncate.output(result.output, {}, id === "browser" ? undefined : agent)
           return {
             ...result,
             output: truncated.content,

@@ -1,4 +1,4 @@
-import { Component, createMemo, createSignal, startTransition } from "solid-js"
+import { Component, createSignal, startTransition, Show } from "solid-js"
 import { Dialog } from "@opencode-ai/ui/v2/dialog-v2"
 import { TabsV2 } from "@opencode-ai/ui/v2/tabs-v2"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -11,9 +11,9 @@ import { SettingsModelsV2 } from "./models"
 import "./settings-v2.css"
 import { SettingsServersV2 } from "./servers"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { useLayout } from "@/context/layout"
-import { useTabs } from "@/context/tabs"
-import { useServerSync } from "@/context/server-sync"
+import { useServerProtocol } from "@/context/server-sdk"
+// UPSTREAM-DIVERGENCE: browser grants use the existing V2 project permission API.
+import { SettingsBrowserGrants, useSettingsProject } from "./browser-grants"
 
 export const DialogSettings: Component<{
   sessionID?: string
@@ -22,20 +22,9 @@ export const DialogSettings: Component<{
   const language = useLanguage()
   const platform = usePlatform()
   const dialog = useDialog()
-  const layout = useLayout()
-  const tabs = useTabs()
-  const serverSync = useServerSync()
+  const { directory, projectID } = useSettingsProject()
+  const protocol = useServerProtocol()
   const [tab, setTab] = createSignal(props.defaultValue ?? "general")
-  const directory = createMemo(() => {
-    const route = layout.route()
-    if (route.type === "dir-new-sesssion") return route.dir
-    if (route.type === "draft") {
-      const draft = tabs.store.find((item) => item.type === "draft" && item.draftID === route.draftID)
-      return draft?.type === "draft" ? draft.directory : undefined
-    }
-    if (route.type === "session") return serverSync().session.get(route.sessionId)?.directory
-    return undefined
-  })
 
   const showProviders = () => {
     void dialog.show(() => <DialogSettings sessionID={props.sessionID} defaultValue="providers" />)
@@ -83,6 +72,12 @@ export const DialogSettings: Component<{
                       <Icon name="models" />
                       {language.t("settings.models.title")}
                     </TabsV2.Trigger>
+                    <Show when={protocol() === "v2"}>
+                      <TabsV2.Trigger value="browser-grants">
+                        <Icon name="sliders" />
+                        {language.t("settings.browserGrants.title")}
+                      </TabsV2.Trigger>
+                    </Show>
                   </div>
                 </div>
               </div>
@@ -108,6 +103,11 @@ export const DialogSettings: Component<{
         <TabsV2.Content value="models" class="settings-v2-panel">
           <SettingsModelsV2 />
         </TabsV2.Content>
+        <Show when={protocol() === "v2"}>
+          <TabsV2.Content value="browser-grants" class="settings-v2-panel">
+            <SettingsBrowserGrants projectID={projectID()} directory={directory()} />
+          </TabsV2.Content>
+        </Show>
       </TabsV2>
     </Dialog>
   )

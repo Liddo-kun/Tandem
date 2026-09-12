@@ -75,14 +75,16 @@ export function createSessionComposerController(options?: { closeMs?: number | (
     return store.responding === perm.id
   })
 
-  const decide = (response: "once" | "always" | "reject") => {
+  // UPSTREAM-DIVERGENCE: pass request-local dismissal through the shared browser permission dock.
+  const decide = (response: "once" | "always" | "reject" | "dismiss") => {
     const perm = permissionRequest()
     if (!perm) return
     if (store.responding === perm.id) return
 
     setStore("responding", perm.id)
+    const request = { sessionID: perm.sessionID, requestID: perm.id, reply: response }
     sdk()
-      .api.permission.reply({ sessionID: perm.sessionID, requestID: perm.id, reply: response })
+      .api.permission.reply(request as unknown as Parameters<ReturnType<typeof sdk>["api"]["permission"]["reply"]>[0])
       .catch((err: unknown) => {
         const description = err instanceof Error ? err.message : String(err)
         showToast({ title: language.t("common.requestFailed"), description })

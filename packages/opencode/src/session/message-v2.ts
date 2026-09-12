@@ -35,6 +35,7 @@ import { isMedia } from "@/util/media"
 import type { SystemError } from "bun"
 import type { Provider } from "@/provider/provider"
 import { Effect, Schema } from "effect"
+import { BrowserMedia } from "@opencode-ai/core/browser-media"
 
 /** Error shape thrown by Bun's fetch() when gzip/br decompression fails mid-stream */
 interface FetchDecompressionError extends Error {
@@ -134,6 +135,7 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
   options?: { stripMedia?: boolean; toolOutputMaxChars?: number },
 ) {
   const result: UIMessage[] = []
+  const browserMedia = yield* BrowserMedia.Service
   const toolNames = new Set<string>()
   // Track media from tool results that need to be injected as user messages
   // for providers that don't support that media type in tool results.
@@ -290,19 +292,40 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
         if (part.type === "tool") {
           toolNames.add(part.tool)
           if (part.state.status === "completed") {
-            const outputText = part.state.time.compacted
+            let outputText = part.state.time.compacted
               ? "[Old tool result content cleared]"
               : truncateToolOutput(part.state.output, options?.toolOutputMaxChars)
-            const attachments = part.state.time.compacted || options?.stripMedia ? [] : (part.state.attachments ?? [])
+            const attachments: NonNullable<typeof part.state.attachments> = []
+            const browserCaptures = new Set<SessionV1.FilePart>()
+            for (const attachment of part.state.time.compacted || options?.stripMedia
+              ? []
+              : (part.state.attachments ?? [])) {
+              if (!BrowserMedia.isReference(attachment.url)) {
+                attachments.push(attachment)
+                continue
+              }
+              const capture = yield* Effect.promise(() => browserMedia.read(msg.info.sessionID, attachment.url))
+              if (capture.ok) {
+                const hydrated = { ...attachment, mime: capture.mime, url: capture.data }
+                attachments.push(hydrated)
+                browserCaptures.add(hydrated)
+              } else outputText += `\n\n${BrowserMedia.unavailableText(capture.reason)}`
+            }
 
             // For providers that don't support media in tool results, extract media files
             // (images, PDFs) to be sent as a separate user message
             const mediaAttachments = attachments.filter((a) => isMedia(a.mime))
-            const extractedMedia = mediaAttachments.filter((a) => !supportsMediaInToolResult(a))
+            // UPSTREAM-DIVERGENCE: legacy native tool-result lowering cannot preserve images;
+            // its existing user-image path handles owned captures in both provider runtimes.
+            const extractedMedia = mediaAttachments.filter(
+              (a) => browserCaptures.has(a) || !supportsMediaInToolResult(a),
+            )
             if (extractedMedia.length > 0) {
               media.push(...extractedMedia)
             }
-            const finalAttachments = attachments.filter((a) => !isMedia(a.mime) || supportsMediaInToolResult(a))
+            const finalAttachments = attachments.filter(
+              (a) => !browserCaptures.has(a) && (!isMedia(a.mime) || supportsMediaInToolResult(a)),
+            )
 
             const output =
               finalAttachments.length > 0

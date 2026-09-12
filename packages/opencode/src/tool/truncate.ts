@@ -8,6 +8,7 @@ import { evaluate } from "@/permission/evaluate"
 import { Config } from "@/config/config"
 import { ToolID } from "./schema"
 import { TRUNCATION_DIR } from "./truncation-dir"
+import { BrowserMedia } from "@opencode-ai/core/browser-media"
 
 const RETENTION = Duration.days(7)
 
@@ -51,6 +52,8 @@ const layer = Layer.effect(
     const fs = yield* FSUtil.Service
 
     const cleanup = Effect.fn("Truncate.cleanup")(function* () {
+      // UPSTREAM-DIVERGENCE: expire owned browser captures alongside legacy tool output.
+      yield* BrowserMedia.cleanupEffect
       const cutoff = Date.now() - Duration.toMillis(RETENTION)
       const entries = yield* fs.readDirectory(TRUNCATION_DIR).pipe(
         Effect.map((all) => all.filter((name) => name.startsWith("tool_"))),

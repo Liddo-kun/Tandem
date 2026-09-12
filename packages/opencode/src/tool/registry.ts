@@ -2,6 +2,9 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { PlanExitTool } from "./plan"
+// UPSTREAM-DIVERGENCE: register the opt-in browser as an internal leaf, not a plugin adapter.
+import { Browser } from "@opencode-ai/core/browser"
+import { BrowserTool } from "./browser"
 import { Session } from "@/session/session"
 import { QuestionTool } from "./question"
 import { ShellTool } from "./shell"
@@ -99,6 +102,7 @@ const layer = Layer.effect(
     const agents = yield* Agent.Service
     const truncate = yield* Truncate.Service
     const flags = yield* RuntimeFlags.Service
+    const browserOwner = yield* Browser.Service
     const mcp = yield* MCP.Service
 
     const invalid = yield* InvalidTool
@@ -109,6 +113,7 @@ const layer = Layer.effect(
     const lsptool = yield* LspTool
     const plan = yield* PlanExitTool
     const webfetch = yield* WebFetchTool
+    const browser = browserOwner.owner ? yield* BrowserTool : undefined
     const websearch = yield* WebSearchTool
     const shell = yield* ShellTool
     const globtool = yield* GlobTool
@@ -219,6 +224,7 @@ const layer = Layer.effect(
           write: Tool.init(writetool),
           task: Tool.init(task),
           fetch: Tool.init(webfetch),
+          ...(browser ? { browser: Tool.init(browser) } : {}),
           todo: Tool.init(todo),
           search: Tool.init(websearch),
           skill: Tool.init(skilltool),
@@ -242,6 +248,7 @@ const layer = Layer.effect(
             tool.write,
             tool.task,
             tool.fetch,
+            ...(tool.browser ? [tool.browser] : []),
             tool.todo,
             tool.search,
             tool.skill,
@@ -325,7 +332,8 @@ const layer = Layer.effect(
           }
           // UPSTREAM-DIVERGENCE: Tandem claude bash-search — with Glob/Grep removed, drop the
           // stale search bullets from the shell description.
-          if (bashSearch && tool.id === ShellID.ToolID) output.description = BashSearch.stripSearchBullets(output.description)
+          if (bashSearch && tool.id === ShellID.ToolID)
+            output.description = BashSearch.stripSearchBullets(output.description)
           yield* plugin.trigger("tool.definition", { toolID: tool.id }, output)
           const jsonSchema =
             output.parameters === tool.parameters || output.jsonSchema !== tool.jsonSchema
@@ -439,6 +447,7 @@ export const node = LayerNode.make({
   service: Service,
   layer,
   deps: [
+    Browser.node,
     Config.node,
     Plugin.node,
     Question.node,

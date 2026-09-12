@@ -1,4 +1,5 @@
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
+import { Browser } from "@opencode-ai/core/browser"
 import { test, expect } from "bun:test"
 import os from "os"
 import { Cause, Deferred, Effect, Exit, Fiber, Layer } from "effect"
@@ -72,6 +73,18 @@ const list = () =>
   Effect.gen(function* () {
     const permission = yield* Permission.Service
     return yield* permission.list()
+  })
+
+const browserPolicy = (origin: string) =>
+  Browser.permissionRequest({
+    browserId: "fixture",
+    browserLabel: "Fixture",
+    callerSessionId: "session_browser",
+    callerTurnId: "turn",
+    capability: "read",
+    documentOrigin: origin,
+    operationId: `op-${origin}`,
+    signal: new AbortController().signal,
   })
 
 // fromConfig tests
@@ -432,6 +445,26 @@ test("evaluate - wildcard permission fallback for unknown tool", () => {
   expect(result.action).toBe("ask")
 })
 
+test("evaluate - browser requires an explicit allow while preserving denies", () => {
+  expect(Permission.evaluate("browser", "resource", [{ permission: "*", pattern: "*", action: "allow" }]).action).toBe(
+    "ask",
+  )
+  expect(
+    Permission.evaluate("browser", "resource", [{ permission: "browser", pattern: "*", action: "allow" }]).action,
+  ).toBe("allow")
+  expect(Permission.evaluate("browser", "resource", [{ permission: "*", pattern: "*", action: "deny" }]).action).toBe(
+    "deny",
+  )
+  expect(
+    Permission.evaluate(
+      "browser",
+      "resource",
+      [{ permission: "browser", pattern: "*", action: "deny" }],
+      [{ permission: "browser", pattern: "resource", action: "allow" }],
+    ).action,
+  ).toBe("deny")
+})
+
 test("evaluate - later wildcard permission can override earlier specific permission", () => {
   const result = Permission.evaluate("bash", "rm", [
     { permission: "bash", pattern: "*", action: "allow" },
@@ -568,6 +601,68 @@ it.instance(
         ruleset: [{ permission: "bash", pattern: "*", action: "allow" }],
       })
       expect(result).toBeUndefined()
+    }),
+  { git: true },
+)
+
+it.instance(
+  "browser remembered grants are origin-scoped and cannot override configured deny",
+  () =>
+    Effect.gen(function* () {
+      const sessionID = SessionID.make("session_browser")
+      const policy = browserPolicy("https://example.com")
+      const first = yield* ask({
+        id: PermissionV1.ID.make("per_browser_first"),
+        sessionID,
+        permission: policy.action,
+        patterns: policy.resources,
+        always: policy.save,
+        metadata: policy.metadata,
+        ruleset: [{ permission: "*", pattern: "*", action: "allow" }],
+      }).pipe(Effect.forkScoped)
+      yield* waitForPending(1)
+      yield* reply({ requestID: PermissionV1.ID.make("per_browser_first"), reply: "always" })
+      yield* Fiber.join(first)
+
+      expect(
+        yield* ask({
+          id: PermissionV1.ID.make("per_browser_remembered"),
+          sessionID,
+          permission: policy.action,
+          patterns: policy.resources,
+          always: policy.save,
+          metadata: policy.metadata,
+          ruleset: [{ permission: "*", pattern: "*", action: "allow" }],
+        }),
+      ).toBeUndefined()
+
+      const redirected = browserPolicy("https://redirected.example")
+      const redirect = yield* ask({
+        id: PermissionV1.ID.make("per_browser_redirect"),
+        sessionID,
+        permission: redirected.action,
+        patterns: redirected.resources,
+        always: redirected.save,
+        metadata: redirected.metadata,
+        ruleset: [{ permission: "*", pattern: "*", action: "allow" }],
+      }).pipe(Effect.forkScoped)
+      expect((yield* waitForPending(1))[0]?.id).toBe(PermissionV1.ID.make("per_browser_redirect"))
+      yield* reply({ requestID: PermissionV1.ID.make("per_browser_redirect"), reply: "dismiss" })
+      yield* Fiber.await(redirect)
+
+      expect(
+        yield* fail(
+          ask({
+            id: PermissionV1.ID.make("per_browser_denied"),
+            sessionID,
+            permission: policy.action,
+            patterns: policy.resources,
+            always: policy.save,
+            metadata: policy.metadata,
+            ruleset: [{ permission: "browser", pattern: "*", action: "deny" }],
+          }),
+        ),
+      ).toBeInstanceOf(PermissionV1.DeniedError)
     }),
   { git: true },
 )
@@ -836,6 +931,102 @@ it.instance(
       expect(Exit.isFailure(eb)).toBe(true)
       if (Exit.isFailure(ea)) expect(Cause.squash(ea.cause)).toBeInstanceOf(PermissionV1.RejectedError)
       if (Exit.isFailure(eb)) expect(Cause.squash(eb.cause)).toBeInstanceOf(PermissionV1.RejectedError)
+    }),
+  { git: true },
+)
+
+it.instance(
+  "reply - dismiss resolves only the selected request",
+  () =>
+    Effect.gen(function* () {
+      const a = yield* ask({
+        id: PermissionV1.ID.make("per_dismiss_a"),
+        sessionID: SessionID.make("session_dismiss"),
+        permission: "bash",
+        patterns: ["ls"],
+        metadata: {},
+        always: [],
+        ruleset: [],
+      }).pipe(Effect.forkScoped)
+      const b = yield* ask({
+        id: PermissionV1.ID.make("per_dismiss_b"),
+        sessionID: SessionID.make("session_dismiss"),
+        permission: "edit",
+        patterns: ["foo.ts"],
+        metadata: {},
+        always: [],
+        ruleset: [],
+      }).pipe(Effect.forkScoped)
+
+      yield* waitForPending(2)
+      yield* reply({ requestID: PermissionV1.ID.make("per_dismiss_a"), reply: "dismiss" })
+      const dismissed = yield* Fiber.await(a)
+      expect(Exit.isFailure(dismissed)).toBe(true)
+      if (Exit.isFailure(dismissed)) {
+        const error = Cause.squash(dismissed.cause)
+        expect(error).toBeInstanceOf(PermissionV1.DismissedError)
+        expect(error).not.toBeInstanceOf(PermissionV1.RejectedError)
+      }
+      expect((yield* list()).map((item) => item.id)).toEqual([PermissionV1.ID.make("per_dismiss_b")])
+
+      yield* reply({ requestID: PermissionV1.ID.make("per_dismiss_b"), reply: "once" })
+      yield* Fiber.join(b)
+    }),
+  { git: true },
+)
+
+it.instance(
+  "ask - AbortSignal cancels only its request and publishes a terminal event",
+  () =>
+    Effect.gen(function* () {
+      const events = yield* EventV2Bridge.Service
+      const cancelled = yield* Deferred.make<{ sessionID: SessionID; requestID: PermissionV1.ID }>()
+      const unsub = yield* events.listen((event) => {
+        if (event.type === Permission.Event.Cancelled.type)
+          Deferred.doneUnsafe(
+            cancelled,
+            Effect.succeed(event.data as { sessionID: SessionID; requestID: PermissionV1.ID }),
+          )
+        return Effect.void
+      })
+      yield* Effect.addFinalizer(() => unsub)
+
+      const controller = new AbortController()
+      const a = yield* ask({
+        id: PermissionV1.ID.make("per_abort_a"),
+        sessionID: SessionID.make("session_abort"),
+        permission: "bash",
+        patterns: ["ls"],
+        metadata: {},
+        always: ["ls"],
+        ruleset: [],
+        signal: controller.signal,
+      }).pipe(Effect.forkScoped)
+      const b = yield* ask({
+        id: PermissionV1.ID.make("per_abort_b"),
+        sessionID: SessionID.make("session_abort"),
+        permission: "edit",
+        patterns: ["foo.ts"],
+        metadata: {},
+        always: [],
+        ruleset: [],
+      }).pipe(Effect.forkScoped)
+
+      yield* waitForPending(2)
+      controller.abort()
+      const aborted = yield* Fiber.await(a)
+      expect(Exit.isFailure(aborted) && Cause.hasInterrupts(aborted.cause)).toBe(true)
+      expect(yield* Deferred.await(cancelled)).toEqual({
+        sessionID: SessionID.make("session_abort"),
+        requestID: PermissionV1.ID.make("per_abort_a"),
+      })
+      expect((yield* list()).map((item) => item.id)).toEqual([PermissionV1.ID.make("per_abort_b")])
+
+      expect(
+        yield* reply({ requestID: PermissionV1.ID.make("per_abort_a"), reply: "always" }).pipe(Effect.flip),
+      ).toBeInstanceOf(PermissionV1.NotFoundError)
+      yield* reply({ requestID: PermissionV1.ID.make("per_abort_b"), reply: "once" })
+      yield* Fiber.join(b)
     }),
   { git: true },
 )

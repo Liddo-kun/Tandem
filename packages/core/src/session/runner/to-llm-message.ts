@@ -2,6 +2,7 @@ import {
   Message,
   ToolCallPart,
   ToolOutput,
+  ToolContent,
   ToolResultPart,
   type ContentPart,
   type Model,
@@ -9,6 +10,8 @@ import {
 } from "@opencode-ai/llm"
 import { SessionMessage } from "../message"
 import type { FileAttachment } from "../prompt"
+import { Effect, Option, Schema } from "effect"
+import { BrowserMedia } from "../../browser-media"
 
 const media = (file: FileAttachment): ContentPart => ({
   type: "media",
@@ -38,8 +41,7 @@ const toolCall = (tool: SessionMessage.AssistantTool, providerMetadata: Provider
 
 const toolResult = (tool: SessionMessage.AssistantTool, providerMetadata: ProviderMetadata | undefined) => {
   if (tool.state.status === "completed") {
-    // TODO: Materialize remote and managed URIs before provider-history lowering.
-    // ToolOutput.toResultValue rejects unresolved URIs rather than treating them as media bytes.
+    // Browser-owned media is materialized by toLLMMessagesEffect, never persisted inline.
     const result =
       tool.provider?.executed === true && tool.state.result !== undefined
         ? tool.state.result
@@ -169,3 +171,38 @@ ${message.recent}
 /** Translate projected V2 Session history into canonical @opencode-ai/llm context. */
 export const toLLMMessages = (messages: readonly SessionMessage.Message[], model: Model) =>
   messages.flatMap((message) => toLLMMessage(message, model))
+
+/** UPSTREAM-DIVERGENCE: hydrate only owned browser captures in the ephemeral provider request. */
+export const toLLMMessagesEffect = Effect.fn("SessionRunner.toLLMMessages")(function* (
+  messages: readonly SessionMessage.Message[],
+  model: Model,
+  sessionID: string,
+) {
+  const media = yield* BrowserMedia.Service
+  return yield* Effect.forEach(toLLMMessages(messages, model), (message) =>
+    Effect.gen(function* () {
+      const content = yield* Effect.forEach(message.content, (part) =>
+        Effect.gen(function* () {
+          if (part.type !== "tool-result" || part.result.type !== "content") return part
+          const content = Schema.decodeUnknownOption(Schema.Array(ToolContent))(part.result.value)
+          if (
+            Option.isNone(content) ||
+            !content.value.some((item) => item.type === "file" && BrowserMedia.isReference(item.uri))
+          )
+            return part
+          const value = yield* Effect.forEach(content.value, (item) =>
+            Effect.gen(function* () {
+              if (item.type !== "file" || !BrowserMedia.isReference(item.uri)) return item
+              const result = yield* Effect.promise(() => media.read(sessionID, item.uri))
+              return result.ok
+                ? { ...item, mime: result.mime, uri: result.data }
+                : { type: "text" as const, text: BrowserMedia.unavailableText(result.reason) }
+            }),
+          )
+          return ToolResultPart.make({ ...part, result: { type: "content", value } })
+        }),
+      )
+      return Message.make({ ...message, content })
+    }),
+  )
+})

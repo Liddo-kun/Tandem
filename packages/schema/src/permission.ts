@@ -37,7 +37,10 @@ export const Request = Schema.Struct({
 }).annotate({ identifier: "PermissionV2.Request" })
 export interface Request extends Schema.Schema.Type<typeof Request> {}
 
-export const Reply = Schema.Literals(["once", "always", "reject"]).annotate({ identifier: "PermissionV2.Reply" })
+// UPSTREAM-DIVERGENCE: browser approvals add request-local dismiss and terminal Cancelled events below.
+export const Reply = Schema.Literals(["once", "always", "reject", "dismiss"]).annotate({
+  identifier: "PermissionV2.Reply",
+})
 export type Reply = typeof Reply.Type
 
 const Asked = define({ type: "permission.v2.asked", schema: Request.fields })
@@ -49,7 +52,14 @@ const Replied = define({
     reply: Reply,
   },
 })
-export const Event = { Asked, Replied, Definitions: inventory(Asked, Replied) }
+const Cancelled = define({
+  type: "permission.v2.cancelled",
+  schema: {
+    sessionID: SessionID,
+    requestID: ID,
+  },
+})
+export const Event = { Asked, Replied, Cancelled, Definitions: inventory(Asked, Replied, Cancelled) }
 
 export const Effect = Schema.Literals(["allow", "deny", "ask"]).annotate({ identifier: "PermissionV2.Effect" })
 export type Effect = typeof Effect.Type

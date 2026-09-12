@@ -281,6 +281,10 @@ const layer = Layer.effect(
           location: "<built-in>",
           content: CUSTOMIZE_OPENCODE_SKILL_BODY,
         }
+        // UPSTREAM-DIVERGENCE: share the opt-in browser skill with canonical V2 tools.
+        if (process.env.TANDEM_CHROME_CONNECTIONS) {
+          s.skills[SkillPlugin.ChromeBrowser.name] = { ...SkillPlugin.ChromeBrowser, location: "<built-in>" }
+        }
         // UPSTREAM-DIVERGENCE: Tandem built-in imagegen skill. Gated on the same
         // ImageGen.isAvailable() check (opt-out flag + OpenAI creds) as the imagegen
         // tool, so the skill only appears when the tool does. Registered before disk

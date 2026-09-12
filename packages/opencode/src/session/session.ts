@@ -1,4 +1,7 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+// UPSTREAM-DIVERGENCE: release only the deleted session's browser leases, including retained handoffs.
+import { Browser } from "@opencode-ai/core/browser"
+import { SessionInterruption } from "@opencode-ai/core/session/interruption"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Slug } from "@opencode-ai/core/util/slug"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
@@ -486,7 +489,12 @@ export type Patch = Omit<Partial<Info>, "time" | "share" | "summary" | "revert" 
 const layer: Layer.Layer<
   Service,
   never,
-  BackgroundJob.Service | RuntimeFlags.Service | Database.Service | EventV2Bridge.Service
+  | BackgroundJob.Service
+  | RuntimeFlags.Service
+  | Database.Service
+  | EventV2Bridge.Service
+  | Browser.Service
+  | SessionInterruption.Service
 > = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -495,6 +503,8 @@ const layer: Layer.Layer<
     const background = yield* BackgroundJob.Service
     const events = yield* EventV2Bridge.Service
     const flags = yield* RuntimeFlags.Service
+    const browser = yield* Browser.Service
+    const interruption = yield* SessionInterruption.Service
 
     const createNext = Effect.fn("Session.createNext")(function* (input: {
       id?: SessionID
@@ -605,6 +615,20 @@ const layer: Layer.Layer<
 
     const remove: Interface["remove"] = Effect.fnUntraced(function* (sessionID: SessionID) {
       const session = yield* get(sessionID)
+      yield* interruption.interrupt(sessionID, session.directory)
+      const owner = browser.owner
+      if (owner) {
+        const reports = yield* Effect.promise(async () => [
+          ...(await owner.closeSession({
+            runtime: "legacy",
+            location: Browser.locationKey(session, "legacy"),
+            sessionID,
+          })),
+          ...(await owner.closeSession({ runtime: "v2", location: Browser.locationKey(session, "v2"), sessionID })),
+        ])
+        if (reports.some((report) => !report.confirmed))
+          yield* Effect.logWarning("Browser deletion cleanup_unconfirmed", { sessionID })
+      }
       try {
         // `remove` needs to work in all cases, such as broken sessions that
         // run cleanup without instance state.
@@ -1010,7 +1034,14 @@ function listByProject(
 export const node = LayerNode.make({
   service: Service,
   layer: layer,
-  deps: [BackgroundJob.node, RuntimeFlags.node, Database.node, EventV2Bridge.node],
+  deps: [
+    BackgroundJob.node,
+    RuntimeFlags.node,
+    Database.node,
+    EventV2Bridge.node,
+    Browser.node,
+    SessionInterruption.node,
+  ],
 })
 
 export * as Session from "./session"

@@ -1,6 +1,7 @@
 import { describe, expect } from "bun:test"
 import { Cause, Deferred, Effect, Fiber, Layer } from "effect"
 import { AgentV2 } from "@opencode-ai/core/agent"
+import { Browser } from "@opencode-ai/core/browser"
 import { Database } from "@opencode-ai/core/database/database"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
@@ -83,6 +84,19 @@ function assertion(input: Partial<PermissionV2.AssertInput> = {}) {
     resources: ["src/index.ts"],
     ...input,
   } satisfies PermissionV2.AssertInput
+}
+
+function browserPolicy(origin: string) {
+  return Browser.permissionRequest({
+    browserId: "fixture",
+    browserLabel: "Fixture",
+    callerSessionId: "ses_test",
+    callerTurnId: "turn",
+    capability: "read",
+    documentOrigin: origin,
+    operationId: `op-${origin}`,
+    signal: new AbortController().signal,
+  })
 }
 
 function waitForRequest() {
@@ -250,6 +264,76 @@ describe("PermissionV2", () => {
     }),
   )
 
+  it.effect("requires an explicit browser rule instead of inheriting wildcard allow", () =>
+    Effect.gen(function* () {
+      yield* setup([{ action: "*", resource: "*", effect: "allow" }])
+      const service = yield* PermissionV2.Service
+      const policy = browserPolicy("https://example.com")
+      expect(yield* service.ask(assertion({ id: PermissionV2.ID.create("per_browser_ask"), ...policy }))).toMatchObject(
+        {
+          effect: "ask",
+        },
+      )
+      yield* service.reply({ requestID: PermissionV2.ID.create("per_browser_ask"), reply: "dismiss" })
+
+      yield* setRules([{ action: "browser", resource: "*", effect: "allow" }])
+      expect(
+        yield* service.ask(assertion({ id: PermissionV2.ID.create("per_browser_allow"), ...policy })),
+      ).toMatchObject({
+        effect: "allow",
+      })
+      yield* setRules([{ action: "browser", resource: "*", effect: "deny" }])
+      expect(
+        yield* service.ask(assertion({ id: PermissionV2.ID.create("per_browser_deny"), ...policy })),
+      ).toMatchObject({
+        effect: "deny",
+      })
+    }),
+  )
+
+  it.effect("persists queued browser approval by policy resource and honors origin, deny, and revocation", () =>
+    Effect.gen(function* () {
+      yield* setup([{ action: "*", resource: "*", effect: "allow" }])
+      const service = yield* PermissionV2.Service
+      const saved = yield* PermissionSaved.Service
+      const policy = browserPolicy("https://example.com")
+      const a = yield* service
+        .assert(assertion({ id: PermissionV2.ID.create("per_browser_a"), ...policy }))
+        .pipe(Effect.forkScoped)
+      const b = yield* service
+        .assert(assertion({ id: PermissionV2.ID.create("per_browser_b"), ...policy }))
+        .pipe(Effect.forkScoped)
+      while ((yield* service.list()).length !== 2) yield* Effect.yieldNow
+
+      yield* service.reply({ requestID: PermissionV2.ID.create("per_browser_a"), reply: "always" })
+      yield* Fiber.join(a)
+      yield* Fiber.join(b)
+      const grant = (yield* saved.list()).find((item) => item.action === "browser")
+      expect(grant?.resource).toBe(policy.resources[0])
+
+      const redirected = browserPolicy("https://redirected.example")
+      expect(
+        yield* service.ask(assertion({ id: PermissionV2.ID.create("per_browser_redirect"), ...redirected })),
+      ).toMatchObject({ effect: "ask" })
+      yield* service.reply({ requestID: PermissionV2.ID.create("per_browser_redirect"), reply: "dismiss" })
+
+      yield* setRules([{ action: "browser", resource: "*", effect: "deny" }])
+      expect(
+        yield* service.ask(assertion({ id: PermissionV2.ID.create("per_browser_blocked"), ...policy })),
+      ).toMatchObject({
+        effect: "deny",
+      })
+
+      if (!grant) throw new Error("browser grant was not saved")
+      yield* saved.remove(grant.id)
+      yield* setRules([{ action: "*", resource: "*", effect: "allow" }])
+      expect(
+        yield* service.ask(assertion({ id: PermissionV2.ID.create("per_browser_revoked"), ...policy })),
+      ).toMatchObject({ effect: "ask" })
+      yield* service.reply({ requestID: PermissionV2.ID.create("per_browser_revoked"), reply: "dismiss" })
+    }),
+  )
+
   it.effect("resolves an asked permission once", () =>
     Effect.gen(function* () {
       yield* setup()
@@ -280,6 +364,75 @@ describe("PermissionV2", () => {
           ),
         ).toBe(true)
       expect(yield* service.list()).toEqual([])
+    }),
+  )
+
+  it.effect("dismisses only the selected parallel request", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      const service = yield* PermissionV2.Service
+      const a = yield* service
+        .assert(assertion({ id: PermissionV2.ID.create("per_dismiss_a") }))
+        .pipe(Effect.forkScoped)
+      const b = yield* service
+        .assert(assertion({ id: PermissionV2.ID.create("per_dismiss_b"), action: "edit" }))
+        .pipe(Effect.forkScoped)
+      while ((yield* service.list()).length !== 2) yield* Effect.yieldNow
+
+      yield* service.reply({ requestID: PermissionV2.ID.create("per_dismiss_a"), reply: "dismiss" })
+      const dismissed = yield* Fiber.await(a)
+      expect(dismissed._tag).toBe("Failure")
+      if (dismissed._tag === "Failure") {
+        const error = Cause.findErrorOption(dismissed.cause)
+        expect(error._tag).toBe("Some")
+        if (error._tag === "Some") {
+          expect(error.value).toBeInstanceOf(PermissionV2.DismissedError)
+          expect(error.value).not.toBeInstanceOf(PermissionV2.DeclinedError)
+        }
+      }
+      expect((yield* service.list()).map((item) => item.id)).toEqual([PermissionV2.ID.create("per_dismiss_b")])
+
+      yield* service.reply({ requestID: PermissionV2.ID.create("per_dismiss_b"), reply: "once" })
+      yield* Fiber.join(b)
+    }),
+  )
+
+  it.effect("interrupts one parallel wait, publishes cancellation, and rejects late approval", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      const service = yield* PermissionV2.Service
+      const events = yield* EventV2.Service
+      const cancelled = yield* Deferred.make<{ sessionID: SessionV2.ID; requestID: PermissionV2.ID }>()
+      const unsubscribe = yield* events.listen((event) =>
+        event.type === PermissionV2.Event.Cancelled.type
+          ? Deferred.succeed(cancelled, event.data as { sessionID: SessionV2.ID; requestID: PermissionV2.ID }).pipe(
+              Effect.asVoid,
+            )
+          : Effect.void,
+      )
+      yield* Effect.addFinalizer(() => unsubscribe)
+
+      const a = yield* service
+        .assert(assertion({ id: PermissionV2.ID.create("per_abort_a"), save: ["src/*"] }))
+        .pipe(Effect.forkScoped)
+      const b = yield* service
+        .assert(assertion({ id: PermissionV2.ID.create("per_abort_b"), action: "edit" }))
+        .pipe(Effect.forkScoped)
+      while ((yield* service.list()).length !== 2) yield* Effect.yieldNow
+
+      yield* Fiber.interrupt(a)
+      expect(yield* Deferred.await(cancelled)).toEqual({
+        sessionID: SessionV2.ID.make("ses_test"),
+        requestID: PermissionV2.ID.create("per_abort_a"),
+      })
+      expect((yield* service.list()).map((item) => item.id)).toEqual([PermissionV2.ID.create("per_abort_b")])
+      expect(
+        yield* service.reply({ requestID: PermissionV2.ID.create("per_abort_a"), reply: "always" }).pipe(Effect.flip),
+      ).toBeInstanceOf(PermissionV2.NotFoundError)
+      expect(yield* (yield* PermissionSaved.Service).list()).toEqual([])
+
+      yield* service.reply({ requestID: PermissionV2.ID.create("per_abort_b"), reply: "once" })
+      yield* Fiber.join(b)
     }),
   )
 

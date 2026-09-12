@@ -9,6 +9,11 @@ import { SessionID, MessageID, PartID } from "../../src/session/schema"
 import { Question } from "../../src/question"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
+import { BrowserMedia } from "@opencode-ai/core/browser-media"
+import fs from "node:fs/promises"
+import { Effect } from "effect"
+import { LLMClient } from "@opencode-ai/llm"
+import { LLMNative } from "../../src/session/llm/native-request"
 
 const sessionID = SessionID.make("session")
 const providerID = ProviderV2.ID.make("test")
@@ -112,6 +117,85 @@ function basePart(messageID: string, id: string) {
 }
 
 describe("session.message-v2.toModelMessage", () => {
+  test("hydrates persisted browser references without changing stored attachments or PNG dimensions", async () => {
+    const directory = await fs.mkdtemp("/tmp/tandem/browser-media-legacy-")
+    let now = Date.now()
+    const media = BrowserMedia.make({ directory, now: () => now, retentionMs: 1000 })
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+      "base64",
+    )
+    try {
+      const capture = await media.store(sessionID, png)
+      const input: SessionV1.WithParts[] = [
+        {
+          info: assistantInfo("m-assistant", "m-user"),
+          parts: [
+            {
+              ...basePart("m-assistant", "capture"),
+              type: "tool",
+              callID: "call-capture",
+              tool: "browser",
+              state: {
+                status: "completed",
+                title: "Screenshot",
+                input: {},
+                metadata: {},
+                output: "viewport CSS coordinates; 1x1 PNG",
+                time: { start: 0, end: 1 },
+                attachments: [
+                  { ...basePart("m-assistant", "image"), type: "file", mime: "image/png", url: capture.uri },
+                ],
+              },
+            },
+          ],
+        },
+      ]
+      const persisted = JSON.stringify(input)
+      expect(persisted).not.toContain(png.toString("base64"))
+      expect(persisted).not.toContain("data:image")
+      await fs.writeFile(`${directory}/transcript.json`, persisted)
+      const restored: SessionV1.WithParts[] = JSON.parse(await fs.readFile(`${directory}/transcript.json`, "utf8"))
+      const vision = {
+        ...model,
+        limit: { ...model.limit, context: 32_000, output: 4096 },
+        capabilities: { ...model.capabilities, input: { ...model.capabilities.input, image: true } },
+      }
+      const project = (messages: SessionV1.WithParts[], target = vision) =>
+        Effect.runPromise(
+          MessageV2.toModelMessagesEffect(messages, target).pipe(Effect.provideService(BrowserMedia.Service, media)),
+        )
+      for (const npm of ["@ai-sdk/openai", "@ai-sdk/openai-compatible"]) {
+        const result = await project(restored, { ...vision, api: { ...vision.api, npm } })
+        const encoded = JSON.stringify(result)
+        expect(encoded).toContain(png.toString("base64"))
+        expect(encoded).toContain('"type":"file"')
+        expect(encoded).not.toContain(BrowserMedia.PREFIX)
+        const request = LLMNative.request({
+          model: { ...vision, api: { ...vision.api, npm } },
+          apiKey: "fixture",
+          messages: result,
+        })
+        const prepared = await Effect.runPromise(LLMClient.prepare(request))
+        expect(JSON.stringify(prepared.body)).toContain(`data:image/png;base64,${png.toString("base64")}`)
+        expect(JSON.stringify(prepared.body)).toMatch(/"type":"(input_image|image_url)"/)
+      }
+      expect(JSON.stringify(restored)).toBe(persisted)
+      const copied = restored.map((message) => ({
+        ...message,
+        info: { ...message.info, sessionID: SessionID.make("ses_foreign") },
+      }))
+      expect(JSON.stringify(await project(copied))).toContain("Browser screenshot unavailable: unauthorized")
+      now += 1000
+      const expired = JSON.stringify(await project(restored))
+      expect(expired).toContain("Browser screenshot unavailable: expired")
+      expect(expired).not.toContain(png.toString("base64"))
+      expect(JSON.stringify(await project(restored))).toContain("Browser screenshot unavailable: missing")
+    } finally {
+      await fs.rm(directory, { recursive: true, force: true })
+    }
+  })
+
   test("filters out messages with no parts", async () => {
     const input: SessionV1.WithParts[] = [
       {

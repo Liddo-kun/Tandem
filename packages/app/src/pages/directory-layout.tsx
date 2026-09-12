@@ -12,6 +12,9 @@ import { Schema } from "effect"
 import type { ServerConnection } from "@/context/server"
 import { sessionHref } from "@/utils/session-route"
 import { useServerSync } from "@/context/server-sync"
+import { useServerSDK } from "@/context/server-sdk"
+import { usePlatform } from "@/context/platform"
+import { readBrowserImage } from "@/utils/browser-media"
 
 export function DirectoryDataProvider(
   props: ParentProps<{
@@ -26,6 +29,14 @@ export function DirectoryDataProvider(
   const sync = useSync()
   const sdk = useSDK()
   const serverSync = useServerSync()
+  const serverSDK = useServerSDK()
+  const platform = usePlatform()
+  // Retargeting the server replaces the reader identity, aborting/releasing old capture leases.
+  const browserImageReader = createMemo(() => {
+    const server = serverSDK().server.http
+    return (sessionID: string, uri: string, signal: AbortSignal) =>
+      readBrowserImage({ server, fetch: platform.fetch, sessionID, uri, signal })
+  })
   const directory = () => (typeof props.directory === "function" ? props.directory() : props.directory)
   const slug = createMemo(() => base64Encode(directory()))
   const href = (sessionID: string) => {
@@ -74,6 +85,7 @@ export function DirectoryDataProvider(
           data={sync().data}
           directory={directory}
           readFile={readFile}
+          readBrowserImage={browserImageReader()}
           sessionID={params.id}
           onNavigateToSession={(sessionID: string) => navigate(href(sessionID))}
           onSessionHref={href}

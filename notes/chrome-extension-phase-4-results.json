@@ -1,0 +1,53 @@
+{
+  "web": {
+    "passed": true,
+    "binary": "/home/jon/code/Tandem/packages/cli/dist/cli-linux-arm64/bin/lildax",
+    "installedHost": "/home/jon/.local/share/tandem-phase4-test/wf/host-bf793d64f0eff2a51a9f1e97f1bcac49ecb5dca1b7dae4d3abf806e41db06e6a",
+    "client": "built web distribution",
+    "provider": "scripted HTTP provider; actual PNG projection asserted by reused session fixture",
+    "approvals": 5,
+    "revokedGrants": 5,
+    "revokedThroughSettings": true,
+    "askedAgain": true,
+    "stopClearedApproval": true,
+    "clicks": 1
+  },
+  "android": {
+    "passed": true,
+    "client": "signed optimized Android release ai.opencode.android.chrome4",
+    "approvals": 5,
+    "modelSawPNG": true,
+    "clientDisplayedPNG": true,
+    "revokedThroughAndroidSettings": 5,
+    "askedAgain": true,
+    "interruptViaAPI": true,
+    "stopClearedApproval": true,
+    "clicks": 1,
+    "cleanup": "confirmed"
+  },
+  "recovery": {
+    "passed": true,
+    "originalOutcome": "unknown",
+    "mutations": 1,
+    "oldJournalHashes": [
+      {
+        "name": "journal-cf7f03bf-8873-4add-83db-d831bf31f465.json",
+        "sha256": "7922afa7bb2cdf0ab7ff6b68999b3e8fef3bd3aef05722e85721f34c8e713a8b"
+      }
+    ],
+    "newBinding": "recovered-fixture",
+    "restartedBrowserHadNoOldAttachments": true,
+    "productionUnchanged": true,
+    "restored": {
+      "binding": {
+        "id": "isolated-phase4",
+        "label": "Isolated Phase 4",
+        "profileIdentity": "unverified"
+      },
+      "hostDigest": "bf793d64f0eff2a51a9f1e97f1bcac49ecb5dca1b7dae4d3abf806e41db06e6a",
+      "capture": "unverified: requires a measured PNG check with the intended browser launch",
+      "server": "verify through the intended Tandem server browser tool",
+      "state": "restored"
+    }
+  }
+}

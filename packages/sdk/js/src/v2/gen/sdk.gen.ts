@@ -175,6 +175,8 @@ import type {
   QuestionReplyErrors,
   QuestionReplyResponses,
   QuestionV2Reply,
+  ServerBrowserMediaBrowserMediaReadErrors,
+  ServerBrowserMediaBrowserMediaReadResponses,
   SessionAbortErrors,
   SessionAbortResponses,
   SessionChildrenErrors,
@@ -3123,7 +3125,7 @@ export class Permission extends HeyApiClient {
       requestID: string
       directory?: string
       workspace?: string
-      reply?: "once" | "always" | "reject"
+      reply?: "once" | "always" | "reject" | "dismiss"
       message?: string
     },
     options?: Options<never, ThrowOnError>,
@@ -3167,7 +3169,7 @@ export class Permission extends HeyApiClient {
       permissionID: string
       directory?: string
       workspace?: string
-      response?: "once" | "always" | "reject"
+      response?: "once" | "always" | "reject" | "dismiss"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -7074,6 +7076,51 @@ export class V2 extends HeyApiClient {
   }
 }
 
+export class BrowserMedia extends HeyApiClient {
+  public read<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      id: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "id" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ServerBrowserMediaBrowserMediaReadResponses,
+      ServerBrowserMediaBrowserMediaReadErrors,
+      ThrowOnError
+    >({
+      url: "/api/browser-media/{sessionID}/{id}",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class BrowserMedia2 extends HeyApiClient {
+  private _browserMedia?: BrowserMedia
+  get browserMedia(): BrowserMedia {
+    return (this._browserMedia ??= new BrowserMedia({ client: this.client }))
+  }
+}
+
+export class Server extends HeyApiClient {
+  private _browserMedia?: BrowserMedia2
+  get browserMedia(): BrowserMedia2 {
+    return (this._browserMedia ??= new BrowserMedia2({ client: this.client }))
+  }
+}
+
 export class OpencodeClient extends HeyApiClient {
   public static readonly __registry = new HeyApiRegistry<OpencodeClient>()
 
@@ -7215,5 +7262,10 @@ export class OpencodeClient extends HeyApiClient {
   private _v2?: V2
   get v2(): V2 {
     return (this._v2 ??= new V2({ client: this.client }))
+  }
+
+  private _server?: Server
+  get server(): Server {
+    return (this._server ??= new Server({ client: this.client }))
   }
 }

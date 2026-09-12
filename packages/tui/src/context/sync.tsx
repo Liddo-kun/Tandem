@@ -178,7 +178,9 @@ export const {
         case "server.instance.disposed":
           void bootstrap()
           break
-        case "permission.replied": {
+        // UPSTREAM-DIVERGENCE: cancelled browser approvals must leave the TUI queue too.
+        case "permission.replied":
+        case "permission.cancelled": {
           const requests = store.permission[event.properties.sessionID]
           if (!requests) break
           const match = search(requests, event.properties.requestID, (r) => r.id)
