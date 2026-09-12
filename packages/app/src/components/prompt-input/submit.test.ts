@@ -40,6 +40,7 @@ let selected = "/repo/worktree-a"
 let variant: string | undefined
 let permissionServer = "server-a"
 let createSessionGate: Promise<void> | undefined
+let onSend: (() => void) | undefined
 
 let promptValue: Prompt = [{ type: "text", content: "ls", start: 0, end: 2 }]
 const [promptStore, setPromptStore] = createStore<PromptStore>({
@@ -95,6 +96,7 @@ const clientFor = (directory: string) => {
         prompt: async (input: unknown) => {
           sentPrompts.push(directory)
           promptInputs.push(input)
+          onSend?.()
           return { data: undefined }
         },
         command: async (input: unknown) => {
@@ -102,6 +104,7 @@ const clientFor = (directory: string) => {
         },
         shell: async (input: { sessionID: string; id?: string; command: string }) => {
           sentShell.push(input)
+          onSend?.()
         },
       },
     },
@@ -135,6 +138,7 @@ beforeAll(async () => {
   mock.module("@opencode-ai/ui/toast", () => ({
     Toast: { Region: () => null },
     showToast: () => 0,
+    toaster: { dismiss: () => undefined },
   }))
 
   mock.module("@opencode-ai/core/util/encode", () => ({
@@ -286,6 +290,7 @@ beforeAll(async () => {
 })
 
 beforeEach(() => {
+  onSend = undefined
   createdClients.length = 0
   createdSessions.length = 0
   sessionCreateInputs.length = 0
@@ -312,6 +317,48 @@ beforeEach(() => {
 })
 
 describe("prompt submit worktree selection", () => {
+  // UPSTREAM-DIVERGENCE: Enter/click must not admit a prompt while optimistic rewind is still pending.
+  test.each(["normal", "shell"] as const)("blocks %s submission until rewind settles", async (mode) => {
+    params = { id: "session-existing" }
+    let disabled = true
+    const sent = Promise.withResolvers<void>()
+    onSend = sent.resolve
+    const history = mock(() => undefined)
+    const submit = createPromptSubmit({
+      prompt,
+      info: () => ({ id: "session-existing" }),
+      imageAttachments: () => [],
+      commentCount: () => 0,
+      autoAccept: () => false,
+      mode: () => mode,
+      working: () => false,
+      submitDisabled: () => disabled,
+      editor: () => undefined,
+      queueScroll: () => undefined,
+      promptLength: () => 2,
+      addToHistory: history,
+      resetHistoryNavigation: () => undefined,
+      setMode: () => undefined,
+      setPopover: () => undefined,
+    })
+    const event = { preventDefault: () => undefined } as unknown as Event
+    await submit.handleSubmit(event)
+    expect(history).not.toHaveBeenCalled()
+    expect(sentPrompts).toEqual([])
+    expect(sentShell).toEqual([])
+    expect(optimistic).toEqual([])
+    expect(prompt.current()).toEqual(promptValue)
+
+    disabled = false
+    await submit.handleSubmit(event)
+    await sent.promise
+    onSend = undefined
+    expect(history).toHaveBeenCalledTimes(1)
+    expect(mode === "normal" ? promptInputs : sentShell).toEqual([
+      expect.objectContaining({ sessionID: "session-existing" }),
+    ])
+  })
+
   test("reads the latest worktree accessor value per submit", async () => {
     const submit = createPromptSubmit({
       prompt,

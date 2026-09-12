@@ -10,12 +10,21 @@ function headers(server: ServerConnection.HttpBase) {
   }
 }
 
-async function probe(server: ServerConnection.HttpBase, fetch: typeof globalThis.fetch, path: string) {
+async function probe(
+  server: ServerConnection.HttpBase,
+  fetch: typeof globalThis.fetch,
+  path: string,
+  failOnError = false,
+) {
   const response = await fetch(new URL(path, server.url), {
     headers: headers(server),
     signal: AbortSignal.timeout(5_000),
   })
-  if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) return
+  if (!response.ok) {
+    if (failOnError && response.status !== 404 && response.status !== 405) throw new Error(`HTTP ${response.status}`)
+    return
+  }
+  if (!response.headers.get("content-type")?.includes("application/json")) return
   const value: unknown = await response.json()
   if (!value || typeof value !== "object") return
   return value
@@ -30,6 +39,11 @@ export async function detectServerProtocol(
 
   const current = await probe(server, fetch, "/api/health").catch(() => undefined)
   if (current && "pid" in current && typeof current.pid === "number") return "v2"
-  if (current && "healthy" in current && current.healthy === true) return "v1"
+  if (current && "healthy" in current && current.healthy === true) {
+    // UPSTREAM-DIVERGENCE: current V2 also uses the transitional health shape; check its session envelope.
+    const sessions = await probe(server, fetch, "/api/session?limit=1", true)
+    if (sessions && "data" in sessions && Array.isArray(sessions.data) && "cursor" in sessions) return "v2"
+    return "v1"
+  }
   return "v2"
 }

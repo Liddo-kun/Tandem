@@ -15,6 +15,8 @@ import { HttpRouter, HttpServer } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { Layer, Option } from "effect"
 import { Api } from "./api"
+// UPSTREAM-DIVERGENCE: standalone V2 uses the shared authenticated web/mobile CORS policy below.
+import { corsMiddleware } from "./cors"
 import { ServerAuth } from "./auth"
 import { handlers } from "./handlers"
 import { authorizationLayer } from "./middleware/authorization"
@@ -41,7 +43,7 @@ export function createRoutes(password?: string) {
     password
       ? ServerAuth.Config.configLayer({ username: "opencode", password: Option.some(password) })
       : ServerAuth.Config.layer,
-  )
+  ).pipe(Layer.provide(corsMiddleware))
 }
 
 export function createEmbeddedRoutes() {

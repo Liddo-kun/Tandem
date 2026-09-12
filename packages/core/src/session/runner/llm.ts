@@ -346,7 +346,15 @@ const layer = Layer.effect(
             yield* withPublication(publisher.failUnsettledTools("Tool execution interrupted"))
           if (stream._tag === "Success" && !publisher.hasProviderError())
             yield* withPublication(publisher.failUnsettledTools("Provider did not return a tool result", true))
-          if (stream._tag === "Failure") return yield* Effect.failCause(stream.cause)
+          if (stream._tag === "Failure") {
+            // UPSTREAM-DIVERGENCE: rejected provider/publisher events must not leave durable tool inputs pending.
+            if (!llmFailure && !Cause.hasInterrupts(stream.cause)) {
+              yield* withPublication(publisher.failUnsettledTools("Provider stream failed"))
+              if (publisher.hasActiveAssistant())
+                yield* withPublication(publisher.failAssistant("Provider stream failed"))
+            }
+            return yield* Effect.failCause(stream.cause)
+          }
           if (settled._tag === "Failure" && Cause.hasInterrupts(settled.cause))
             return yield* Effect.failCause(settled.cause)
           return { needsContinuation: !publisher.hasProviderError() && needsContinuation, step: currentStep }

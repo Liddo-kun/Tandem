@@ -54,7 +54,16 @@ describe("LocationServiceMap", () => {
             expect(decoded).toEqual(constructed)
             expect(Equal.equals(constructed, decoded)).toBe(true)
             expect(Hash.hash(constructed)).toBe(Hash.hash(decoded))
-            expect(yield* locations.contextEffect(constructed)).toBe(yield* locations.contextEffect(decoded))
+            const stored = Location.Ref.make({ directory, workspaceID: undefined })
+            // Release borrowed graphs before testing eviction, so reacquisition cannot retain an invalidated lease.
+            const prior = yield* Effect.gen(function* () {
+              const context = yield* locations.contextEffect(constructed)
+              expect(context).toBe(yield* locations.contextEffect(decoded))
+              expect(context).toBe(yield* locations.contextEffect(stored))
+              return context
+            }).pipe(Effect.scoped)
+            yield* locations.invalidate(stored)
+            expect(yield* locations.contextEffect(constructed)).not.toBe(prior)
           }),
         ),
       ),
@@ -135,6 +144,42 @@ describe("LocationServiceMap", () => {
             "websearch",
             "write",
           ])
+        }),
+      ),
+    ),
+  )
+
+  it.live("materializes configured models before exposing a cold location", () =>
+    Effect.acquireRelease(
+      Effect.promise(() => tmpdir()),
+      (dir) => Effect.promise(() => dir[Symbol.asyncDispose]()),
+    ).pipe(
+      Effect.flatMap((dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            fs.writeFile(
+              path.join(dir.path, "opencode.json"),
+              JSON.stringify({
+                providers: {
+                  cold: {
+                    name: "Cold fixture",
+                    api: {
+                      type: "aisdk",
+                      package: "@ai-sdk/openai-compatible",
+                      url: "http://127.0.0.1:1/v1",
+                      settings: {},
+                    },
+                    models: { fixture: { name: "Cold model" } },
+                  },
+                },
+              }),
+            ),
+          )
+          const location = Location.Ref.make({ directory: AbsolutePath.make(dir.path) })
+          const configured = yield* Catalog.Service.use((catalog) =>
+            catalog.model.get(ProviderV2.ID.make("cold"), ModelV2.ID.make("fixture")),
+          ).pipe(Effect.provide(LocationServiceMap.Service.get(location)))
+          expect(configured?.name).toBe("Cold model")
         }),
       ),
     ),

@@ -1,6 +1,6 @@
 # Tandem Project Context
 
-Use this as the recurring startup context when working in `Tandem` from Windows. The root `AGENTS.md` should stay as a thin pointer to the environment-specific context file so the project rules do not drift across documents.
+Read this at session startup when working in `Tandem` from Windows. The root `AGENTS.md` owns shared follow-through rules; keep environment-specific guidance here without duplicating those rules.
 
 ## Goal
 
@@ -252,6 +252,16 @@ Keep commits focused so they can be cherry-picked later if needed.
 
 ## Testing Bias
 
+- Jon's verification rule: after necessary source/context inspection, start with
+  a real agent session and actual tool calls, not `bun test`, test-writing,
+  fixture repairs or typechecks. Do not write, modify or run low-level tests
+  unless Jon explicitly requests them; calling one "targeted" or a "regression"
+  is not an exception. Historical test failures are reference, not a work queue.
+  If live testing is blocked or unsafe, report the specific blocker rather than
+  substituting synthetic tests. Build when needed to load changes for live
+  testing; use a focused typecheck after implementation only when needed, not as
+  a baseline or repeated ritual. Verify general features across multiple real
+  websites/workflows. Test counts/builds/typechecks do not prove agent usability.
 - Avoid mocks as much as possible.
 - Test actual implementation behavior instead of duplicating implementation logic in tests.
 - When a Tandem behavior change breaks an upstream test or fixture, prefer asserting the Tandem-specific expectation in a separate Tandem-only test file and leave the upstream test/fixture as close to upstream as possible. Hand-editing upstream test expectations (or recorded cassettes) inline couples them to Tandem values and conflicts on every sync; only do it when isolation is genuinely impractical, and mark it so it is easy to spot.

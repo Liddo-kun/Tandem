@@ -232,6 +232,7 @@ type PromptSubmitInput = {
   newSessionWorktree?: Accessor<string | undefined>
   onNewSessionWorktreeReset?: () => void
   shouldQueue?: Accessor<boolean>
+  submitDisabled?: Accessor<boolean>
   onQueue?: (draft: FollowupDraft) => void
   onAbort?: () => void
   onSubmit?: () => void
@@ -325,6 +326,8 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
   const handleSubmit = async (event: Event) => {
     event.preventDefault()
+    // UPSTREAM-DIVERGENCE: a pending rewind must finish before any replacement prompt is admitted.
+    if (input.submitDisabled?.()) return
 
     const target = prompt.capture()
     const submission = createPromptSubmissionState({

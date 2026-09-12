@@ -12,28 +12,36 @@ export { pathKey as directoryKey, type PathKey as DirectoryKey } from "@/utils/p
 
 export const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
-export function normalizeAgentList(input: AgentListOutput["data"] | Agent[]): Agent[] {
+type AgentInput = Omit<AgentListOutput["data"][number], "request"> & {
+  request: { settings?: Record<string, unknown>; body?: Record<string, unknown>; headers?: Record<string, string> }
+}
+
+export function normalizeAgentList(input: AgentInput[] | Agent[]): Agent[] {
   if (input.every((agent) => !("request" in agent))) return input as Agent[]
-  return (input as AgentListOutput["data"]).map((agent) => ({
-    name: agent.id,
-    description: agent.description,
-    mode: agent.mode,
-    hidden: agent.hidden,
-    temperature:
-      typeof agent.request.settings.temperature === "number" ? agent.request.settings.temperature : undefined,
-    topP: typeof agent.request.settings.topP === "number" ? agent.request.settings.topP : undefined,
-    color: agent.color,
-    permission: agent.permissions.map((rule) => ({
-      permission: rule.action,
-      pattern: rule.resource,
-      action: rule.effect,
-    })),
-    model: agent.model && { providerID: agent.model.providerID, modelID: agent.model.id },
-    variant: agent.model?.variant,
-    prompt: agent.system,
-    options: agent.request.settings,
-    steps: agent.steps,
-  }))
+  return (input as AgentInput[]).map((agent) => {
+    // UPSTREAM-DIVERGENCE: standalone V2 moved request options into body;
+    // retain compatibility with servers that still send settings.
+    const settings = agent.request.settings ?? agent.request.body ?? {}
+    return {
+      name: agent.id,
+      description: agent.description,
+      mode: agent.mode,
+      hidden: agent.hidden,
+      temperature: typeof settings.temperature === "number" ? settings.temperature : undefined,
+      topP: typeof settings.topP === "number" ? settings.topP : undefined,
+      color: agent.color,
+      permission: agent.permissions.map((rule) => ({
+        permission: rule.action,
+        pattern: rule.resource,
+        action: rule.effect,
+      })),
+      model: agent.model && { providerID: agent.model.providerID, modelID: agent.model.id },
+      variant: agent.model?.variant,
+      prompt: agent.system,
+      options: settings,
+      steps: agent.steps,
+    }
+  })
 }
 
 export function normalizePermissionRequest(input: PermissionV2Request | PermissionRequest): PermissionRequest {

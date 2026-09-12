@@ -1,4 +1,5 @@
 import { Context } from "effect"
+import { HttpMiddleware, HttpRouter } from "effect/unstable/http"
 
 const opencodeOrigin = /^https:\/\/([a-z0-9-]+\.)*opencode\.ai$/
 
@@ -32,3 +33,10 @@ function sameHost(origin: string, host: string) {
     return false
   }
 }
+
+// UPSTREAM-DIVERGENCE: standalone V2 serves the same authenticated web/mobile
+// clients as the embedded server; preflight must reach CORS before API auth.
+export const corsMiddleware = HttpRouter.middleware(
+  HttpMiddleware.cors({ allowedOrigins: (origin) => isAllowedCorsOrigin(origin), maxAge: 86_400 }),
+  { global: true },
+)

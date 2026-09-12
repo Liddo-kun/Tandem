@@ -4,6 +4,7 @@ import { TextField } from "@opencode-ai/ui/text-field"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Mark } from "@opencode-ai/ui/logo"
 import { bridge } from "./bridge"
+import { checkHealth } from "./server-health"
 
 // UPSTREAM-DIVERGENCE: Tandem-branded mobile onboarding prefers the parallel-install web port.
 // The app connects to either a Tandem or an official OpenCode server, so both CLIs are offered.
@@ -20,19 +21,6 @@ interface OnboardingProps {
 
 type ScanResult = { host: string; port: number; url: string }
 type ServerConfig = { url: string; displayName?: string; username?: string; password?: string }
-
-async function checkHealth(url: string, username?: string, password?: string): Promise<boolean> {
-  const base = url.replace(/\/+$/, "")
-  const headers: HeadersInit = {}
-  if (password) headers.Authorization = `Basic ${btoa(`${username || "opencode"}:${password}`)}`
-  const primary = await fetch(`${base}/global/health`, { headers, signal: AbortSignal.timeout(3000) })
-    .then((r) => r.ok)
-    .catch(() => false)
-  if (primary) return true
-  return fetch(`${base}/health`, { headers, signal: AbortSignal.timeout(3000) })
-    .then((r) => r.ok)
-    .catch(() => false)
-}
 
 function CopyBlock(props: { code: string }) {
   const [copied, setCopied] = createSignal(false)
@@ -76,6 +64,7 @@ export function Onboarding(props: OnboardingProps) {
   const [selectedHealthy, setSelectedHealthy] = createSignal<boolean | undefined>(undefined)
 
   let healthTimer: ReturnType<typeof setTimeout> | undefined
+  let healthGeneration = 0
 
   const stopScanResult = bridge.on("scanResult", (payload) => {
     const result = payload as ScanResult
@@ -113,6 +102,7 @@ export function Onboarding(props: OnboardingProps) {
   }
 
   createEffect(() => {
+    const generation = ++healthGeneration
     const raw = manualUrl()
     const username = manualUsername()
     const password = manualPassword()
@@ -123,7 +113,7 @@ export function Onboarding(props: OnboardingProps) {
     healthTimer = setTimeout(async () => {
       const normalized = url.startsWith("http") ? url : `http://${url}`
       const healthy = await checkHealth(normalized, username, password)
-      if (manualUrl().trim() === url) setManualStatus(healthy)
+      if (healthGeneration === generation) setManualStatus(healthy)
     }, 500)
   })
 

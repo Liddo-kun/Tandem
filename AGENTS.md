@@ -1,7 +1,12 @@
 # Tandem Agent Notes
 
-All substantive Tandem repo guidance lives in the environment-specific context files: `contextW.md` for Windows desktop work and `contextL.md` for Ubuntu/Linux/proot work.
+Shared follow-through rules live here. Environment-specific repo guidance lives in `contextW.md` for Windows desktop work and `contextL.md` for Ubuntu/Linux/proot work.
 
-- At the start of a session, read `contextL.md` when running from Ubuntu/Linux/proot, or `contextW.md` when running from Windows.
+- At the start of a session, read `contextL.md` when running from Ubuntu/Linux/proot, or `contextW.md` when running from Windows. Do not repeat startup reading on each follow-up turn.
 - If editing package-specific code, also check the nearest nested `AGENTS.md` for that package.
-- Keep this file as a small pointer only so it does not duplicate context guidance.
+- Keep platform details in those context files; do not duplicate them here.
+
+## Build And Install
+
+- When Jon says "Install", run the platform's documented build/install commands directly using the established context. Do not restart discovery or repeat completed verification; stop only for a concrete deployment blocker.
+- Preserve rollback, use staged replacement, verify the installed version, and leave the running service alone unless a restart is explicitly requested.

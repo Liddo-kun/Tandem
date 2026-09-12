@@ -120,7 +120,8 @@ const layer = Layer.effectDiscard(
         yield* add(ConfigProviderPlugin.Plugin)
         yield* add(VariantPlugin.Plugin)
       }),
-    ).pipe(Effect.withSpan("PluginInternal.boot"), Effect.forkScoped({ startImmediately: true }))
+      // UPSTREAM-DIVERGENCE: a placed runner must not observe a partially populated agent/model catalog.
+    ).pipe(Effect.withSpan("PluginInternal.boot"))
   }),
 )
 

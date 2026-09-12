@@ -107,6 +107,17 @@ export function buildLocationServiceMap(
         )
       },
       { idleTimeToLive: "60 minutes" },
+    ).pipe(
+      Effect.map((map) => {
+        // UPSTREAM-DIVERGENCE: decoded API refs and stored Session refs must share the same implicit-local graph.
+        const key = (ref: Location.Ref) => Location.Ref.make({ directory: ref.directory, workspaceID: ref.workspaceID })
+        return {
+          ...map,
+          get: (ref: Location.Ref) => map.get(key(ref)),
+          contextEffect: (ref: Location.Ref) => map.contextEffect(key(ref)),
+          invalidate: (ref: Location.Ref) => map.invalidate(key(ref)),
+        }
+      }),
     ),
   )
 }

@@ -3463,4 +3463,26 @@ describe("SessionRunnerLLM", () => {
       )
     }),
   )
+
+  it.effect("settles pending tool input when duplicate provider input is rejected", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* SessionV2.Service
+      yield* session.prompt({ sessionID, prompt: Prompt.make({ text: "Reject duplicate input" }), resume: false })
+      responses = undefined
+      streamGate = undefined
+      streamStarted = undefined
+      response = [
+        LLMEvent.toolInputStart({ id: "call-duplicate", name: "read" }),
+        LLMEvent.toolInputStart({ id: "call-duplicate", name: "read" }),
+      ]
+      expect(yield* session.resume(sessionID).pipe(Effect.catchDefect(Effect.succeed))).toBe(
+        "Duplicate tool input start: call-duplicate",
+      )
+      expect(yield* session.context(sessionID)).toMatchObject([
+        { type: "user", text: "Reject duplicate input" },
+        { type: "assistant", content: [{ type: "tool", id: "call-duplicate", state: { status: "error" } }] },
+      ])
+    }),
+  )
 })

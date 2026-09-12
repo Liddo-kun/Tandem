@@ -31,6 +31,18 @@ const initialMessagePageSize = 20
 const historyMessagePageSize = 200
 const sessionInfoLimit = 2_048
 const emptyIDs: ReadonlySet<string> = new Set()
+const projectedV2Events = new Set([
+  "session.next.prompted",
+  "session.next.synthetic",
+  "session.next.step.started",
+  "session.next.step.ended",
+  "session.next.step.failed",
+  "session.next.text.ended",
+  "session.next.reasoning.ended",
+  "session.next.tool.called",
+  "session.next.tool.success",
+  "session.next.tool.failed",
+])
 
 function needsOlderTurnRoot(source: readonly SessionMessageInfo[]) {
   const boundary = source.find(
@@ -539,10 +551,15 @@ export function createServerSession(
 
   const fetchMessages = async (sessionID: string, limit: number, before?: string, onAttempt?: () => void) => {
     if (messageApi && (await options?.protocol) !== "v1") {
+      // UPSTREAM-DIVERGENCE: cache size can be zero or exceed the V2 wire
+      // page bound after history loads. It is not a valid request limit.
+      const pageSize = Math.min(historyMessagePageSize, Math.max(1, limit || initialMessagePageSize))
       const request = (cursor?: string) =>
         (options?.retry ?? retry)(() => {
           onAttempt?.()
-          return messageApi.list(cursor ? { sessionID, limit, cursor } : { sessionID, limit, order: "desc" })
+          return messageApi.list(
+            cursor ? { sessionID, limit: pageSize, cursor } : { sessionID, limit: pageSize, order: "desc" },
+          )
         })
       const first = await request(before)
       const pages = [first]
@@ -924,21 +941,45 @@ export function createServerSession(
     })
   }
 
+  const hydrations = new Map<string, { again: boolean }>()
   const hydrateV2Message = (sessionID: string, messageID: string) => {
     if (!sessionApi) return
-    void sessionApi
-      .message({ sessionID, messageID })
-      .then((message) => {
+    const key = `${sessionID}:${messageID}`
+    const pending = hydrations.get(key)
+    if (pending) {
+      pending.again = true
+      return
+    }
+    const state = { again: false }
+    const active = generation(sessionID)
+    hydrations.set(key, state)
+    void (async () => {
+      do {
+        state.again = false
+        const message = await sessionApi.message({ sessionID, messageID })
+        if (generations.get(sessionID) !== active) return
         const current = data.session_message[sessionID] ?? []
         const messages = [...current.filter((item) => item.id !== message.id), message].sort(compareMessages)
         projectV2({ sessionID, messages, touched: [message.id] })
-      })
+      } while (state.again)
+    })()
       .catch(() => {})
+      .finally(() => hydrations.delete(key))
   }
 
   const applyV2 = (event: OpenCodeEvent) => {
     if (!("data" in event) || !("sessionID" in event.data) || typeof event.data.sessionID !== "string") return
     const sessionID = event.data.sessionID
+    // UPSTREAM-DIVERGENCE: current standalone V2 publishes session.next events,
+    // whose payloads differ from the vendored client's incremental reducer.
+    // Read the authoritative projection at durable message/tool boundaries.
+    // Coalesced per-message reads preserve ordering without replaying actions.
+    if (projectedV2Events.has(event.type)) {
+      const data = event.data as Record<string, unknown>
+      const messageID = data.assistantMessageID ?? data.messageID
+      if (typeof messageID === "string") hydrateV2Message(sessionID, messageID)
+      return
+    }
     const reduction = v2.reduce(data.session_message[sessionID] ?? [], event)
     if (reduction) {
       projectV2(reduction)
@@ -1396,10 +1437,13 @@ export function createServerSession(
     async todo(sessionID: string, request?: { force?: boolean }) {
       touch(sessionID)
       if (data.todo[sessionID] !== undefined && !request?.force) return
-      // UPSTREAM-DIVERGENCE: upstream's v2 branch resets todos to [] and relies purely on
-      // `todo.updated` events, but idle sessions emit none — a cold load, cache eviction, or
-      // Tandem's forced resume/manual refresh would leave the dock empty or stale. The todo
-      // endpoint is DB-backed on v2 servers too, so keep the pull; live events take over after.
+      // UPSTREAM-DIVERGENCE: the standalone V2 API has no legacy todo endpoint.
+      // Preserve event-projected todos on forced refresh instead of replacing them
+      // with [] (or treating a web fallback's HTML response as a todo array).
+      if ((await options?.protocol) === "v2") {
+        if (data.todo[sessionID] === undefined) setData("todo", sessionID, [])
+        return
+      }
       return runInflight(inflightTodo, sessionID, () => {
         const active = generation(sessionID)
         return (options?.retry ?? retry)(() => client.session.todo({ sessionID })).then((result) => {

@@ -8,6 +8,19 @@ import type {
 import { directoryKey, normalizeAgentList, normalizePermissionRequest, normalizeProviderList } from "./utils"
 
 describe("normalizeAgentList", () => {
+  test("accepts the standalone V2 request body without legacy settings", () => {
+    const [agent] = normalizeAgentList([
+      {
+        id: "build",
+        name: "Build",
+        mode: "primary",
+        hidden: false,
+        request: { headers: {}, body: { temperature: 0.4, topP: 0.8 } },
+        permissions: [],
+      },
+    ])
+    expect(agent).toMatchObject({ temperature: 0.4, topP: 0.8, options: { temperature: 0.4, topP: 0.8 } })
+  })
   test("adapts current agents to the app agent shape", () => {
     const result = normalizeAgentList([
       {

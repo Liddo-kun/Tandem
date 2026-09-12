@@ -309,19 +309,35 @@ describe("server session", () => {
     expect(assistants.map((item) => store.data.part[item.id]?.[0]?.type)).toEqual(["text", "text", "text"])
   })
 
-  // UPSTREAM-DIVERGENCE: upstream's v2 todo() resets to [] and relies purely on events, which
-  // empties the dock on cold load and on Tandem's forced resume/manual refresh of idle sessions.
-  // Tandem keeps the DB-backed pull on v2; events still project on top of it.
-  test("pulls V2 todos on cold load and forced refresh", async () => {
-    const initial = [{ id: "todo-1", content: "task", status: "pending", priority: "medium" }]
+  test("V2 refresh requests a bounded page after an empty session or a large requested window", async () => {
+    const requests: number[] = []
+    const api = {
+      list: async ({ limit }: { limit: number }) => {
+        requests.push(limit)
+        if (limit < 1 || limit > 200) throw new Error("Invalid V2 page limit")
+        return { data: [], cursor: {} }
+      },
+    } as unknown as MessageApi
+    const store = createServerSession(
+      {} as OpencodeClient,
+      { get: async () => session("root") } as unknown as SessionApi,
+      api,
+    )
+    store.remember(session("root"))
+    await store.sync("root")
+    await store.sync("root", { force: true })
+    await store.sync("root", { force: true, messageLimit: 1000 })
+    expect(requests).toEqual([20, 20, 200])
+  })
+
+  test("V2 todo refresh skips the absent legacy endpoint and preserves projected events", async () => {
     const updated = [{ id: "todo-1", content: "task", status: "completed", priority: "medium" }]
-    let served = initial
-    const requests: unknown[] = []
+    let requests = 0
     const client = {
       session: {
-        todo: async (input: unknown) => {
-          requests.push(input)
-          return { data: served }
+        todo: async () => {
+          requests++
+          throw new Error("The standalone V2 server has no /session/:id/todo endpoint")
         },
       },
     } as unknown as OpencodeClient
@@ -329,16 +345,13 @@ describe("server session", () => {
     store.remember(session("root"))
 
     await store.todo("root")
-    expect(requests).toEqual([{ sessionID: "root" }])
-    expect(store.data.todo.root).toMatchObject(initial)
-
+    expect(store.data.todo.root).toEqual([])
     store.apply({ type: "todo.updated", properties: { sessionID: "root", todos: updated } })
-    expect(store.data.todo.root).toMatchObject(updated)
-
-    served = updated
     await store.todo("root", { force: true })
-    expect(requests).toHaveLength(2)
-    expect(store.data.todo.root).toMatchObject(updated)
+    expect(store.data.todo.root.map((todo) => ({ content: todo.content, status: todo.status }))).toEqual([
+      { content: "task", status: "completed" },
+    ])
+    expect(requests).toBe(0)
   })
 
   test("indexes V1 messages for the current timeline projection", async () => {
