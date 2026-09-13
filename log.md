@@ -97,7 +97,7 @@ Remove each entry (and its marked code) once upstream ships its own fix; these a
 
 ## GPT System Prompt
 
-- Customizes the GPT-family system prompt (used by non-codex `gpt-*` models, e.g. `gpt-5.6-sol`): trims verbose upstream prose (persona paragraph, autonomy/review/formatting detail, several one-off rules) and condenses the `commentary` channel section to a single paragraph, and adds a short personal user-context paragraph under "Working with the user". Whole-file text divergence with no marker comments; on upstream merges, diff upstream's new version and re-apply the trims plus the user-context paragraph rather than keeping either side wholesale. File: `packages/opencode/src/session/prompt/gpt.txt`.
+- Customizes the generic GPT-family system prompt (non-codex `gpt-*` models except `gpt-6*`, e.g. `gpt-5.6-sol`): trims verbose upstream prose (persona paragraph, autonomy/review/formatting detail, several one-off rules), condenses the `commentary` channel section to a single paragraph, and adds a short personal user-context paragraph under "Working with the user". GPT-6 models use upstream's dedicated Astra prompt and upstream selection order in `system.ts`; Tandem retains that new prompt structure, adds the same personal user-context paragraph, and omits upstream's explicit-request-only delegation restriction so automatic subagent use remains available. Whole-file text divergences with no marker comments; on upstream merges, re-apply each prompt's documented customization onto its new upstream wording rather than keeping either side wholesale. Files: `packages/opencode/src/session/prompt/gpt.txt`, `packages/opencode/src/session/prompt/gpt-astra.txt`.
 
 ## Prompt Corrector
 
