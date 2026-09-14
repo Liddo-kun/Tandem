@@ -29,10 +29,13 @@ Guidance for the Tandem `imagegen` tool, which **generates or edits raster image
 1. **Intent — generate or edit?**
    - User wants to modify an existing image while preserving parts of it → **edit** (pass `image_paths`).
    - User provides images only as references for style/composition/mood, or provides none → **generate** (no `image_paths`).
-2. **Execution — one asset or many?**
-   - Each call produces exactly one image.
-   - Several **distinct** assets → one call **per asset**, each with its own prompt.
-   - Several **variants of the same generation** → call the tool several times in parallel with the same parameters.
+2. **Execution — what belongs in each image?**
+   - Each call produces one image, which may contain a scene, a single subject, a complete deliverable (such as a flashcard), or multiple elements arranged as a sheet or grid. An individual asset does not require its own call.
+   - Group related elements into one image when shared styling and joint generation benefit the task—for example, fruit illustrations or a game character's views and poses. Prefer a shared sheet when it provides sufficient detail with fewer calls.
+   - If elements will be extracted, request clear separation, adequate margins, a suitable background, and enough resolution per element. Inspect the result before cropping; do not assume the generated grid is pixel-exact.
+   - Use separate calls for independent scenes or compositions, incompatible visual requirements, or elements that need more resolution or individual control. Run independent calls in parallel when useful.
+   - Choose between generating the complete deliverable and generating components for programmatic assembly based on the task's requirements for text accuracy, counting, layout, and editability.
+   - For several variants, choose a comparison sheet or separate images based on how the results will be used and the detail each variant needs.
 
 Assume the user wants a new image unless they clearly ask to change an existing one.
 

@@ -26,6 +26,7 @@ function document(name: string): string {
   let text = source.documentation[name]
   if (typeof text !== "string") throw new Error(`Documentation is not available: ${name}`)
   if (name === "browser-safety") {
+    text = replace(text, ", including through page-defined WebMCP tools.", ".")
     text = replace(text,
       "- Apply the active confirmation policy before consequential actions: external communications, data transmission, purchases, deletion, access changes, software installation, credential/payment saving, browser permissions, CAPTCHAs, age verification, and password changes. Existing user authorization counts where that policy permits it.\n",
       "")
@@ -73,6 +74,9 @@ function document(name: string): string {
     text = replace(text, "reuse the existing `agent`; do not reset the JavaScript session or import another browser runtime",
       "reuse the configured browser ID; do not import another browser runtime or change user configuration")
     text = replace(text, "`await agent.browsers.list()`", '`browser` with `action: "browsers"`')
+    text = replace(text,
+      "If a requested backend has specific troubleshooting documentation in the skill's setup catalog, read it before retrying.",
+      'Before retrying a Chrome connection failure, read `browser` with `action: "documentation"`, the selected browser ID, and `topic: "chrome-troubleshooting"`.')
   }
   if (name === "chrome-troubleshooting") {
     // The original diagnostics/auto-repair are Codex installer and REPL features,
@@ -93,7 +97,9 @@ function document(name: string): string {
     text = replace(text, "Call `tab.reload()`, then take a fresh DOM snapshot or screenshot", "Call `navigate` with the observed current URL for that intentional reload, then `inspect` or `screenshot`")
   if (name === "screenshots") {
     text = replace(text, "include them inline in the final response using `![description](IMAGE_LINK)`", "use `screenshot` to deliver them through Tandem's managed image output; do not invent an image URL or treat a private capture reference as a public link")
-    text = replace(text, "screenshot bytes are not necessarily PNG", "Tandem's exposed capture channel returns PNG")
+    text = replace(text,
+      "When saving an image, match its filename extension to its actual format; screenshot bytes are not necessarily PNG.",
+      "Tandem's exposed capture channel returns PNG.")
   }
   return text.trim()
 }
