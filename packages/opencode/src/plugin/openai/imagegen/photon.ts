@@ -6,7 +6,7 @@ import photonWasm from "@silvia-odwyer/photon-node/photon_rs_bg.wasm" with { typ
 // dependency, used by Image.normalize). Mirrors the wasm-path shim in src/image/image.ts so the
 // Bun-compiled single-file binary resolves the embedded wasm; cached so it initializes once per
 // process. `??=` avoids clobbering the global if the Image service set it first (both derive the
-// same embedded asset path). Used by imagegen.ts (JPEG/WebP chat copies) and chroma.ts.
+// same embedded asset path). Used by imagegen.ts for JPEG/WebP chat copies.
 let photonPromise: Promise<typeof import("@silvia-odwyer/photon-node")> | undefined
 export function loadPhoton(): Promise<typeof import("@silvia-odwyer/photon-node")> {
   if (!photonPromise) {

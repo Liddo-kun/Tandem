@@ -1,145 +1,55 @@
-<!--
-  Built-in skill body for the Tandem imagegen tool. Name and description are
-  registered in code at packages/opencode/src/plugin/openai/imagegen/imagegen.ts
-  (ImageGen.SKILL); the skill is gated on the same OpenAI-cred check as the tool.
--->
+# Image generation
 
-# Image Generation Skill
+Use `imagegen` to generate or edit raster images. Prefer SVG/HTML/CSS for deterministic diagrams, simple shapes, and existing vector systems.
 
-Guidance for the Tandem `imagegen` tool, which **generates or edits raster images** via OpenAI's image models and **saves a PNG to disk, returning its file path**.
+## Parameters
 
-**Transparent backgrounds:** set `transparent: true` for a cutout with no background (real alpha) — for logos, stickers, sprites, or a subject to drop onto another background. Clean for solid-edged subjects; wispy edges (hair, fur, glass, smoke) may keep a fringe. See "Transparent backgrounds" below.
+- `prompt`: concrete description of the desired result or edit.
+- `image_paths`: up to 10 local source/reference images. Omit for text-only generation. Include references even when creating a new composition; identify each image's role in the prompt.
+- `mask_path`: optional PNG with alpha, matching the first source image's dimensions. Transparent areas mark the editable region. Applies to the first image; requires `image_paths`. Masks guide the model, not pixel-exact compositing.
+- `transparent`: true for native alpha output; false (opaque) by default. Works for generation and edits. No chroma-key background or local removal is needed.
 
-## When to use
+**ChatGPT sign-in:** these are the only four controls. The backend selects the image model, quality, and dimensions automatically. Describe the desired aspect ratio, composition, and level of detail in the prompt; exact dimensions are not guaranteed. No automatic resize or crop is applied. Generation and ordinary edits use native Codex Images. Masked edits use Responses because native mask support is unverified; masked transparent requests currently encounter a backend limitation.
 
-- Generate a new image (concept art, product shot, hero image, illustration, sprite, texture, infographic, mockup).
-- Generate using one or more images purely as **style/composition/mood references**.
-- Edit an existing image (object removal/replacement, recolor, lighting/weather change, background replacement, compositing, restyle).
-- Produce several variants or several distinct assets for one task.
+**API-key sign-in:** the public Images API requests GPT Image 2.5 Sunburst and exposes these additional controls in the tool schema:
 
-## When not to use
+- `width`, `height`: required pixel dimensions, each a positive multiple of 16 and at most 3840. Aspect ratio between 1:3 and 3:1; total pixels 655,360–8,294,400. Examples: 1024×1024, 1536×864, 2048×2048, 3840×2160. Above 3,686,400 pixels is experimental.
+- `quality`: `medium`, `high` (default), `xhigh`, or `max`.
 
-- Extending or matching an existing SVG/vector icon set, logo system, or illustration library in the repo.
-- Simple shapes, diagrams, wireframes, or icons that are cleaner as SVG/HTML/CSS/canvas.
-- A small project-local asset edit when an editable native source already exists.
-- Any task where the user clearly wants deterministic, code-native output instead of a bitmap.
+Only pass controls exposed by the current tool schema. Do not claim a specific serving model on ChatGPT sign-in.
 
-## Two questions before you call
+## Prompting
 
-1. **Intent — generate or edit?**
-   - User wants to modify an existing image while preserving parts of it → **edit** (pass `image_paths`).
-   - User provides images only as references for style/composition/mood, or provides none → **generate** (no `image_paths`).
-2. **Execution — what belongs in each image?**
-   - Each call produces one image, which may contain a scene, a single subject, a complete deliverable (such as a flashcard), or multiple elements arranged as a sheet or grid. An individual asset does not require its own call.
-   - Group related elements into one image when shared styling and joint generation benefit the task—for example, fruit illustrations or a game character's views and poses. Prefer a shared sheet when it provides sufficient detail with fewer calls.
-   - If elements will be extracted, request clear separation, adequate margins, a suitable background, and enough resolution per element. Inspect the result before cropping; do not assume the generated grid is pixel-exact.
-   - Use separate calls for independent scenes or compositions, incompatible visual requirements, or elements that need more resolution or individual control. Run independent calls in parallel when useful.
-   - Choose between generating the complete deliverable and generating components for programmatic assembly based on the task's requirements for text accuracy, counting, layout, and editability.
-   - For several variants, choose a comparison sheet or separate images based on how the results will be used and the detail each variant needs.
+Write a complete prompt from the user's intent. Preserve their words exactly when requested. Add useful composition, lighting, material, and intended-use details without inventing unrelated objects or creative requirements. Plain prose or a short labeled spec both work; no mandatory template.
 
-Assume the user wants a new image unless they clearly ask to change an existing one.
+- Specify subject, composition/framing, style, visible details, and important constraints.
+- For exact text, quote it and specify placement, typography, and whether additional text is forbidden. Inspect spelling and legibility afterward.
+- For reference images, state each role: subject/identity, style, clothing, background, or layout. Explain how to combine them.
+- For edits, say **change only X; preserve Y**. Name critical identity, geometry, labels, framing, lighting, and layout constraints. Restate them on subsequent edits.
+- Pass the prior full-quality PNG as the next edit input. Make one targeted change at a time. If a region must remain pixel-identical, composite the approved edited region into the original programmatically.
+- For transparency, describe the subject and request preserved fine edges/soft shadows where appropriate. Repeat transparency requirements on edits; inspect actual alpha rather than trusting a checkerboard appearance.
 
-## Author the prompt yourself
-
-Turn the user's request into a complete, concrete image prompt — don't just pass their words straight through, unless the user asks you to.
-
-**Specificity policy:**
-
-- If the user's prompt is already specific and detailed, **normalize** it into a clean spec without inventing new creative requirements.
-- If the user's prompt is generic, add **appropriate** detail where it will materially improve the result.
-
-**Allowed augmentation** (for generic prompts): composition/framing cues, intended-use or polish-level hints, practical layout guidance, reasonable scene concreteness that supports the request.
-
-**Do not add:** extra characters, props, or objects that aren't implied; brand palettes, slogans, or story beats that aren't implied; arbitrary left/right placement the layout doesn't support.
-
-## Editing
-
-- Edit mode triggers when `image_paths` is present. Inputs must be **local file paths** (this tool does not read images out of the chat). If the only copy of the target lives in the conversation and has no file on disk, save it to a path first, then pass that path.
-- Use `mask_path` (a PNG whose transparent areas mark the editable region) **only** when the change must be constrained to part of the image; it applies to the first image and is prompt-guided, not pixel-exact.
-- State invariants aggressively: `change only X; keep Y unchanged`, and repeat them on every iteration to reduce drift.
-- Saving is non-destructive (the tool writes a new file); don't overwrite a user asset unless asked.
-
-## Transparent backgrounds
-
-Set `transparent: true` when the user wants a **cutout with no background** — a logo, sticker, game sprite, icon, or a subject to composite onto another background. The image models can't output alpha directly, so the tool renders the subject on a flat key color and removes it to transparency locally, saving an image with a real alpha channel.
-
-- Best for **solid-edged subjects**: products, icons, characters, objects with crisp outlines.
-- **Wispy or translucent edges** — hair, fur, feathers, smoke, glass, liquids, soft shadows, motion blur — may keep a faint fringe or lose fine detail; warn the user the cutout may be imperfect for those.
-- Describe **only the subject** in the prompt; don't specify a background (the tool forces a flat key background and keys it out). Don't pick the key color or ask for "green screen" yourself — the tool handles it.
-- Works with edits too (`image_paths` + `transparent: true`) to cut the subject out of an existing image.
-
-## Use-case taxonomy (pick one; keep wording consistent)
-
-Generate: `photorealistic-natural`, `product-mockup`, `ui-mockup`, `infographic-diagram`, `scientific-educational`, `ads-marketing`, `productivity-visual`, `logo-brand`, `illustration-story`, `stylized-concept`, `historical-scene`.
-
-Edit: `text-localization`, `identity-preserve`, `precise-object-edit`, `lighting-weather`, `background-replace`, `style-transfer`, `compositing`, `sketch-to-render`.
-
-## Prompt scaffolding
-
-Shape the `prompt` as a short labeled spec — use only the lines that help:
-
-```text
-Use case: <taxonomy slug>
-Asset type: <where the asset will be used>
-Primary request: <the main subject/action>
-Input images: <Image 1: role; Image 2: role>   (edit/reference only)
-Scene/backdrop: <environment>
-Subject: <main subject>
-Style/medium: <photo / illustration / 3D / etc.>
-Composition/framing: <wide / close / top-down; placement; negative space>
-Lighting/mood: <lighting + mood>
-Color palette: <palette notes>
-Materials/textures: <surface details>
-Text (verbatim): "<exact text>"
-Constraints: <must keep / must avoid>
-```
-
-`Asset type` and `Input images` are prompt scaffolding, not tool arguments. Keep it tight; for edits, list invariants explicitly.
-
-## Prompting best practices
-
-- Order: scene/backdrop → subject → key details → constraints → intended use.
-- Include intended use (ad, UI mock, infographic) to set polish level.
-- Use camera/composition language (lens, framing, lighting) for photorealism; call for real texture (pores, fabric wear, material grain) when realism matters.
-- Put literal in-image text in quotes or ALL CAPS, specify typography and placement, and require **verbatim** rendering; spell uncommon words letter-by-letter. Prefer `high` quality for dense text, legends, axes, and small labels.
-- Reference multiple input images by index and say how each is used (`place the subject from Image 2 into Image 1`).
-- Iterate with one targeted change at a time, re-stating critical constraints; don't rewrite the whole prompt each round.
+Each call produces one image. A shared sheet can suit related assets when it provides enough detail; request separation and margins if elements will be cropped. Use separate calls for independent compositions or assets needing individual resolution/control. Independent calls may run in parallel.
 
 ## Examples
 
-Generation:
-
-```text
-Use case: product-mockup
-Asset type: landing-page hero
-Primary request: a single ceramic coffee mug on a clean surface
-Style/medium: clean studio product photography
-Composition/framing: wide, with usable negative space on the right for headline copy
-Lighting/mood: soft diffused studio light, gentle shadow
-Constraints: no logos, no text, no watermark
-```
-
-Call: `imagegen({ prompt: "<the spec above>", size: "1536x1024", quality: "high" })`
+Generate:
+`imagegen({ prompt: "Wide landscape studio photograph of a blue ceramic mug, soft side lighting, fine ceramic texture, no text" })`
 
 Edit:
+`imagegen({ prompt: "Change only the mug's glaze to red; preserve its geometry, lighting, and framing", image_paths: ["/abs/path/mug.png"] })`
 
-```text
-Use case: precise-object-edit
-Primary request: replace only the background with a warm sunset gradient
-Constraints: change only the background; keep the mug and its edges unchanged; no text; no watermark
-```
+Cutout:
+`imagegen({ prompt: "An isolated glass perfume bottle with a silver cap, preserve translucent glass and fine edges", transparent: true })`
 
-Call: `imagegen({ prompt: "<the spec above>", image_paths: ["/abs/path/mug.png"] })`
+These examples use ChatGPT sign-in. With an API key, also supply `width` and `height`, and optionally `quality`.
 
-## After the call: output handling
+## Results
 
-- The tool returns the **saved file path(s)** as text.
-- If you need to inspect the result, use the `read` tool on the returned path.
-- **Report the saved path(s)** to the user. Do not invent a description of contents you haven't viewed, and don't claim success on details you can't confirm.
-- If the asset is meant for the current project, move/copy it from the returned path into the workspace (the tool controls where it's saved) and wire up any references. Don't leave a project-bound asset only at the tool's default path.
-- On OAuth, the model may report a slightly adjusted "prompt used"; the tool surfaces it only when it differs from yours — treat that as the source of truth for what was rendered, not the prose.
-- **Size is best-effort on OAuth.** With an OpenAI API key the requested `size` is exact. With ChatGPT (OAuth) sign-in the image backend ignores `size` and auto-sizes from the prompt; steer aspect ratio through the prompt (e.g. "wide landscape", "tall portrait", "square") instead.
+The tool saves the original PNG under `imagegen/` in the working directory, plus a smaller JPEG (opaque) or WebP (transparent) when useful. It returns the chat-copy path; the original PNG has the same stem. The UI fetches a thumbnail separately, so image bytes do not enter model context automatically.
 
-## Errors
+Use `read` to inspect results when necessary. Report the saved path; do not claim details you haven't checked. For project assets, place the appropriate original/copy at its intended location and wire up references.
 
-The call fails with a clear message for: missing credentials, content-policy/moderation rejection, invalid size, missing/oversized `image_paths`, or network/auth failure. Surface the message and adjust (rephrase the prompt, fix the path, pick a supported size) rather than retrying verbatim.
+The output reports actual dimensions and quality when the backend supplies it. Missing quality remains unknown. API-key output notes discrepancies from requested settings. Available request/generation IDs are retained in metadata for tracing. OAuth masked edits use a host model; a changed reported prompt is surfaced as “Image prompt used.” Treat that as the rendering prompt, not the host model's prose.
+
+On errors, report the concrete failure and correct the invalid input or request. Do not retry an unchanged rejected request.

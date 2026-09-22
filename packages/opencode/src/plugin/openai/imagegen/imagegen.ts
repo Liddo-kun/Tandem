@@ -2,7 +2,6 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { Global } from "@opencode-ai/core/global"
 import { extractAccountId } from "../codex"
-import { Chroma } from "./chroma"
 import { loadPhoton } from "./photon"
 import description from "./imagegen.txt"
 import skillContent from "./imagegen-skill.md" with { type: "text" }
@@ -18,7 +17,7 @@ export const DESCRIPTION: string = description
 export const SKILL = {
   name: "imagegen",
   description:
-    "Use when the user wants to create or edit a raster image — a photo, illustration, diagram, mockup, sprite, texture, product shot, logo concept, meme, portrait, or icon art — or to modify an existing image (add/remove elements, recolor, restyle, replace background). Drives the Tandem `imagegen` tool (OpenAI gpt-image). Do not use for vector/SVG output, established icon/logo systems, or visuals better built directly in HTML/CSS/canvas or code.",
+    "Generate or edit raster images with Tandem's imagegen tool. Use for image requests, not vector/SVG or code-native visuals.",
   content: skillContent,
 } as const
 
@@ -34,11 +33,13 @@ export async function isAvailable(): Promise<boolean> {
   return !!(await resolveCreds().catch(() => undefined))
 }
 
-// gpt-image-2 backs the API-key Images endpoint. The OAuth path instead drives
-// the Responses API's built-in `image_generation` tool, hosted by a chat model.
-const IMAGE_MODEL = "gpt-image-2"
+export const IMAGE_MODEL = "gpt-image-2.5-sunburst"
+// Native Codex compatibility name, matching the official client. The serving
+// image model is backend-managed; this request field does not verify its identity.
+const OAUTH_IMAGE_MODEL = "gpt-image-2"
 const OAUTH_HOST_MODEL = process.env.TANDEM_IMAGEGEN_OAUTH_MODEL || "gpt-5.5"
 const API_BASE = "https://api.openai.com/v1"
+const OAUTH_IMAGES_BASE = "https://chatgpt.com/backend-api/codex/images"
 const OAUTH_RESPONSES_URL = "https://chatgpt.com/backend-api/codex/responses"
 
 // Duplicated from plugin/openai/codex.ts (not exported there) so codex.ts needs
@@ -46,32 +47,46 @@ const OAUTH_RESPONSES_URL = "https://chatgpt.com/backend-api/codex/responses"
 const OAUTH_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
 const OAUTH_ISSUER = "https://auth.openai.com"
 
-// Curated gpt-image-2 sizes (base 4). A closed enum keeps the model from emitting
-// invalid free-form WxH; the backend still validates server-side.
-export const SIZES = ["auto", "1024x1024", "1536x1024", "1024x1536"] as const
-export type Size = (typeof SIZES)[number]
-export const QUALITIES = ["low", "medium", "high", "auto"] as const
+export const QUALITIES = ["medium", "high", "xhigh", "max"] as const
 export type Quality = (typeof QUALITIES)[number]
 export const MAX_EDIT_IMAGES = 10
 
 export interface Args {
   prompt: string
-  quality: Quality
-  size: Size
+  quality?: Quality
+  width?: number
+  height?: number
   image_paths?: string[]
   mask_path?: string
-  // Produce a transparent-background cutout. gpt-image-2 / the OAuth image tool cannot emit alpha
-  // natively, so this renders on a flat chroma-key background and removes it to alpha locally.
   transparent?: boolean
 }
 
+interface ApiArgs extends Args {
+  quality: Quality
+  width: number
+  height: number
+}
+
 // A produced image plus the prompt the image model reports it actually used
-// (`revised_prompt`). On the OAuth path the host chat model authors the prompt,
-// so this is how the caller learns what was really rendered. May be undefined
+// (`revised_prompt`). Masked OAuth edits use a host model, so this records
+// the prompt it actually handed off. May be undefined
 // when the backend does not return one.
 export interface GeneratedImage {
   png: Buffer
   revisedPrompt?: string
+  transport?: "images" | "responses"
+  requestId?: string
+  generationId?: string
+  reported?: { model?: string; quality?: string; background?: string; action?: string }
+}
+
+function reportedSettings(value: Record<string, unknown>): GeneratedImage["reported"] {
+  return {
+    model: typeof value.model === "string" ? value.model : undefined,
+    quality: typeof value.quality === "string" ? value.quality : undefined,
+    background: typeof value.background === "string" ? value.background : undefined,
+    action: typeof value.action === "string" ? value.action : undefined,
+  }
 }
 
 interface ApiCreds {
@@ -165,38 +180,63 @@ export async function refreshOAuth(creds: OauthCreds): Promise<OauthCreds> {
 export async function run(args: Args, creds: Creds): Promise<GeneratedImage> {
   validate(args)
   const editing = !!args.image_paths?.length
-  if (!args.transparent) return generateOrEdit(args, creds, editing)
-
-  // Transparent output: gpt-image-2 and the OAuth image_generation tool cannot emit a transparent
-  // background, so render the subject on a flat chroma-key background and key it out to alpha locally
-  // (matches the Codex imagegen skill's built-in transparent workflow). The key instruction is
-  // appended to the prompt — not the system message — so it survives the OAuth verbatim pass-through
-  // and reaches the image model on both transports. revisedPrompt is dropped because the altered
-  // prompt's revision would just echo the chroma directive, which is noise to the user.
-  const keyed: Args = { ...args, prompt: `${args.prompt.trim()}\n\n${Chroma.PROMPT}` }
-  const image = await generateOrEdit(keyed, creds, editing)
-  return { png: await Chroma.removeChromaKey(image.png) }
-}
-
-function generateOrEdit(args: Args, creds: Creds, editing: boolean): Promise<GeneratedImage> {
-  if (creds.mode === "api") return editing ? editApiKey(args, creds) : generateApiKey(args, creds)
-  return editing ? editOAuth(args, creds) : generateOAuth(args, creds)
+  let image: GeneratedImage
+  if (creds.mode === "api") {
+    validateApiArgs(args)
+    image = await (editing ? editApiKey(args, creds) : generateApiKey(args, creds))
+  } else {
+    image = await (args.mask_path ? editOAuth(args, creds) : nativeOAuth(args, creds))
+  }
+  if (args.transparent) {
+    const photon = await loadPhoton()
+    const decoded = photon.PhotonImage.new_from_byteslice(image.png)
+    try {
+      if (!decoded.get_raw_pixels().some((value, index) => index % 4 === 3 && value < 255))
+        throw new Error("OpenAI returned an opaque image despite requesting native transparency")
+    } finally {
+      decoded.free()
+    }
+  }
+  return image
 }
 
 function validate(args: Args): void {
   if (!args.prompt.trim()) throw new Error("prompt is required")
   if (args.image_paths && args.image_paths.length > MAX_EDIT_IMAGES)
     throw new Error(`image_paths supports at most ${MAX_EDIT_IMAGES} images`)
+  if (args.mask_path && !args.image_paths?.length) throw new Error("mask_path requires image_paths")
+}
+
+function validateApiArgs(args: Args): asserts args is ApiArgs {
+  if (!args.quality || !QUALITIES.includes(args.quality)) throw new Error("quality must be medium, high, xhigh, or max")
+  const { width, height } = args
+  if (width === undefined || height === undefined)
+    throw new Error("width and height are required for API-key image generation")
+  if (![width, height].every((edge) => Number.isInteger(edge) && edge > 0 && edge <= 3840 && edge % 16 === 0))
+    throw new Error("width and height must be positive multiples of 16, at most 3840 pixels each")
+  const pixels = width * height
+  if (Math.max(width, height) > 3 * Math.min(width, height) || pixels < 655_360 || pixels > 8_294_400)
+    throw new Error("Dimensions require an aspect ratio between 1:3 and 3:1 and 655360–8294400 total pixels")
+}
+
+function requestId(res: Response): string | undefined {
+  return (
+    res.headers.get("x-codex-imagegen-request-id") ??
+    res.headers.get("x-request-id") ??
+    res.headers.get("x-oai-request-id") ??
+    undefined
+  )
 }
 
 // ---- API-key transport: REST /v1/images/{generations,edits} ----
 
-async function generateApiKey(args: Args, creds: ApiCreds): Promise<GeneratedImage> {
+async function generateApiKey(args: ApiArgs, creds: ApiCreds): Promise<GeneratedImage> {
   const body: Record<string, unknown> = {
     model: IMAGE_MODEL,
     prompt: args.prompt,
-    size: args.size,
+    size: `${args.width}x${args.height}`,
     quality: args.quality,
+    background: args.transparent ? "transparent" : "opaque",
     output_format: "png",
     moderation: "low",
   }
@@ -206,15 +246,18 @@ async function generateApiKey(args: Args, creds: ApiCreds): Promise<GeneratedIma
     body: JSON.stringify(body),
   })
   if (!res.ok) throw await httpError(res, "image generation")
-  return decodeImageResponse(await res.json())
+  return { ...decodeImageResponse(await res.json()), requestId: requestId(res) }
 }
 
-async function editApiKey(args: Args, creds: ApiCreds): Promise<GeneratedImage> {
+async function editApiKey(args: ApiArgs, creds: ApiCreds): Promise<GeneratedImage> {
   const form = new FormData()
   form.append("model", IMAGE_MODEL)
   form.append("prompt", args.prompt)
-  if (args.size !== "auto") form.append("size", args.size)
+  form.append("size", `${args.width}x${args.height}`)
   form.append("quality", args.quality)
+  form.append("background", args.transparent ? "transparent" : "opaque")
+  form.append("output_format", "png")
+  form.append("moderation", "low")
   for (const file of args.image_paths!) {
     form.append("image[]", new Blob([await readBlobPart(file)], { type: mimeFromPath(file) }), path.basename(file))
   }
@@ -230,34 +273,63 @@ async function editApiKey(args: Args, creds: ApiCreds): Promise<GeneratedImage> 
     body: form,
   })
   if (!res.ok) throw await httpError(res, "image edit")
-  return decodeImageResponse(await res.json())
+  return { ...decodeImageResponse(await res.json()), requestId: requestId(res) }
 }
 
-function decodeImageResponse(json: { data?: { b64_json?: string; revised_prompt?: string }[] }): GeneratedImage {
+function decodeImageResponse(
+  json: Record<string, unknown> & { data?: { b64_json?: string; revised_prompt?: string; generation_id?: string }[] },
+): GeneratedImage {
   const item = (json.data ?? []).find(
-    (entry): entry is { b64_json: string; revised_prompt?: string } => typeof entry.b64_json === "string",
+    (entry): entry is { b64_json: string; revised_prompt?: string; generation_id?: string } =>
+      typeof entry.b64_json === "string",
   )
   if (!item) throw new Error("OpenAI returned no image data")
   return {
     png: Buffer.from(item.b64_json, "base64"),
     revisedPrompt: typeof item.revised_prompt === "string" ? item.revised_prompt : undefined,
+    generationId: typeof item.generation_id === "string" ? item.generation_id : undefined,
+    reported: reportedSettings(json),
   }
 }
 
-// ---- OAuth transport: Responses API image_generation tool over /codex/responses ----
-
-async function generateOAuth(args: Args, creds: OauthCreds): Promise<GeneratedImage> {
-  return oauthOneImage(args, creds, undefined)
+// Native Codex Images API: direct prompt, no host-model hop. The backend may
+// choose its own model/quality/dimensions; preserve reported values separately.
+async function nativeOAuth(args: Args, creds: OauthCreds): Promise<GeneratedImage> {
+  const images = await Promise.all(
+    (args.image_paths ?? []).map(async (file) => ({
+      image_url: `data:${mimeFromPath(file)};base64,${(await readFile(file)).toString("base64")}`,
+    })),
+  )
+  const body = {
+    model: OAUTH_IMAGE_MODEL,
+    prompt: args.prompt,
+    background: args.transparent ? "transparent" : "opaque",
+    quality: "auto",
+    size: "auto",
+    ...(images.length ? { images } : {}),
+  }
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${creds.access}`,
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    originator: "opencode",
+  }
+  if (creds.accountId) headers["ChatGPT-Account-Id"] = creds.accountId
+  const operation = images.length ? "edits" : "generations"
+  const res = await fetch(`${OAUTH_IMAGES_BASE}/${operation}`, { method: "POST", headers, body: JSON.stringify(body) })
+  if (!res.ok) throw await httpError(res, "image generation")
+  return { ...decodeImageResponse(await res.json()), transport: "images", requestId: requestId(res) }
 }
 
+// Masked OAuth edits retain Responses input_image_mask: the native Images route
+// silently accepts even invalid mask bytes (live control), so it cannot be relied
+// on for masks. Do not send a mask there and pretend it was applied.
 async function editOAuth(args: Args, creds: OauthCreds): Promise<GeneratedImage> {
   const inputImages = await Promise.all(
     args.image_paths!.map(
       async (file) => `data:${mimeFromPath(file)};base64,${(await readFile(file)).toString("base64")}`,
     ),
   )
-  // The Responses image_generation tool has no separate mask parameter; mask_path
-  // is honored only on the API-key path. Edits here are prompt + input images.
   return oauthOneImage(args, creds, inputImages)
 }
 
@@ -281,7 +353,22 @@ async function oauthOneImage(
       "Call the image_generation tool exactly once. Use the user's message as the image prompt VERBATIM: pass their exact words unchanged. Do not rewrite, rephrase, paraphrase, translate, summarize, expand, embellish, add details, or alter, soften, or sanitize the wording in any way. Do not ask questions, explain, or add commentary.",
     input: [{ role: "user", content }],
     tools: [
-      { type: "image_generation", size: args.size, quality: args.quality, output_format: "png", moderation: "low" },
+      {
+        type: "image_generation",
+        action: inputImages?.length ? "edit" : "generate",
+        size: "auto",
+        quality: "auto",
+        background: args.transparent ? "transparent" : "opaque",
+        output_format: "png",
+        moderation: "low",
+        ...(args.mask_path
+          ? {
+              input_image_mask: {
+                image_url: `data:image/png;base64,${(await readFile(args.mask_path)).toString("base64")}`,
+              },
+            }
+          : {}),
+      },
     ],
     tool_choice: { type: "image_generation" },
   }
@@ -294,7 +381,7 @@ async function oauthOneImage(
   if (creds.accountId) headers["ChatGPT-Account-Id"] = creds.accountId
   const res = await fetch(OAUTH_RESPONSES_URL, { method: "POST", headers, body: JSON.stringify(body) })
   if (!res.ok || !res.body) throw await httpError(res, "image generation")
-  return readImageFromSSE(res.body)
+  return { ...(await readImageFromSSE(res.body)), transport: "responses", requestId: requestId(res) }
 }
 
 // Parse the Responses SSE stream and return the first completed image plus the
@@ -307,11 +394,14 @@ async function readImageFromSSE(body: ReadableStream<Uint8Array>): Promise<Gener
   let buffer = ""
   let result: string | undefined
   let revisedPrompt: string | undefined
+  let reported: GeneratedImage["reported"]
   let failure: string | undefined
 
   const capture = (item: any) => {
     if (item?.type !== "image_generation_call" || typeof item.result !== "string") return
     result ??= item.result
+    const settings = reportedSettings(item)
+    reported = { ...settings, model: settings.model ?? reported?.model }
     if (revisedPrompt === undefined && typeof item.revised_prompt === "string") revisedPrompt = item.revised_prompt
   }
 
@@ -321,6 +411,12 @@ async function readImageFromSSE(body: ReadableStream<Uint8Array>): Promise<Gener
       parsed = JSON.parse(data)
     } catch {
       return
+    }
+    // Codex can replace the requested image model and settings before generation.
+    // Inspect the effective tool configuration, not just the generated image item.
+    const imageTool = parsed.response?.tools?.find((tool: any) => tool.type === "image_generation")
+    if (typeof imageTool?.model === "string") {
+      reported = { ...reported, model: imageTool.model }
     }
     if (event === "response.output_item.done") {
       capture(parsed.item)
@@ -350,10 +446,17 @@ async function readImageFromSSE(body: ReadableStream<Uint8Array>): Promise<Gener
         else if (line.startsWith("data:")) data += line.slice(5).trim()
       }
       if (data && data !== "[DONE]") handle(event, data)
-      if (result) return { png: Buffer.from(result, "base64"), revisedPrompt }
+      if (failure) {
+        await reader.cancel()
+        throw new Error(failure)
+      }
+      if (result) {
+        await reader.cancel()
+        return { png: Buffer.from(result, "base64"), revisedPrompt, reported }
+      }
     }
   }
-  if (result) return { png: Buffer.from(result, "base64"), revisedPrompt }
+  if (result) return { png: Buffer.from(result, "base64"), revisedPrompt, reported }
   throw new Error(failure ?? "image generation produced no image")
 }
 
@@ -486,11 +589,7 @@ function mimeFromPath(file: string): string {
   return "image/png"
 }
 
-// Real pixel size read straight from a PNG's IHDR header: width and height are the two
-// big-endian uint32s at byte offsets 16 and 20 (after the 8-byte signature and the IHDR
-// length+type). This is the only reliable size readout on the OAuth path — there the
-// image_generation tool ignores the requested `size` and the host model auto-sizes from
-// the prompt, so the returned dimensions can differ from what was asked for.
+// Report decoded dimensions rather than assuming the backend honored the request.
 export function pngDimensions(png: Buffer): string | undefined {
   if (png.length < 24 || png.readUInt32BE(0) !== 0x89504e47) return undefined
   const width = png.readUInt32BE(16)

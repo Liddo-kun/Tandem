@@ -1,4 +1,5 @@
 import type { Hooks, PluginInput, ToolContext } from "@opencode-ai/plugin"
+import path from "node:path"
 import { tool } from "@opencode-ai/plugin"
 import { ImageGen } from "./imagegen"
 
@@ -21,7 +22,24 @@ export async function ImagegenPlugin(input: PluginInput): Promise<Hooks> {
   // construction (opt-out flag + a resolvable credential). The built-in imagegen
   // skill gates on the same `isAvailable()` so the two stay in lockstep.
   // Re-evaluation on later login is deferred (future option B).
-  if (!(await ImageGen.isAvailable())) return {}
+  if (ImageGen.disabledByFlag()) return {}
+  const creds = await ImageGen.resolveCreds().catch(() => undefined)
+  if (!creds) return {}
+
+  const apiControls =
+    creds.mode === "api"
+      ? {
+          quality: tool.schema.enum(ImageGen.QUALITIES).optional().describe("Image quality, default high."),
+          width: tool.schema
+            .number()
+            .int()
+            .positive()
+            .max(3840)
+            .multipleOf(16)
+            .describe("Width in pixels. Aspect ratio ≤3:1; total pixels 655360–8294400."),
+          height: tool.schema.number().int().positive().max(3840).multipleOf(16).describe("Height in pixels."),
+        }
+      : {}
 
   return {
     tool: {
@@ -29,25 +47,12 @@ export async function ImagegenPlugin(input: PluginInput): Promise<Hooks> {
         description: ImageGen.DESCRIPTION,
         args: {
           prompt: tool.schema.string().describe("What to generate, or how to edit the provided image(s). Be specific."),
-          // NOTE: the plugin registry validates these Zod args only as a predicate
-          // (safeParse().success) and passes the RAW args to execute — Zod `.default()`
-          // is never applied. So fields are optional here and defaults are applied in
-          // execute below; the defaults are documented in the descriptions for the model.
-          quality: tool.schema
-            .enum(["low", "medium", "high", "auto"])
-            .optional()
-            .describe("Image quality (default high). Higher is slower and costlier."),
-          size: tool.schema
-            .enum(["auto", "1024x1024", "1536x1024", "1024x1536"])
-            .optional()
-            .describe(
-              "Output size (default auto): auto, 1024x1024 (square), 1536x1024 (landscape), or 1024x1536 (portrait). Exact size is honored only with an OpenAI API key; with ChatGPT (OAuth) sign-in the backend ignores this and auto-sizes from the prompt, so steer aspect ratio via the prompt instead.",
-            ),
+          ...apiControls,
           image_paths: tool.schema
             .array(tool.schema.string())
             .max(ImageGen.MAX_EDIT_IMAGES)
             .optional()
-            .describe("Local image file path(s) to edit. Omit to generate a brand new image."),
+            .describe("Local source/reference images. Describe each image's role in the prompt."),
           mask_path: tool.schema
             .string()
             .optional()
@@ -55,13 +60,13 @@ export async function ImagegenPlugin(input: PluginInput): Promise<Hooks> {
           transparent: tool.schema
             .boolean()
             .optional()
-            .describe(
-              "Set true for a transparent-background cutout (e.g. a logo, sprite, or product shot to place on another background). Renders the subject on a flat key color and removes it to alpha locally. Best for solid-edged subjects; wispy edges (hair, fur, glass, smoke) may keep a fringe. Default false (opaque).",
-            ),
+            .describe("Native transparent background. Default false (opaque)."),
         },
         async execute(args, ctx: ToolContext & { callID?: string }) {
           let live = await ImageGen.resolveCreds()
           if (!live) throw new Error("No OpenAI credentials. Run `opencode auth login` (OpenAI) or set OPENAI_API_KEY.")
+          if (live.mode !== creds.mode)
+            throw new Error("OpenAI authentication mode changed. Reload the project to refresh imagegen controls.")
           // The OAuth token may have refreshed since construction; refresh + persist if stale.
           if (live.mode === "oauth" && ImageGen.needsRefresh(live)) {
             live = await ImageGen.refreshOAuth(live)
@@ -82,10 +87,15 @@ export async function ImagegenPlugin(input: PluginInput): Promise<Hooks> {
           // Apply defaults here since the registry does not apply Zod `.default()`.
           const request: ImageGen.Args = {
             prompt: args.prompt,
-            quality: args.quality ?? "high",
-            size: args.size ?? "auto",
-            image_paths: args.image_paths,
-            mask_path: args.mask_path,
+            ...(live.mode === "api"
+              ? {
+                  quality: args.quality ?? "high",
+                  width: args.width,
+                  height: args.height,
+                }
+              : {}),
+            image_paths: args.image_paths?.map((file) => path.resolve(ctx.directory, file)),
+            mask_path: args.mask_path ? path.resolve(ctx.directory, args.mask_path) : undefined,
             transparent: args.transparent ?? false,
           }
           const image = await ImageGen.run(request, live)
@@ -96,41 +106,47 @@ export async function ImagegenPlugin(input: PluginInput): Promise<Hooks> {
           // is what the chat shows and the model reads back, so the heavy PNG stays on disk but out
           // of context. Size reporting below reads the original PNG header.
           const saved = await ImageGen.saveImage(png, ctx.directory, callID, request.transparent)
-          // Report the real pixel size read from the PNG, not the requested size: on the
-          // ChatGPT/OAuth backend the image_generation tool IGNORES `size` and the host
-          // model auto-sizes from the prompt (verified — a landscape prompt yields 1536x1024
-          // regardless of the `size` sent). Exact size is honored only on the API-key path.
           const actualSize = ImageGen.pngDimensions(png)
-          const fallbackLabel = request.size === "auto" ? "auto size" : request.size
-          const sizeLabel = actualSize ?? fallbackLabel
-          // Tell the caller when a requested size was dropped so the agent does not retry the
-          // same size expecting a different result. Only the OAuth backend silently auto-sizes.
-          const sizeIgnored =
-            live.mode === "oauth" && request.size !== "auto" && actualSize !== undefined && actualSize !== request.size
-          const sizeNote = sizeIgnored
-            ? `\n\nNote: requested size ${request.size} was not applied — the ChatGPT (OAuth) image backend auto-sizes from the prompt. Sign in with an OpenAI API key for exact sizes.`
-            : ""
-          // The prompt the image model reports it actually used. On OAuth the host model can
-          // still adjust wording despite the verbatim instruction, so surface what was rendered.
+          const requestedSize = live.mode === "api" ? `${request.width}x${request.height}` : undefined
+          const sizeLabel = actualSize ?? "unknown size"
+          const sizeNote =
+            requestedSize && actualSize !== undefined && actualSize !== requestedSize
+              ? `\n\nNote: requested ${requestedSize}; the backend returned ${actualSize}.`
+              : ""
+          const qualityNote =
+            request.quality && image.reported?.quality && image.reported.quality !== request.quality
+              ? `\n\nNote: requested quality ${request.quality}; the backend reported ${image.reported.quality}.`
+              : ""
+          const modelNote = image.reported?.model ? `\n\nBackend image model/route: ${image.reported.model}.` : ""
+          // Masked OAuth edits use a host model; surface any prompt revision it reports.
           const revisedPrompt = image.revisedPrompt ?? null
           // Return only the saved path as text — the image is NOT attached, so it is not fed
           // into the model's context (a full PNG would balloon context and be re-sent every
           // turn). The web UI fetches this relative path via file.read to render a
           // click-to-zoom thumbnail, which never touches the model's context.
           const label = request.transparent ? "Saved transparent image" : "Saved image"
-          const output = `${label} (${sizeLabel}):\n${saved}${sizeNote}${revisedPromptOutput(revisedPrompt, request.prompt)}`
+          const qualityLabel = image.reported?.quality ? `; reported quality: ${image.reported.quality}` : ""
+          const output = `${label} (${sizeLabel}${qualityLabel}):\n${saved}${sizeNote}${qualityNote}${modelNote}${revisedPromptOutput(revisedPrompt, request.prompt)}`
           return {
             title: request.prompt.length > 60 ? `${request.prompt.slice(0, 57)}...` : request.prompt,
             output,
             metadata: {
               path: saved,
-              // Actual rendered size; the requested size is kept separately so a mismatch
-              // (OAuth) is inspectable.
-              size: actualSize ?? fallbackLabel,
-              requestedSize: request.size,
-              quality: request.quality,
+              size: actualSize ?? null,
+              ...(live.mode === "api"
+                ? {
+                    requestedSize,
+                    requestedModel: ImageGen.IMAGE_MODEL,
+                    requestedQuality: request.quality,
+                  }
+                : {}),
+              reported: image.reported,
+              quality: image.reported?.quality ?? null,
+              requestId: image.requestId,
+              generationId: image.generationId,
               transparent: request.transparent,
               mode: live.mode,
+              transport: image.transport ?? "images",
               revisedPrompt,
             },
           }
