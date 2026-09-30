@@ -1,5 +1,15 @@
 # Chromium Side By Side
 
+**Status: removed at Jon's request.** The dedicated Codex profile and cache,
+`chromium-codex` / `codex-chromium` wrappers, desktop entry, browser environment
+file, and side-by-side rollback directory were deleted. Source and installed
+Codex plugin launchers were restored to their pre-isolation contents. Regular
+Chromium's profile and Tandem native-host manifest were preserved (manifest hash
+verified unchanged). No dedicated browser or process using its environment was
+running at removal. The standalone Codex plugin itself remains installed; this
+does not establish coexistence with Tandem on the regular browser. The setup and
+rollback paths below are historical and no longer available.
+
 Installed on the Y700 Ubuntu desktop on 2026-09-12 at Jon's request, including an
 explicitly authorized local profile and credential transfer. No Tandem build,
 service restart, browser restart, or shared-registration takeover was performed.
