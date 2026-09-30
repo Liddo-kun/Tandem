@@ -32,6 +32,8 @@ import { markdownBlockKey, type MarkdownToken } from "./markdown-worker-protocol
 import { shouldResetCodeTokens, type RenderedCodeState } from "./markdown-code-state"
 import { getCachedMarkdown, sanitizeMarkdown, touchCachedMarkdown, type MarkdownCacheEntry } from "./markdown-cache"
 import { inlineCodeKind } from "./markdown-inline-code-kind"
+// UPSTREAM-DIVERGENCE: assistant Markdown can display local images through the SDK file reader.
+import { createMarkdownImages, markdownImageContent, type MarkdownFileReader } from "./markdown-images"
 
 type RenderedBlock =
   | (MarkdownCacheEntry & { key: string; mode: Exclude<Block["mode"], "code"> })
@@ -366,16 +368,18 @@ export function Markdown(
     text: string
     cacheKey?: string
     streaming?: boolean
+    readFile?: MarkdownFileReader
     class?: string
     classList?: Record<string, boolean>
   },
 ) {
-  const [local, others] = splitProps(props, ["text", "cacheKey", "streaming", "class", "classList"])
+  const [local, others] = splitProps(props, ["text", "cacheKey", "streaming", "readFile", "class", "classList"])
   const i18n = useI18n()
   const [root, setRoot] = createSignal<HTMLDivElement>()
   const owner = createUniqueId()
   const activeCodeKeys = new Set<string>()
   const completedCode = new Map<string, Extract<RenderedBlock, { mode: "code" }>>()
+  const images = createMarkdownImages()
   let streamed = false
   const [projection] = createResource(
     () => {
@@ -502,6 +506,7 @@ export function Markdown(
     if (content.length === 0) {
       disposeCopyButtons(container)
       container.innerHTML = ""
+      images.update(container, local.readFile)
       return
     }
 
@@ -515,13 +520,14 @@ export function Markdown(
     })
     activeCodeKeys.clear()
     nextCodeKeys.forEach((key) => activeCodeKeys.add(key))
-    content.forEach((block, index) => updateBlock(container, index, block, labels))
+    content.forEach((block, index) => updateBlock(container, index, block, labels, !!local.readFile))
     while (container.children.length > content.length) {
       const child = container.lastElementChild
       if (!child) break
       disposeCopyButtons(child)
       child.remove()
     }
+    images.update(container, local.readFile)
     container
       .querySelectorAll<HTMLElement>('[data-slot="markdown-copy-button"]')
       .forEach((button) => setCopyState(button, labels, button.dataset.copied === "true"))
@@ -533,6 +539,7 @@ export function Markdown(
   })
 
   onCleanup(() => {
+    images.dispose()
     if (copyCleanup) copyCleanup()
     disposeMarkdownProjection(owner)
     activeCodeKeys.forEach(disposeCode)
@@ -586,7 +593,13 @@ function disposeCode(key: string) {
   disposeStreamingCode(key)
 }
 
-function updateBlock(container: HTMLDivElement, index: number, block: RenderedBlock, labels: CopyLabels) {
+function updateBlock(
+  container: HTMLDivElement,
+  index: number,
+  block: RenderedBlock,
+  labels: CopyLabels,
+  localImages: boolean,
+) {
   const current = container.children[index]
   if (block.mode === "code") {
     updateCodeBlock(container, current, block, labels)
@@ -595,7 +608,8 @@ function updateBlock(container: HTMLDivElement, index: number, block: RenderedBl
   if (
     current instanceof HTMLDivElement &&
     current.dataset.markdownKey === block.key &&
-    current.dataset.markdownHash === block.hash
+    current.dataset.markdownHash === block.hash &&
+    current.dataset.markdownLocalImages === String(localImages)
   )
     return
 
@@ -603,8 +617,10 @@ function updateBlock(container: HTMLDivElement, index: number, block: RenderedBl
   next.dataset.markdownBlock = ""
   next.dataset.markdownKey = block.key
   next.dataset.markdownHash = block.hash
+  next.dataset.markdownLocalImages = String(localImages)
   next.style.display = "contents"
-  next.innerHTML = block.html
+  if (localImages) next.appendChild(markdownImageContent(block.html))
+  else next.innerHTML = block.html
   decorate(next, labels)
 
   if (!(current instanceof HTMLDivElement)) {

@@ -343,7 +343,13 @@ function createPacedValue(getValue: () => string, live?: () => boolean) {
   return value
 }
 
-function PacedMarkdown(props: { text: string; cacheKey: string; streaming: boolean }) {
+// UPSTREAM-DIVERGENCE: only assistant text opts into authenticated local image reads.
+function PacedMarkdown(props: {
+  text: string
+  cacheKey: string
+  streaming: boolean
+  readFile?: ComponentProps<typeof Markdown>["readFile"]
+}) {
   const value = createPacedValue(
     () => props.text,
     () => props.streaming,
@@ -351,7 +357,12 @@ function PacedMarkdown(props: { text: string; cacheKey: string; streaming: boole
 
   return (
     <Show when={value()}>
-      <Markdown text={value()} cacheKey={props.cacheKey} streaming={props.streaming} />
+      <Markdown
+        text={value()}
+        cacheKey={props.cacheKey}
+        streaming={props.streaming}
+        readFile={props.readFile}
+      />
     </Show>
   )
 }
@@ -1834,7 +1845,12 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
     <Show when={text()}>
       <div data-component="text-part" data-timeline-part-id={part().id}>
         <div data-slot="text-part-body">
-          <PacedMarkdown text={text()} cacheKey={part().id} streaming={streaming()} />
+          <PacedMarkdown
+            text={text()}
+            cacheKey={part().id}
+            streaming={streaming()}
+            readFile={props.message.role === "assistant" ? data.readFile : undefined}
+          />
         </div>
         <Show when={showCopy()}>
           <div data-slot="text-part-copy-wrapper" data-interrupted={interrupted() ? "" : undefined}>

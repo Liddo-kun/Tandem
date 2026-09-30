@@ -101,6 +101,13 @@ const layer = Layer.effect(
             ``,
             `Use \`${Global.Path.tmp}\` for ALL temporary files — intermediate results, throwaway scripts, working files during analysis, anything that doesn't belong in the user's project. It already exists and is pre-approved for external directory access. Only use \`/tmp\` directly if the user explicitly requests it.`,
           ].join("\n"),
+          // UPSTREAM-DIVERGENCE: the shared web UI resolves local Markdown images with file.read.
+          [
+            `# Presenting images`,
+            ``,
+            `To present a saved image, use \`![Description](relative/path.png)\` with a path inside the session working directory. Use forward slashes and \`%20\` for spaces. Tandem's web UI fetches the image from the connected server and renders it inline; do not invent HTTP URLs or inline base64.`,
+            `This inline preview feature only supports images.`,
+          ].join("\n"),
           references.length === 0
             ? undefined
             : [

@@ -61,7 +61,7 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
     data: Data
     directory: string
     // UPSTREAM-DIVERGENCE: optional file reader injected by the app (SDK file.read). Tool
-    // renderers (e.g. imagegen) use it to fetch an image by path for a thumbnail without
+    // renderers (e.g. imagegen) and assistant Markdown use it to fetch an image by path without
     // routing the bytes through the model's context. Omitted in contexts without an SDK.
     readFile?: (path: string) => Promise<FileContent | undefined>
     // UPSTREAM-DIVERGENCE: authenticated, session-owned browser captures; never arbitrary file paths.

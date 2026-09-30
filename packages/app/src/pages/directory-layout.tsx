@@ -45,14 +45,17 @@ export function DirectoryDataProvider(
     return `/${slug()}/session/${sessionID}`
   }
 
-  // UPSTREAM-DIVERGENCE: expose worktree-scoped file reads to UI tool renderers (imagegen
-  // thumbnails) via the Data context, so generated images can be shown without entering the
-  // model's context. Resolves relative paths against the session directory (file.read).
-  const readFile = (path: string) =>
-    sdk()
-      .client.file.read({ path })
-      .then((x) => x.data)
-      .catch(() => undefined)
+  // UPSTREAM-DIVERGENCE: local Markdown images and imagegen thumbnails use authenticated
+  // file reads, outside model context. Reader identity changes with the scoped SDK so image
+  // caches cannot survive a server/directory retarget with the same relative filename.
+  const readFile = createMemo(() => {
+    const client = sdk().client
+    return (path: string) =>
+      client.file
+        .read({ path })
+        .then((x) => x.data)
+        .catch(() => undefined)
+  })
 
   createEffect(() => {
     // A draft lives at /new-session?draftId=… and has no directory segment to normalize.
@@ -84,7 +87,7 @@ export function DirectoryDataProvider(
         <DataProvider
           data={sync().data}
           directory={directory}
-          readFile={readFile}
+          readFile={readFile()}
           readBrowserImage={browserImageReader()}
           sessionID={params.id}
           onNavigateToSession={(sessionID: string) => navigate(href(sessionID))}
