@@ -26,20 +26,18 @@ export async function ImagegenPlugin(input: PluginInput): Promise<Hooks> {
   const creds = await ImageGen.resolveCreds().catch(() => undefined)
   if (!creds) return {}
 
-  const apiControls =
-    creds.mode === "api"
-      ? {
-          quality: tool.schema.enum(ImageGen.QUALITIES).optional().describe("Image quality, default high."),
-          width: tool.schema
-            .number()
-            .int()
-            .positive()
-            .max(3840)
-            .multipleOf(16)
-            .describe("Width in pixels. Aspect ratio ≤3:1; total pixels 655360–8294400."),
-          height: tool.schema.number().int().positive().max(3840).multipleOf(16).describe("Height in pixels."),
-        }
-      : {}
+  const apiControls = tool.schema.object({
+    quality: tool.schema.enum(ImageGen.QUALITIES).optional().describe("Image quality, default high."),
+    width: tool.schema
+      .number()
+      .int()
+      .positive()
+      .max(3840)
+      .multipleOf(16)
+      .describe("Width in pixels. Aspect ratio ≤3:1; total pixels 655360–8294400."),
+    height: tool.schema.number().int().positive().max(3840).multipleOf(16).describe("Height in pixels."),
+  })
+  const controls = creds.mode === "api" ? apiControls : apiControls.omit({ quality: true, width: true, height: true })
 
   return {
     tool: {
@@ -47,7 +45,7 @@ export async function ImagegenPlugin(input: PluginInput): Promise<Hooks> {
         description: ImageGen.DESCRIPTION,
         args: {
           prompt: tool.schema.string().describe("What to generate, or how to edit the provided image(s). Be specific."),
-          ...apiControls,
+          ...controls.shape,
           image_paths: tool.schema
             .array(tool.schema.string())
             .max(ImageGen.MAX_EDIT_IMAGES)
@@ -85,15 +83,10 @@ export async function ImagegenPlugin(input: PluginInput): Promise<Hooks> {
           }
 
           // Apply defaults here since the registry does not apply Zod `.default()`.
+          const settings = live.mode === "api" ? apiControls.parse(args) : undefined
           const request: ImageGen.Args = {
             prompt: args.prompt,
-            ...(live.mode === "api"
-              ? {
-                  quality: args.quality ?? "high",
-                  width: args.width,
-                  height: args.height,
-                }
-              : {}),
+            ...(settings ? { ...settings, quality: settings.quality ?? "high" } : {}),
             image_paths: args.image_paths?.map((file) => path.resolve(ctx.directory, file)),
             mask_path: args.mask_path ? path.resolve(ctx.directory, args.mask_path) : undefined,
             transparent: args.transparent ?? false,

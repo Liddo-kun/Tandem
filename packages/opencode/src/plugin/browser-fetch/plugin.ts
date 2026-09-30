@@ -168,7 +168,8 @@ export async function BrowserFetchPlugin({ client }: PluginInput): Promise<Hooks
       cfg.agent ??= {}
       cfg.agent[SUBAGENT] = { ...AGENT, ...cfg.agent[SUBAGENT] }
       const permission: ConfigPermissionV1.Info = (cfg.permission ??= {})
-      const task = typeof permission.task === "string" ? { "*": permission.task } : { ...permission.task }
+      const task: Record<string, "allow" | "ask" | "deny"> =
+        typeof permission.task === "string" ? { "*": permission.task } : { ...permission.task }
       // `hidden` only affects the UI. Task permissions also remove the agent from
       // the model's catalog; webfetch creates its child directly, without Task.
       // Append the deny after existing wildcards (permissions are last-match-wins).

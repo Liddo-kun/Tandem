@@ -80,7 +80,7 @@ export interface GeneratedImage {
   reported?: { model?: string; quality?: string; background?: string; action?: string }
 }
 
-function reportedSettings(value: Record<string, unknown>): GeneratedImage["reported"] {
+function reportedSettings(value: Record<string, unknown>): NonNullable<GeneratedImage["reported"]> {
   return {
     model: typeof value.model === "string" ? value.model : undefined,
     quality: typeof value.quality === "string" ? value.quality : undefined,

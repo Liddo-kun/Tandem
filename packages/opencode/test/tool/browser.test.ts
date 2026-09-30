@@ -17,7 +17,7 @@ import { SessionInterruption } from "@opencode-ai/core/session/interruption"
 import { SessionRunCoordinator } from "@opencode-ai/core/session/run-coordinator"
 import { SessionRunState } from "../../src/session/run-state"
 
-const it = testEffect(LayerNode.compile(LayerNode.group([Agent.node, Truncate.node])))
+const it = testEffect(LayerNode.compile(LayerNode.group([Agent.node, Truncate.node, Session.node])))
 
 it.instance("deletion awaits legacy foreground and V2 coordinator finalizers before removing history", () =>
   Effect.gen(function* () {
