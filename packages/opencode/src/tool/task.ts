@@ -21,6 +21,14 @@ export interface TaskPromptOps {
   prompt(input: SessionPrompt.PromptInput): Effect.Effect<SessionV1.WithParts>
 }
 
+type TaskMetadata = {
+  parentSessionId: SessionID
+  sessionId: SessionID
+  model?: Pick<SessionV1.Assistant, "modelID" | "providerID">
+  background?: boolean
+  jobId?: string
+}
+
 const id = "task"
 const BACKGROUND_DESCRIPTION = [
   "Background mode: background=true launches the subagent asynchronously and returns immediately.",
@@ -34,19 +42,31 @@ const BACKGROUND_STARTED = [
   "Work on non-overlapping tasks, or briefly tell the user what you launched and end your response.",
 ].join("\n")
 const BACKGROUND_UPDATED = [
-  "Additional context sent to the running background task.",
+  "Steering update accepted for the running task's next model turn; it does not wait for the current task to finish.",
+  "The current model response or tool call is not interrupted. Use cancel=true with task_id to stop execution instead.",
   "The task is still working in the background. You will be notified automatically when it finishes.",
   "DO NOT sleep, poll for progress, ask the task for status, or duplicate this task's work — avoid working with the same files or topics it is using.",
   "Work on non-overlapping tasks, or briefly tell the user what you sent and end your response.",
 ].join("\n")
 
 const BaseParameterFields = {
-  description: Schema.String.annotate({ description: "A short (3-5 words) description of the task" }),
-  prompt: Schema.String.annotate({ description: "The task for the agent to perform" }),
-  subagent_type: Schema.String.annotate({ description: "The type of specialized agent to use for this task" }),
+  description: Schema.optional(Schema.String).annotate({
+    description: "A short (3-5 words) description; required for a new task",
+  }),
+  prompt: Schema.optional(Schema.String).annotate({
+    description: "Task or steering instruction; required unless cancel=true",
+  }),
+  subagent_type: Schema.optional(Schema.String).annotate({
+    description: "Agent type; required for a new task, inferred from an existing task_id otherwise",
+  }),
   task_id: Schema.optional(Schema.String).annotate({
     description:
-      "This should only be set if you mean to resume a previous task (you can pass a prior task_id and the task will continue the same subagent session as before instead of creating a fresh one)",
+      "Existing subagent session to steer while running, resume when idle, or stop with cancel=true. Running follow-ups steer at the next model turn, not after task completion.",
+  }),
+  // UPSTREAM-DIVERGENCE: cancellation is a control operation, not a queued prompt.
+  cancel: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "Stop the task identified by task_id and wait for cancellation cleanup. No prompt is sent. To redirect, cancel first, then send a follow-up using the same task_id.",
   }),
   command: Schema.optional(Schema.String).annotate({ description: "The command that triggered this task" }),
 }
@@ -63,7 +83,7 @@ export const Parameters = Schema.Struct({
 
 function renderOutput(input: {
   sessionID: SessionID
-  state: "running" | "completed" | "error"
+  state: "running" | "completed" | "error" | "cancelled"
   summary?: string
   text: string
 }) {
@@ -94,6 +114,39 @@ export const TaskTool = Tool.define(
       ctx: Tool.Context,
     ) {
       const cfg = yield* config.get()
+      const ops = ctx.extra?.promptOps as TaskPromptOps
+      if (!ops) return yield* Effect.fail(new Error("TaskTool requires promptOps in ctx.extra"))
+      const session = params.task_id
+        ? yield* sessions.get(SessionID.make(params.task_id)).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
+        : undefined
+      if (session && session.parentID !== ctx.sessionID) {
+        return yield* Effect.fail(new Error("task_id must identify a subagent of this session"))
+      }
+      const subagentType = params.subagent_type ?? session?.agent
+      const description = params.description ?? session?.title ?? "Subagent task"
+      // UPSTREAM-DIVERGENCE: cancel bypasses prompt submission and awaits both
+      // job-scope and session-runner cleanup before the caller can resume it.
+      if (params.cancel === true) {
+        if (!session) return yield* Effect.fail(new Error("cancel=true requires an existing task_id"))
+        yield* background.cancel(session.id)
+        yield* ops.cancel(session.id)
+        const result: Tool.ExecuteResult<TaskMetadata> = {
+          title: description,
+          metadata: { parentSessionId: ctx.sessionID, sessionId: session.id, background: false, jobId: session.id },
+          output: renderOutput({
+            sessionID: session.id,
+            state: "cancelled",
+            text: "Task stopped. No follow-up prompt was sent. Resume this session by sending a new prompt with the same task_id.",
+          }),
+        }
+        return result
+      }
+      if (!params.prompt || !subagentType || (!session && !params.description)) {
+        return yield* Effect.fail(
+          new Error("A prompt is required; new tasks also require description and subagent_type"),
+        )
+      }
+      const prompt = params.prompt
       const runInBackground = params.background === true
       if (runInBackground && !flags.experimentalBackgroundSubagents) {
         return yield* Effect.fail(
@@ -119,23 +172,20 @@ export const TaskTool = Tool.define(
       if (!ctx.extra?.bypassAgentCheck) {
         yield* ctx.ask({
           permission: id,
-          patterns: [params.subagent_type],
+          patterns: [subagentType],
           always: ["*"],
           metadata: {
-            description: params.description,
-            subagent_type: params.subagent_type,
+            description,
+            subagent_type: subagentType,
           },
         })
       }
 
-      const next = yield* agent.get(params.subagent_type)
+      const next = yield* agent.get(subagentType)
       if (!next) {
-        return yield* Effect.fail(new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`))
+        return yield* Effect.fail(new Error(`Unknown agent type: ${subagentType} is not a valid agent type`))
       }
 
-      const session = params.task_id
-        ? yield* sessions.get(SessionID.make(params.task_id)).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
-        : undefined
       const childPermission = deriveSubagentSessionPermission({
         parentSessionPermission: parent.permission ?? [],
         subagent: next,
@@ -157,7 +207,7 @@ export const TaskTool = Tool.define(
         session ??
         (yield* sessions.create({
           parentID: ctx.sessionID,
-          title: params.description + ` (@${next.name} subagent)`,
+          title: description + ` (@${next.name} subagent)`,
           agent: next.name,
           permission: [
             ...childPermission,
@@ -190,15 +240,12 @@ export const TaskTool = Tool.define(
       }
 
       yield* ctx.metadata({
-        title: params.description,
+        title: description,
         metadata,
       })
 
-      const ops = ctx.extra?.promptOps as TaskPromptOps
-      if (!ops) return yield* Effect.fail(new Error("TaskTool requires promptOps in ctx.extra"))
-
       const runTask = Effect.fn("TaskTool.runTask")(function* () {
-        const parts = yield* ops.resolvePromptParts(params.prompt)
+        const parts = yield* ops.resolvePromptParts(prompt)
         const result = yield* ops.prompt({
           messageID: MessageID.ascending(),
           sessionID: nextSession.id,
@@ -243,8 +290,8 @@ export const TaskTool = Tool.define(
                   state,
                   summary:
                     state === "completed"
-                      ? `Background task completed: ${params.description}`
-                      : `Background task failed: ${params.description}`,
+                      ? `Background task completed: ${description}`
+                      : `Background task failed: ${description}`,
                   text,
                 }),
               },
@@ -264,9 +311,10 @@ export const TaskTool = Tool.define(
         )
       })
 
-      if (yield* background.extend({ id: nextSession.id, run: runTask() })) {
+      const work = runTask().pipe(Effect.onInterrupt(() => ops.cancel(nextSession.id)))
+      if (yield* background.extend({ id: nextSession.id, run: work })) {
         return {
-          title: params.description,
+          title: description,
           metadata: {
             ...metadata,
             background: true,
@@ -284,21 +332,21 @@ export const TaskTool = Tool.define(
       const info = yield* background.start({
         id: nextSession.id,
         type: id,
-        title: params.description,
+        title: description,
         metadata,
         onPromote: Effect.all([
           ctx.metadata({
-            title: params.description,
+            title: description,
             metadata: { ...metadata, background: true, jobId: nextSession.id },
           }),
           notify(nextSession.id),
         ]),
-        run: runTask().pipe(Effect.onInterrupt(() => ops.cancel(nextSession.id))),
+        run: work,
       })
 
       function backgroundResult() {
         return {
-          title: params.description,
+          title: description,
           metadata: {
             ...metadata,
             background: true,
@@ -339,7 +387,7 @@ export const TaskTool = Tool.define(
             if (result?.status === "error") return yield* Effect.fail(new Error(result.error ?? "Task failed"))
             if (result?.status === "cancelled") return yield* Effect.fail(new Error("Task cancelled"))
             return {
-              title: params.description,
+              title: description,
               metadata,
               output: renderOutput({ sessionID: nextSession.id, state: "completed", text: result?.output ?? "" }),
             }

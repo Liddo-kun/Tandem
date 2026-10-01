@@ -46,6 +46,7 @@ import { SystemPrompt } from "../../src/session/system"
 import { Shell } from "@opencode-ai/core/shell"
 import { Snapshot } from "../../src/snapshot"
 import { ToolRegistry } from "@/tool/registry"
+import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { Truncate } from "@/tool/truncate"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
@@ -1493,6 +1494,142 @@ it.instance("prompt submitted during an active run is included in the next LLM i
     const messages = inputs.at(-1)?.messages
     if (!Array.isArray(messages)) throw new Error("expected LLM messages")
     expect(messages.at(-1)).toEqual({ role: "user", content: "second" })
+  }),
+)
+
+it.instance("task follow-ups steer the next provider turn without finishing the original task", () =>
+  Effect.gen(function* () {
+    const { llm, dir } = yield* useServerConfig(providerCfg)
+    const gate = yield* Deferred.make<void>()
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const chat = yield* sessions.create({
+      title: "Pinned",
+      permission: [{ permission: "*", pattern: "*", action: "allow" }],
+    })
+    const { assistant } = yield* seed(chat.id)
+    const tool = yield* TaskTool
+    const def = yield* tool.init()
+    const context = {
+      sessionID: chat.id,
+      messageID: assistant.id,
+      agent: "build",
+      abort: new AbortController().signal,
+      extra: {
+        promptOps: {
+          cancel: prompt.cancel,
+          resolvePromptParts: prompt.resolvePromptParts,
+          prompt: (input) => prompt.prompt(input).pipe(Effect.orDie),
+        } satisfies TaskPromptOps,
+      },
+      messages: [],
+      metadata: () => Effect.void,
+      ask: () => Effect.void,
+    }
+    yield* llm.push(
+      reply()
+        .wait(deferredAsPromise(gate))
+        .tool("read", { filePath: path.join(dir, "opencode.json") })
+        .stop(),
+    )
+    yield* llm.text("Used the corrected weight and scope")
+    const running = yield* def
+      .execute(
+        { description: "inspect weights", prompt: "Split the planter weights", subagent_type: "general" },
+        context,
+      )
+      .pipe(Effect.forkChild)
+    yield* llm.wait(1)
+    const [child] = yield* sessions.children(chat.id)
+    expect(child).toBeDefined()
+    if (!child) throw new Error("Missing child")
+    for (const text of ["Use shared mass50 instead", "Do not clone any assets"]) {
+      const update = yield* def.execute({ task_id: child.id, prompt: text }, context)
+      expect(update.output).toContain("next model turn")
+      yield* pollWithTimeout(
+        sessions
+          .messages({ sessionID: child.id })
+          .pipe(
+            Effect.map((msgs) =>
+              msgs.some(
+                (msg) =>
+                  msg.info.role === "user" && msg.parts.some((part) => part.type === "text" && part.text === text),
+              )
+                ? true
+                : undefined,
+            ),
+          ),
+        "Steering was not admitted while original task was active",
+      )
+    }
+    expect(yield* llm.calls).toBe(1)
+    yield* Deferred.succeed(gate, undefined)
+    const result = yield* Fiber.join(running)
+    expect(result.output).toContain("Used the corrected weight and scope")
+    const inputs = yield* llm.inputs
+    expect(inputs).toHaveLength(2)
+    expect(JSON.stringify(inputs[1]?.messages)).toContain("Use shared mass50 instead")
+    expect(JSON.stringify(inputs[1]?.messages)).toContain("Do not clone any assets")
+  }),
+)
+
+it.instance("task cancellation stops execution and permits a follow-up in the same session", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const jobs = yield* BackgroundJob.Service
+    const status = yield* SessionStatus.Service
+    const chat = yield* sessions.create({ title: "Pinned" })
+    const { assistant } = yield* seed(chat.id)
+    const tool = yield* TaskTool
+    const def = yield* tool.init()
+    const context = {
+      sessionID: chat.id,
+      messageID: assistant.id,
+      agent: "build",
+      abort: new AbortController().signal,
+      extra: {
+        promptOps: {
+          cancel: prompt.cancel,
+          resolvePromptParts: prompt.resolvePromptParts,
+          prompt: (input) => prompt.prompt(input).pipe(Effect.orDie),
+        } satisfies TaskPromptOps,
+      },
+      messages: [],
+      metadata: () => Effect.void,
+      ask: () => Effect.void,
+    }
+    yield* llm.hang
+    const running = yield* def
+      .execute({ description: "old work", prompt: "Investigate a mass split", subagent_type: "general" }, context)
+      .pipe(Effect.forkChild)
+    yield* llm.wait(1)
+    const [child] = yield* sessions.children(chat.id)
+    if (!child) throw new Error("Missing child")
+    yield* def.execute({ task_id: child.id, prompt: "An update before cancellation" }, context)
+    yield* pollWithTimeout(
+      sessions
+        .messages({ sessionID: child.id })
+        .pipe(Effect.map((msgs) => (msgs.filter((msg) => msg.info.role === "user").length === 2 ? true : undefined))),
+      "Steering was not admitted",
+    )
+    const cancelled = yield* def.execute({ task_id: child.id, cancel: true }, context)
+    expect(cancelled.output).toContain('state="cancelled"')
+    expect((yield* jobs.get(child.id))?.status).toBe("cancelled")
+    expect((yield* status.get(child.id)).type).toBe("idle")
+    expect(Exit.isFailure(yield* Fiber.await(running))).toBe(true)
+    expect((yield* sessions.messages({ sessionID: child.id })).filter((msg) => msg.info.role === "user")).toHaveLength(
+      2,
+    )
+
+    yield* llm.text("Resumed with shared mass50")
+    const resumed = yield* def.execute({ task_id: child.id, prompt: "Use shared mass50; abandon the split" }, context)
+    expect(resumed.metadata.sessionId).toBe(child.id)
+    expect(resumed.output).toContain("Resumed with shared mass50")
+    expect(yield* llm.calls).toBe(2)
+    expect(yield* sessions.children(chat.id)).toHaveLength(1)
+    expect((yield* jobs.get(child.id))?.status).toBe("completed")
   }),
 )
 

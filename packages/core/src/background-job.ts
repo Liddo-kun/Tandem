@@ -26,7 +26,6 @@ type Active = {
   pending: number
   next: number
   output?: { sequence: number; text: string }
-  tail: Deferred.Deferred<void>
   promoted: Deferred.Deferred<Info>
   onPromote?: Effect.Effect<void>
 }
@@ -54,9 +53,7 @@ type ExtendResult =
   | { extended: false }
   | {
       extended: true
-      previous: Deferred.Deferred<void>
       scope: Scope.Closeable
-      tail: Deferred.Deferred<void>
       token: object
       sequence: number
     }
@@ -206,7 +203,6 @@ export const make = Effect.gen(function* () {
         const started_at = yield* Clock.currentTimeMillis
         const done = yield* Deferred.make<Info>()
         const promoted = yield* Deferred.make<Info>()
-        const tail = yield* Deferred.make<void>()
         const result = yield* SynchronizedRef.modifyEffect(
           state.jobs,
           Effect.fnUntraced(function* (jobs) {
@@ -230,7 +226,6 @@ export const make = Effect.gen(function* () {
               token,
               pending: 1,
               next: 1,
-              tail,
               promoted,
               onPromote: input.onPromote,
             }
@@ -240,14 +235,7 @@ export const make = Effect.gen(function* () {
             ]
           }),
         )
-        if ("scope" in result)
-          yield* fork(
-            result.scope,
-            id,
-            result.token,
-            0,
-            restore(input.run).pipe(Effect.ensuring(Deferred.succeed(tail, undefined))),
-          )
+        if ("scope" in result) yield* fork(result.scope, id, result.token, 0, restore(input.run))
         return result.info
       }),
     )
@@ -256,19 +244,17 @@ export const make = Effect.gen(function* () {
   const extend: Interface["extend"] = Effect.fn("BackgroundJob.extend")(function* (input) {
     return yield* Effect.uninterruptibleMask((restore) =>
       Effect.gen(function* () {
-        const tail = yield* Deferred.make<void>()
         const result = yield* SynchronizedRef.modify(
           state.jobs,
           (jobs): readonly [ExtendResult, Map<string, Active>] => {
             const job = jobs.get(input.id)
             if (!job || job.info.status !== "running") return [{ extended: false }, jobs]
             return [
-              { extended: true, previous: job.tail, scope: job.scope, tail, token: job.token, sequence: job.next },
+              { extended: true, scope: job.scope, token: job.token, sequence: job.next },
               new Map(jobs).set(input.id, {
                 ...job,
                 pending: job.pending + 1,
                 next: job.next + 1,
-                tail,
               }),
             ]
           },
@@ -279,10 +265,9 @@ export const make = Effect.gen(function* () {
           input.id,
           result.token,
           result.sequence,
-          Deferred.await(result.previous).pipe(
-            Effect.andThen(restore(input.run)),
-            Effect.ensuring(Deferred.succeed(result.tail, undefined)),
-          ),
+          // UPSTREAM-DIVERGENCE: admit steering now; the session runner joins one
+          // execution loop. Waiting for the previous prompt would queue whole tasks.
+          restore(input.run),
         )
         return true
       }),

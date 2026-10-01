@@ -168,6 +168,34 @@ function reply(
 }
 
 describe("tool.task", () => {
+  it.instance("cancel rejects missing or unrelated task IDs without starting a prompt", () =>
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      const { chat, assistant } = yield* seed()
+      const unrelated = yield* sessions.create({ title: "Unrelated session" })
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      let prompts = 0
+      const context = {
+        sessionID: chat.id,
+        messageID: assistant.id,
+        agent: "build",
+        abort: new AbortController().signal,
+        extra: { promptOps: stubOps({ onPrompt: () => prompts++ }) },
+        messages: [],
+        metadata: () => Effect.void,
+        ask: () => Effect.void,
+      }
+      for (const task_id of [undefined, "ses_missing", unrelated.id]) {
+        const result = yield* def.execute({ task_id, cancel: true }, context).pipe(Effect.exit)
+        expect(Exit.isFailure(result)).toBe(true)
+      }
+      expect(Exit.isFailure(yield* def.execute({}, context).pipe(Effect.exit))).toBe(true)
+      expect(prompts).toBe(0)
+      expect(yield* sessions.children(chat.id)).toHaveLength(0)
+    }),
+  )
+
   it.instance(
     "description sorts subagents by name and is stable across calls",
     () =>
@@ -787,7 +815,7 @@ describe("tool.task", () => {
     }),
   )
 
-  background.instance("background task completion waits for running updates", () =>
+  background.instance("running updates reach the prompt service before the first task finishes", () =>
     Effect.gen(function* () {
       const jobs = yield* BackgroundJob.Service
       const { chat, assistant } = yield* seed()
@@ -844,12 +872,13 @@ describe("tool.task", () => {
       expect(result.metadata.sessionId).toBe(started.metadata.sessionId)
       expect(result.metadata.background).toBe(true)
       expect(result.output).toContain("Background task updated")
-      first.resolve()
+      expect(result.output).toContain("next model turn")
       expect((yield* jobs.get(started.metadata.sessionId))?.status).toBe("running")
       expect((yield* Effect.promise(() => updated.promise)).parts).toEqual([
         { type: "text", text: "also inspect cancellation" },
       ])
 
+      first.resolve()
       second.resolve()
       const waited = yield* jobs.wait({ id: started.metadata.sessionId, timeout: 1_000 })
       expect(waited.info?.status).toBe("completed")

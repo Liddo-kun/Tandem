@@ -305,32 +305,31 @@ exports[`tool parameters JSON Schema (wire shape) task 1`] = `
       "description": "Run the agent in the background. You will be notified when it completes. DO NOT sleep, poll, or proactively check on its progress",
       "type": "boolean",
     },
+    "cancel": {
+      "description": "Stop the task identified by task_id and wait for cancellation cleanup. No prompt is sent. To redirect, cancel first, then send a follow-up using the same task_id.",
+      "type": "boolean",
+    },
     "command": {
       "description": "The command that triggered this task",
       "type": "string",
     },
     "description": {
-      "description": "A short (3-5 words) description of the task",
+      "description": "A short (3-5 words) description; required for a new task",
       "type": "string",
     },
     "prompt": {
-      "description": "The task for the agent to perform",
+      "description": "Task or steering instruction; required unless cancel=true",
       "type": "string",
     },
     "subagent_type": {
-      "description": "The type of specialized agent to use for this task",
+      "description": "Agent type; required for a new task, inferred from an existing task_id otherwise",
       "type": "string",
     },
     "task_id": {
-      "description": "This should only be set if you mean to resume a previous task (you can pass a prior task_id and the task will continue the same subagent session as before instead of creating a fresh one)",
+      "description": "Existing subagent session to steer while running, resume when idle, or stop with cancel=true. Running follow-ups steer at the next model turn, not after task completion.",
       "type": "string",
     },
   },
-  "required": [
-    "description",
-    "prompt",
-    "subagent_type",
-  ],
   "type": "object",
 }
 `;

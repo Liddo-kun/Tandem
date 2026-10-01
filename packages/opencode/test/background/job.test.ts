@@ -100,10 +100,11 @@ describe("background.job", () => {
     }),
   )
 
-  it.instance("runs extensions after earlier work completes", () =>
+  it.instance("starts steering extensions before earlier work completes", () =>
     Effect.gen(function* () {
       const jobs = yield* BackgroundJob.Service
       const first = yield* Deferred.make<void>()
+      const admitted = yield* Deferred.make<void>()
       const order: string[] = []
       const job = yield* jobs.start({
         type: "test",
@@ -113,11 +114,15 @@ describe("background.job", () => {
       expect(
         yield* jobs.extend({
           id: job.id,
-          run: Effect.sync(() => order.push("extend")).pipe(Effect.as("second")),
+          run: Effect.sync(() => order.push("extend")).pipe(
+            Effect.andThen(Deferred.succeed(admitted, undefined)),
+            Effect.as("second"),
+          ),
         }),
       ).toBe(true)
-      yield* Effect.yieldNow
-      expect(order).toEqual(["start"])
+      yield* Deferred.await(admitted)
+      expect(order).toEqual(["start", "extend"])
+      expect((yield* jobs.get(job.id))?.status).toBe("running")
 
       yield* Deferred.succeed(first, undefined)
       expect((yield* jobs.wait({ id: job.id })).info?.output).toBe("second")

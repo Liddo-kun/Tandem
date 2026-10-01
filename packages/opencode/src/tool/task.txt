@@ -1,6 +1,10 @@
 Launch a new agent to handle complex, multistep tasks autonomously.
 
-When using the Task tool, you must specify a subagent_type parameter to select which agent type to use.
+For a new task, provide description, prompt, and subagent_type. For an existing task_id, the agent type and description can be omitted.
+
+Follow-ups to a running task steer its current work at the next model turn (after the current model response/tool call); they are not queued until the task finishes. An idle task resumes in the same session with its history.
+
+To stop a subagent, call this tool with task_id and cancel=true. This cancels execution and waits for cleanup; no prompt is sent. Do not send a "STOP" prompt as a substitute for cancellation. To redirect immediately, cancel first, then send the new prompt with the same task_id. Completed file changes are not rolled back by cancellation.
 
 When NOT to use the Task tool:
 - If you want to read a specific file path, use the Read or Glob tool instead of the Task tool, to find the match more quickly

@@ -1,6 +1,6 @@
 # Tandem Mobile App Changelog
 
-The Android (`packages/android`) and iOS (`packages/ios`) app packages are Tandem-owned product code, inherited from the discontinued Whispercode project (Whispercode is no longer maintained; Tandem carries its mobile apps forward). Upstream OpenCode has no mobile app packages, so the apps are not upstream divergence and are not tracked in `log.md` — but every upstream-shared file the apps depend on (the platform contract, shared mobile UI behavior, rebranding seams) **is** still inventoried there. Read `log.md` before changing shared web-UI or server code the apps rely on.
+The Android (`packages/android`) and iOS (`packages/ios`) app packages are Tandem-owned product code, inherited from discontinued Whispercode. This file owns their detailed baseline and history. User-visible mobile changes also get concise dated entries in [`log.md`](log.md#release-history), the combined Tandem release-note source. App internals are not duplicated in its OpenCode-divergence inventory, but shared-file dependencies (platform contract, shared mobile UI and rebranding seams) are inventoried there. Read the relevant `log.md` entries before changing shared web-UI or server code the apps rely on.
 
 This file has two parts: a current-state baseline of the apps, and a dated history (newest first). New app work appends dated entries to History; when a change alters the apps' current shape, also update the matching Baseline bullet.
 

@@ -16,11 +16,14 @@ needed, not the entire reference by default.
   verify actual state. Normal upstream syncs merge `upstream/dev` into `dev`;
   do not rebase or force-push them.
 - Before changing backend, web UI or mobile code, read relevant entries in
-  `log.md`. It inventories current divergence, not change history: revise an
-  existing entry when an upstream-shared file changes or a fork-owned file is
-  added, removed or retargeted. Do not append chronological "also changed" notes.
-  Changes confined to existing fork-owned code belong in the feature's own doc.
-  App-package-only changes belong in `tandem-changelog.md`, not `log.md`.
+  `log.md`. It contains dated release history, a feature overview and a current
+  divergence inventory. Add dated Unreleased entries for user-visible changes
+  (including fork-owned features/mobile apps) and material maintenance/docs work.
+  Separately revise the inventory when a shared file changes or a fork-owned file
+  is added, removed or retargeted. Keep feature docs and the detailed mobile
+  baseline/history in `tandem-changelog.md` in sync. Follow the release workflow
+  in `log.md`; preserve published history and explicitly target `Liddo-kun/Tandem`
+  in GitHub release commands rather than relying on this checkout's default repo.
 - Before editing a package, read its nearest nested `AGENTS.md`. Before changing
   `packages/opencode`, check whether config, plugins or documented extension
   points solve the request without additional backend divergence.

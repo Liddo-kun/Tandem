@@ -243,8 +243,14 @@ describe("tool parameters", () => {
       const parsed = parse(Task, { description: "d", prompt: "p", subagent_type: "general", background: true })
       expect(parsed.background).toBe(true)
     })
-    test("rejects missing prompt", () => {
-      expect(accepts(Task, { description: "d", subagent_type: "general" })).toBe(false)
+    test("accepts cancellation without a prompt or agent type", () => {
+      expect(parse(Task, { task_id: "ses_child", cancel: true })).toEqual({ task_id: "ses_child", cancel: true })
+    })
+    test("accepts steering without repeating the agent type", () => {
+      expect(parse(Task, { task_id: "ses_child", prompt: "use mass50" })).toEqual({
+        task_id: "ses_child",
+        prompt: "use mass50",
+      })
     })
   })
 
