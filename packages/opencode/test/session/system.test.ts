@@ -102,14 +102,24 @@ describe("session.system", () => {
     }
   })
 
-  test("selects the Opus 5 prompt only for Opus 5 model IDs", () => {
-    const opus5 = SystemPrompt.provider({ api: { id: "claude-opus-5" } } as Provider.Model)
-    expect(opus5[0]).toContain("You are Claude Code")
-    expect(opus5[0]).toContain("A follow-up question about your earlier work")
+  test("selects the Opus 5 prompt only for Opus 5.0 model IDs", () => {
+    for (const id of [
+      "claude-opus-5",
+      "claude-opus-5-0",
+      "claude-opus-5-20260724",
+      "claude-opus-5@default",
+      "us.anthropic.claude-opus-5-v1:0",
+    ]) {
+      const prompt = SystemPrompt.provider({ api: { id } } as Provider.Model)[0]
+      expect(prompt).toContain("You are Claude Code")
+      expect(prompt).toContain("A follow-up question about your earlier work")
+    }
 
-    const opus45 = SystemPrompt.provider({ api: { id: "claude-opus-4-5" } } as Provider.Model)
-    expect(opus45[0]).toContain("You are Claude Code")
-    expect(opus45[0]).not.toContain("A follow-up question about your earlier work")
+    for (const id of ["claude-opus-4-5", "claude-opus-5-5", "claude-opus-5.5", "anthropic/claude-opus-5-5"]) {
+      const prompt = SystemPrompt.provider({ api: { id } } as Provider.Model)[0]
+      expect(prompt).toContain("You are Claude Code")
+      expect(prompt).not.toContain("A follow-up question about your earlier work")
+    }
   })
 
   test("selects the Kimi prompt for official provider model IDs", () => {

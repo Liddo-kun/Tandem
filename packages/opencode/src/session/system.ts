@@ -43,8 +43,8 @@ export function provider(model: Provider.Model) {
   }
   if (model.api.id.includes("gemini-")) return [PROMPT_GEMINI]
   // UPSTREAM-DIVERGENCE: Opus 5 has its own fork-owned prompt, forked from anthropic.txt.
-  // Shared Anthropic prose edits need applying to both files.
-  if (model.api.id.includes("opus-5")) return [PROMPT_ANTHROPIC_OPUS_5]
+  // Shared Anthropic prose edits need applying to both files. Opus 5.0 only; point releases (5-5, 5.5) use anthropic.txt.
+  if (model.api.id.includes("opus-5") && !/opus-5[-.][1-9](?!\d)/.test(model.api.id)) return [PROMPT_ANTHROPIC_OPUS_5]
   if (model.api.id.includes("claude")) return [PROMPT_ANTHROPIC]
   if (model.api.id.toLowerCase().includes("trinity")) return [PROMPT_TRINITY]
   if (

@@ -9,4 +9,4 @@ Shared follow-through rules live here. Environment-specific repo guidance lives 
 ## Build And Install
 
 - When Jon says "Install", run the platform's documented build/install commands directly using the established context. Do not restart discovery or repeat completed verification; stop only for a concrete deployment blocker.
-- Preserve rollback, use staged replacement, verify the installed version, and leave the running service alone unless a restart is explicitly requested.
+- Use staged replacement, verify the installed version, and leave the running service alone unless a restart is explicitly requested.
