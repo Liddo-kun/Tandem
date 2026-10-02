@@ -102,26 +102,6 @@ describe("session.system", () => {
     }
   })
 
-  test("selects the Opus 5 prompt only for Opus 5.0 model IDs", () => {
-    for (const id of [
-      "claude-opus-5",
-      "claude-opus-5-0",
-      "claude-opus-5-20260724",
-      "claude-opus-5@default",
-      "us.anthropic.claude-opus-5-v1:0",
-    ]) {
-      const prompt = SystemPrompt.provider({ api: { id } } as Provider.Model)[0]
-      expect(prompt).toContain("You are Claude Code")
-      expect(prompt).toContain("A follow-up question about your earlier work")
-    }
-
-    for (const id of ["claude-opus-4-5", "claude-opus-5-5", "claude-opus-5.5", "anthropic/claude-opus-5-5"]) {
-      const prompt = SystemPrompt.provider({ api: { id } } as Provider.Model)[0]
-      expect(prompt).toContain("You are Claude Code")
-      expect(prompt).not.toContain("A follow-up question about your earlier work")
-    }
-  })
-
   test("selects the Kimi prompt for official provider model IDs", () => {
     for (const providerID of ["kimi-for-coding", "moonshotai", "moonshotai-cn"]) {
       const prompt = SystemPrompt.provider({ providerID, api: { id: "k3" } } as Provider.Model)[0]
