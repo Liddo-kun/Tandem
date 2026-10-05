@@ -3,12 +3,15 @@ import { createStore } from "solid-js/store"
 import { useMutation } from "@tanstack/solid-query"
 import type { SessionInboxInfo } from "@opencode/client/promise"
 import { SessionMessage } from "@opencode/schema/session-message"
+// UPSTREAM-DIVERGENCE: Read queued Corrector snapshots from owned metadata.
+import { TandemAuxiliary } from "@opencode/util/tandem-auxiliary"
 import { Skill } from "@opencode/schema/skill"
 import type { ComposerDelivery } from "@/composer/adapter"
 import type { ComposerStateTarget } from "@/composer/submission-state"
 import type { ImageAttachmentPart, PathAttachmentPart, Prompt } from "@/composer/state"
 import { appendPrompt, clonePrompt, isAttachment, promptLength } from "@/composer/prompt-parts"
-import { buildPromptRequest } from "@/composer/request"
+// UPSTREAM-DIVERGENCE: Preserve model-only queued context outside authored correction ranges.
+import { appendPromptContext, buildPromptRequest } from "@/composer/request"
 import { blobDataUrl, createLegacyBlobReference } from "@/runtime/persistence/drafts"
 import { readPromptPresentation } from "@/composer/comment-note"
 import { useData } from "@/runtime/server/current"
@@ -24,6 +27,9 @@ type EditStash = {
   cursor: number
   mode: "normal" | "shell"
   retry: ReturnType<ComposerStateTarget["retry"]["current"]>
+  // UPSTREAM-DIVERGENCE: Stash Corrector snapshots and restored queued context while editing.
+  correctorDisabled: boolean | undefined
+  queuedContext: string | undefined
 }
 
 export function createSessionQueue(input: {
@@ -63,6 +69,11 @@ export function createSessionQueue(input: {
           ? appendPrompt(draft, change.prompt)
           : [...change.prompt, ...draft.filter(isAttachment)]
         input.draft.set(prompt, promptLength(prompt))
+        // UPSTREAM-DIVERGENCE: Undo retains the queued Corrector snapshot and model-only context suffix.
+        input.draft.correctorDisabled.set(TandemAuxiliary.readCorrectorMetadata(change.item.payload.metadata)?.tandemCorrectorDisabled ?? false)
+        const display = queuedPromptText(change.item)
+        const suffix = change.item.payload.text.startsWith(display) ? change.item.payload.text.slice(display.length) : ""
+        input.draft.queuedContext.set(appendPromptContext(input.draft.queuedContext.current() ?? "", suffix))
         input.restoreFocus(promptLength(prompt))
         return
       }
@@ -185,10 +196,16 @@ export function createSessionQueue(input: {
         cursor: input.draft.cursor() ?? promptLength(draft),
         mode: input.draft.mode.current(),
         retry: input.draft.retry.current(),
+        // UPSTREAM-DIVERGENCE: Queue edits temporarily stash the draft's Corrector snapshot and context.
+        correctorDisabled: input.draft.correctorDisabled.current(),
+        queuedContext: input.draft.queuedContext.current(),
       },
     })
     const text = queuedPromptText(item)
     input.draft.mode.set("normal")
+    // UPSTREAM-DIVERGENCE: Edit with the queued Corrector snapshot, without carrying unrelated draft context.
+    input.draft.correctorDisabled.set(TandemAuxiliary.readCorrectorMetadata(item.payload.metadata)?.tandemCorrectorDisabled ?? false)
+    input.draft.queuedContext.set(undefined)
     input.draft.set(
       [{ type: "text", content: text, start: 0, end: text.length }, ...queuedPromptAttachments(item)],
       text.length,
@@ -205,6 +222,9 @@ export function createSessionQueue(input: {
     input.draft.mode.set(editing.stash.mode)
     input.draft.set(editing.stash.prompt, editing.stash.cursor)
     if (editing.stash.retry) input.draft.retry.set(editing.stash.retry)
+    // UPSTREAM-DIVERGENCE: Restore the original draft's Corrector snapshot and context after editing.
+    input.draft.correctorDisabled.set(editing.stash.correctorDisabled)
+    input.draft.queuedContext.set(editing.stash.queuedContext)
     input.restoreFocus(editing.stash.cursor)
   }
   const confirmEdit = (delivery: ComposerDelivery) => {
@@ -317,8 +337,9 @@ export function queuedPromptAttachments(item: QueuedPrompt): (ImageAttachmentPar
   ]
 }
 
-// Use the full model-visible text so comment notes and path references remain
-// in the draft. Convert mentioned files, agents, and skills back into editor
+// UPSTREAM-DIVERGENCE: Queue undo restores authored text and keeps model-only context outside correction ranges.
+// Restore authored text; undo preserves its model-only suffix separately in queuedContext.
+// Convert mentioned files, agents, and skills back into editor
 // parts; a detached draft cannot represent non-mentioned file context.
 function queuedPromptUndoDraft(item: QueuedPrompt): Prompt | undefined {
   if (
@@ -327,7 +348,8 @@ function queuedPromptUndoDraft(item: QueuedPrompt): Prompt | undefined {
     item.payload.skills?.some((skill) => !skill.mention)
   )
     return
-  const text = item.payload.text
+  // UPSTREAM-DIVERGENCE: Queue undo separates authored text from its restored model-only context.
+  const text = queuedPromptText(item)
   const references = [
     ...(item.payload.files ?? []).flatMap((file) =>
       file.mention
@@ -467,6 +489,14 @@ async function editedPromptInput(
     ],
     agents: agents.map((agent) => ({ name: agent.name, mention: mention(agent.mention) })),
     skills: skills.map((skill) => ({ id: skill.id, mention: mention(skill.mention) })),
-    metadata: { ...payload?.metadata, displayText: request.displayText, attachments: request.attachments },
+    // UPSTREAM-DIVERGENCE: Keep the queued Corrector setting and recompute ranges without stale correction results.
+    metadata: {
+      ...Object.fromEntries(Object.entries(payload?.metadata ?? {}).filter(([key]) =>
+        key !== "tandemPromptCorrectorOriginal" && key !== "tandemPromptCorrectorProcessed")),
+      tandemCorrectorDisabled: TandemAuxiliary.readCorrectorMetadata(payload?.metadata)?.tandemCorrectorDisabled ?? false,
+      tandemPromptCorrectorRanges: request.correctorRanges,
+      displayText: request.displayText,
+      attachments: request.attachments,
+    },
   }
 }

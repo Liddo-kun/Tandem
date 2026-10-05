@@ -3,6 +3,8 @@ import { SessionsCursor } from "@opencode/protocol/groups/session"
 import { Model } from "@opencode/schema/model"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { FSUtil } from "@opencode/util/fs-util"
+// UPSTREAM-DIVERGENCE: Central Tandem display/auth-command identity.
+import { Brand } from "@opencode/util/brand"
 import { DateTime, Effect, Ref, Schema } from "effect"
 import { withTimestampedFallback } from "@opencode/util/session-title-fallback"
 import type {
@@ -127,14 +129,16 @@ export function make(input: {
   return {
     initialize: Effect.fnUntraced(function* (params) {
       yield* Ref.set(input.capabilities, ACPCapabilities.parse(params.clientCapabilities))
+      // UPSTREAM-DIVERGENCE: Tandem login copy/command; ACP auth ID and wire fields stay upstream.
       const authMethod: AuthMethod = {
-        description: "Run `opencode auth login` in the terminal",
-        name: "Login with opencode",
+        description: `Run \`${Brand.command} auth login\` in the terminal`,
+        name: `Login with ${Brand.product}`,
         id: AuthMethodID,
       }
+      // UPSTREAM-DIVERGENCE: Launch the Tandem auth command for terminal-capable ACP clients.
       if (params.clientCapabilities?._meta?.["terminal-auth"] === true) {
         authMethod._meta = {
-          "terminal-auth": { command: "opencode", args: ["auth", "login"], label: "OpenCode Login" },
+          "terminal-auth": { command: Brand.command, args: ["auth", "login"], label: `${Brand.product} Login` },
         }
       }
       return {
@@ -147,7 +151,8 @@ export function make(input: {
           _meta: { [ACPCapabilities.ChildSessionUpdates]: true },
         },
         authMethods: [authMethod],
-        agentInfo: { name: "OpenCode", version: OPENCODE_VERSION },
+        // UPSTREAM-DIVERGENCE: Tandem branding.
+        agentInfo: { name: Brand.product, version: OPENCODE_VERSION },
       }
     }),
     authenticate: Effect.fnUntraced(function* (params) {

@@ -5,15 +5,12 @@
 
 ## Debugging
 
-- NEVER try to restart the app, or the server process, EVER.
+- Preserve the daily v1 app/server. The master orchestrator may relaunch the isolated v2 app/server as required for the port's persistence, recovery and deployment acceptance checks.
 
 ## Local Dev
 
-- `opencode dev web` proxies `https://app.opencode.ai`, so local UI/CSS changes will not show there.
-- For local UI changes, run the backend and app dev servers separately.
-- Backend (from the repository root): `bun dev serve --port 4096`
-- App (from `packages/app`): `bun dev -- --port 4444`
-- Open `http://localhost:4444` to verify UI changes (it targets the backend at `http://localhost:4096`).
+- Use the root isolated v2 launcher and explicit server URL. Follow `contextL.md` or `contextW.md`; do not use daily service discovery or assume port 4096.
+- `serve` embeds the locally built shared app. For frontend iteration, configure the Vite frontend to connect to the isolated v2 backend.
 
 ## SolidJS
 
@@ -44,6 +41,8 @@
 - Also use the relevant language authority or official dictionary for the locale (for example RAE/Fundéu, FranceTerme, Duden, TDK, Kotus/Kielitoimiston sanakirja, Språkrådet/Bokmålsordboka, Rada Języka Polskiego/PWN, the Russian and Arabic language academies, the Ukrainian Orthography, Taiwan MOE dictionaries, or the Royal Society of Thailand). Treat the English dictionary as the semantic source of truth and preserve placeholders, code identifiers, product names, and keyboard labels.
 
 ## Tests
+
+The port's real-workflow verification rule takes precedence: no low-level test writing/running unless Jon requests it. Build as necessary for a real session/client workflow; static checks alone are not acceptance.
 
 A test must pay for its upkeep. Before adding one, answer three questions: which observable contract does it protect, which credible regression makes it fail, and why does no existing test already catch that regression. If any answer is missing, do not add the test.
 

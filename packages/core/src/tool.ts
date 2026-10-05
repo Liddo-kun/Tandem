@@ -49,6 +49,9 @@ export interface NormalizedResult extends Tool.Result {
 }
 
 export interface Snapshot {
+  // UPSTREAM-DIVERGENCE: carry request-local Bash-search activation alongside the filtered tool snapshot.
+  /** Tandem's request-local search policy, selected before Code Mode catalog construction. */
+  readonly bashSearch?: boolean
   readonly definitions: ReadonlyArray<ToolDefinition>
   readonly codeModeCatalog?: CodeModeCatalog.Inventory
   readonly execute: (input: {

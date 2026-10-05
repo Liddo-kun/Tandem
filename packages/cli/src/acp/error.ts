@@ -112,7 +112,8 @@ export function toRequestError(error: Error): RequestError {
         error.safeMessage,
       )
     case "ACPServerUnavailableError":
-      return RequestError.internalError({ errorName: "ServerUnavailable" }, "OpenCode server is unavailable")
+      // UPSTREAM-DIVERGENCE: Tandem branding.
+      return RequestError.internalError({ errorName: "ServerUnavailable" }, "Tandem server is unavailable")
   }
   const exhaustive: never = error
   return exhaustive

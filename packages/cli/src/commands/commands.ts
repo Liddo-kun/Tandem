@@ -2,6 +2,8 @@ import { Argument, Flag, GlobalFlag } from "effect/unstable/cli"
 import { Schema } from "effect"
 import { Spec } from "../framework/spec"
 import { Updater } from "../services/updater"
+// UPSTREAM-DIVERGENCE: Central Tandem command/help identity.
+import { Brand } from "@opencode/util/brand"
 
 export const PrintLogs = GlobalFlag.setting("print-logs")({
   flag: Flag.boolean("print-logs").pipe(
@@ -35,13 +37,14 @@ const PermissionParams = {
   ),
 }
 
-const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME : "opencode", {
-  description: "OpenCode command line interface",
+// UPSTREAM-DIVERGENCE: Tandem root command and help copy.
+const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME : Brand.command, {
+  description: `${Brand.product} command line interface`,
   params: {
     ...ServerParams,
     ...PermissionParams,
     directory: Argument.string("directory").pipe(
-      Argument.withDescription("Directory to start OpenCode in"),
+      Argument.withDescription(`Directory to start ${Brand.product} in`),
       Argument.optional,
     ),
     continue: Flag.boolean("continue").pipe(
@@ -58,7 +61,8 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
   },
   commands: [
     Spec.make("upgrade", {
-      description: "Upgrade OpenCode to the latest or a specific version",
+      // UPSTREAM-DIVERGENCE: Upgrade help describes Tandem's manual-only release workflow.
+      description: `Show where to download ${Brand.product} releases for manual installation`,
       aliases: ["update"],
       params: {
         target: Argument.string("target").pipe(
@@ -73,7 +77,8 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       },
     }),
     Spec.make("uninstall", {
-      description: "Uninstall OpenCode and remove all related files",
+      // UPSTREAM-DIVERGENCE: Tandem branding.
+      description: `Uninstall ${Brand.product} and remove all related files`,
       params: {
         keepConfig: Flag.boolean("keep-config").pipe(
           Flag.withAlias("c"),
@@ -374,7 +379,8 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       },
     }),
     Spec.make("run", {
-      description: "Run OpenCode with a message",
+      // UPSTREAM-DIVERGENCE: Tandem branding.
+      description: `Run ${Brand.product} with a message`,
       params: {
         ...ServerParams,
         message: Argument.string("message").pipe(
@@ -519,6 +525,8 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
     Spec.make("pair", {
       description: "Print one-time links to connect a browser or app",
       params: {
+        // UPSTREAM-DIVERGENCE: Pair can target an explicit isolated server with --server.
+        ...ServerParams,
         url: Flag.string("url").pipe(
           Flag.withDescription("Use an external HTTP(S) server URL in pairing links"),
           Flag.mapTryCatch(

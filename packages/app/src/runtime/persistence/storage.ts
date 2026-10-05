@@ -461,9 +461,8 @@ export function removePersisted(
   if (target.draft && platform?.draftStore) {
     void platform.draftStore.removeItem(`${target.storage ?? "default"}:${target.key}`)
   }
-  const isDesktop = platform?.platform === "desktop" && !!platform.storage
-
-  if (isDesktop) {
+  // UPSTREAM-DIVERGENCE: Remove persisted items through native storage on Android as well as desktop.
+  if (platform?.storage) {
     void platform.storage?.(target.storage)?.removeItem(target.key)
     for (const storage of target.workspaceStorageAliases ?? []) {
       void platform.storage?.(storage)?.removeItem(target.key)
@@ -501,7 +500,8 @@ export function persisted<S extends Schema.ConstraintCodec<object, unknown>>(
     if (Option.isSome(value)) return serialize(value.value)
   }
   const store = createStore<S["Type"]>(Schema.decodeUnknownSync(Schema.toType(initialized))(initial))
-  const isDesktop = platform.platform === "desktop" && !!platform.storage
+  // UPSTREAM-DIVERGENCE: Native async storage is optional beyond desktop, including Android.
+  const nativeStorage = !!platform.storage
   const draft = config.draft ? platform.draftStore : undefined
   const prefix = `${config.storage ?? "default"}:`
   // The newest serialized draft, replayed into storage if a slow load finishes after an edit.
@@ -515,7 +515,8 @@ export function persisted<S extends Schema.ConstraintCodec<object, unknown>>(
         removeItem: (key: string) => draft.removeItem(prefix + key),
       } satisfies AsyncStorage
     }
-    if (isDesktop) return platform.storage?.(config.storage)
+    // UPSTREAM-DIVERGENCE: Route Android persistence to its native storage provider.
+    if (nativeStorage) return platform.storage?.(config.storage)
     if (!config.storage) return localStorageDirect()
     return localStorageWithPrefix(config.storage)
   })()
@@ -523,7 +524,8 @@ export function persisted<S extends Schema.ConstraintCodec<object, unknown>>(
   const workspaceAliases = config.workspaceStorageAliases ?? []
 
   const storage = (() => {
-    if (!isDesktop && !draft) {
+    // UPSTREAM-DIVERGENCE: Keep Android on the existing async migration path.
+    if (!nativeStorage && !draft) {
       const current = currentStorage as SyncStorage
       const sources: RelocationSource<SyncStorage>[] = [
         ...workspaceAliases.map((storage) => ({ storage: localStorageWithPrefix(storage) })),
@@ -565,24 +567,28 @@ export function persisted<S extends Schema.ConstraintCodec<object, unknown>>(
     }
 
     const current = currentStorage as AsyncStorage
+    // UPSTREAM-DIVERGENCE: Migrate previous draft storage through Android's native provider too.
     const previousDraftStorage = draft
-      ? isDesktop
+      ? nativeStorage
         ? platform.storage?.(config.storage)
         : config.storage
           ? localStorageWithPrefix(config.storage)
           : localStorageDirect()
       : undefined
-    const previousStorage = config.previousKey ? (isDesktop ? platform.storage?.() : localStorageDirect()) : undefined
+    // UPSTREAM-DIVERGENCE: Read legacy Android keys from native storage.
+    const previousStorage = config.previousKey ? (nativeStorage ? platform.storage?.() : localStorageDirect()) : undefined
     const relocationSources = [
       previousDraftStorage ? { storage: previousDraftStorage } : undefined,
       ...workspaceAliases.map((name) => ({
-        storage: isDesktop ? platform.storage?.(name) : localStorageWithPrefix(name),
+        // UPSTREAM-DIVERGENCE: Resolve Android workspace aliases in native storage.
+        storage: nativeStorage ? platform.storage?.(name) : localStorageWithPrefix(name),
       })),
       previousStorage && config.previousKey ? { storage: previousStorage, key: config.previousKey } : undefined,
       config.copyFrom
         ? {
             storage: config.copyFrom.storage
-              ? isDesktop
+              // UPSTREAM-DIVERGENCE: Resolve named Android migration sources in native storage.
+              ? nativeStorage
                 ? platform.storage?.(config.copyFrom.storage)
                 : localStorageWithPrefix(config.copyFrom.storage)
               : current,
@@ -592,7 +598,8 @@ export function persisted<S extends Schema.ConstraintCodec<object, unknown>>(
         : undefined,
       config.copyFrom && config.storage
         ? {
-            storage: isDesktop ? platform.storage?.() : localStorageDirect(),
+            // UPSTREAM-DIVERGENCE: Resolve Android default migration sources in native storage.
+            storage: nativeStorage ? platform.storage?.() : localStorageDirect(),
             key: config.copyFrom.key,
             pick: config.copyFrom.pick,
           }

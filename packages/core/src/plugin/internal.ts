@@ -103,6 +103,15 @@ import { VcsGitPlugin } from "./vcs/git.js"
 import { VerbosityPlugin } from "./verbosity.js"
 import { WarmingPlugin } from "./warming.js"
 import { WellKnownPlugin } from "../wellknown/plugin.js"
+// UPSTREAM-DIVERGENCE: register Tandem-owned auxiliary, browser, imagegen, Bash-search and Claude plugins.
+import { TandemAuxiliaryPlugin } from "./tandem/auxiliary.js"
+import { PromptCorrectorPlugin } from "./tandem/prompt-corrector.js"
+import { BrowserFetchPlugin } from "./tandem/browser-fetch/plugin.js"
+import { ImagegenPlugin } from "./tandem/imagegen/plugin.js"
+import { ImagegenAuth } from "./tandem/imagegen/auth.js"
+import { BashSearch } from "./tandem/bash-search/plugin.js"
+import { ClaudePlugin } from "./tandem/claude/plugin.js"
+import { ToolGuidancePlugin } from "./tandem/tool-guidance/plugin.js" // UPSTREAM-DIVERGENCE: keep tool wording in a Tandem-owned transform.
 
 const services = [
   Agent.Service,
@@ -218,6 +227,9 @@ const pre = [
   WellKnownPlugin.Plugin,
   VcsGitPlugin.Plugin,
   AgentPlugin.Plugin,
+  // UPSTREAM-DIVERGENCE: install auxiliary defaults and Corrector before normal prompt handling.
+  TandemAuxiliaryPlugin.Defaults,
+  PromptCorrectorPlugin.Plugin,
   PlanPlugin.Plugin,
   CommandPlugin.Plugin,
   SkillPlugin.Plugin,
@@ -241,6 +253,10 @@ const pre = [
   SkillTool.Plugin,
   SubagentTool.Plugin,
   WebFetchTool.Plugin,
+  // UPSTREAM-DIVERGENCE: install browser-backed fetch and authenticated image generation.
+  BrowserFetchPlugin.Plugin,
+  ImagegenAuth.AuthPlugin,
+  ImagegenPlugin.Plugin,
   WebSearchTool.Plugin,
   WriteTool.Plugin,
   WarmingPlugin.Plugin,
@@ -264,6 +280,13 @@ const post = [
   ConfigProviderPlugin.Plugin,
   ConfigWebSearchPlugin.Plugin,
   ConfigPolicyPlugin.Plugin,
+  // UPSTREAM-DIVERGENCE: apply Tandem policies and Claude/Bash-search presentation after upstream plugins.
+  BrowserFetchPlugin.Policy,
+  PromptCorrectorPlugin.Policy,
+  TandemAuxiliaryPlugin.Policy,
+  ToolGuidancePlugin.Plugin, // UPSTREAM-DIVERGENCE: customize tool wording before Bash-search and Claude presentation.
+  BashSearch.Plugin,
+  ClaudePlugin.Plugin,
 ] as const satisfies readonly InternalPlugin[]
 
 // Repository config must not switch off policy enforcement or the Console connection that delivers

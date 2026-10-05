@@ -7,7 +7,8 @@ import type { ImageAttachmentPart, Prompt } from "./state"
 import { clonePrompt, promptLength } from "./prompt-parts"
 import type { ComposerAdapter, ComposerDelivery, ComposerSelection, ComposerSession } from "./adapter"
 import { createComposerSubmission } from "./submission-state"
-import { buildPromptRequest } from "./request"
+// UPSTREAM-DIVERGENCE: Restore queued context without including it in authored correction ranges.
+import { appendPromptContext, buildPromptRequest } from "./request"
 import { setCursorPosition } from "./editor/dom"
 import { blobDataUrl, resolveBlobUrl } from "@/runtime/persistence/drafts"
 import { isAttachment } from "./prompt-parts"
@@ -25,11 +26,16 @@ type ComposerSubmission = {
   images: ImageAttachmentPart[]
   selection: ComposerSelection
   delivery: ComposerDelivery
+  // UPSTREAM-DIVERGENCE: Snapshot Corrector state and queued context per submission.
+  correctorDisabled: boolean
+  queuedContext?: string
 }
 
 type ComposerSubmitInput = {
   adapter: ComposerAdapter
   mode: Accessor<"normal" | "shell">
+  // UPSTREAM-DIVERGENCE: Read the persisted Corrector preference at submission time.
+  correctorEnabled?: Accessor<boolean>
   commands: Accessor<readonly { name: string }[] | undefined>
   editor: () => HTMLDivElement | undefined
   queueScroll: () => void
@@ -195,6 +201,8 @@ function handoffMessage(value: ComposerSubmission): SessionMessageUser {
       name: image.sourcePath ?? image.filename,
     })),
     metadata: {
+      // UPSTREAM-DIVERGENCE: Handoff messages preserve their Corrector snapshot.
+      tandemCorrectorDisabled: value.correctorDisabled,
       displayText: value.text,
       attachments: value.prompt.flatMap((part) =>
         part.type === "path" ? [{ name: part.filename, mime: part.mime, path: part.path }] : [],
@@ -279,6 +287,10 @@ function readSubmission(
       variant,
     },
     delivery: input.delivery?.(alternate) ?? "steer",
+    // UPSTREAM-DIVERGENCE: Restored/retried prompts retain their original Corrector setting and context.
+    correctorDisabled: input.adapter.state.correctorDisabled.current() ??
+      (retryID ? retry?.correctorDisabled : undefined) ?? !(input.correctorEnabled?.() ?? true),
+    queuedContext: input.adapter.state.queuedContext.current(),
   }
 }
 
@@ -301,6 +313,9 @@ function restoreSubmission(
   input.removeFromHistory(value.prompt, value.mode, comments)
   restored.target.set(restored.prompt, promptLength(restored.prompt))
   restored.target.mode.set(value.mode)
+  // UPSTREAM-DIVERGENCE: Restore the failed submission's Corrector snapshot and queued context.
+  restored.target.correctorDisabled.set(value.correctorDisabled)
+  restored.target.queuedContext.set(value.queuedContext)
   restored.target.context.replaceComments(
     restored.context
       .filter((item) => !!item.comment?.trim())
@@ -336,6 +351,8 @@ function restoreSubmission(
       providerID: value.selection.model.providerID,
       modelID: value.selection.model.modelID,
       variant: value.selection.variant,
+      // UPSTREAM-DIVERGENCE: Retrying a failed prompt retains its original Corrector setting.
+      correctorDisabled: value.correctorDisabled,
     })
   }
   if (!submission.current(input.adapter.state)) return true
@@ -430,6 +447,9 @@ async function sendPrompt(
     agents: request.agents,
     skills: request.skills,
     metadata: {
+      // UPSTREAM-DIVERGENCE: Backend Corrector receives the snapshot and authored-only ranges.
+      tandemCorrectorDisabled: value.correctorDisabled,
+      tandemPromptCorrectorRanges: request.correctorRanges,
       displayText: request.displayText,
       comments: request.comments,
       attachments: request.attachments,
@@ -452,13 +472,16 @@ async function buildSubmissionRequest(session: ComposerSession, value: ComposerS
       dataUrl: await blobDataUrl(attachment.blob, attachment.mime),
     })),
   )
-  return buildPromptRequest({
+  // UPSTREAM-DIVERGENCE: Append restored queue context after computing authored correction ranges.
+  const request = buildPromptRequest({
     prompt: value.prompt,
     context: value.context,
     images,
     text: value.text,
     sessionDirectory: session.directory,
   })
+  // UPSTREAM-DIVERGENCE: Preserve restored model-only queue context on resubmission.
+  return { ...request, text: appendPromptContext(request.text, value.queuedContext) }
 }
 
 function failSubmission(

@@ -4,6 +4,8 @@ import { $ } from "bun"
 import { mkdir, rm } from "fs/promises"
 import path from "path"
 import { Script } from "@opencode/script"
+// UPSTREAM-DIVERGENCE: Central Tandem command identity.
+import { Brand } from "@opencode/util/brand"
 import { createSolidTransformPlugin } from "@opentui/solid/bun-plugin"
 import type { BunPlugin } from "bun"
 import pkg from "../package.json"
@@ -12,6 +14,8 @@ import { verifyArtifact, verifySimulationGraph } from "./verify-artifact"
 import { resolveOpencodePty } from "./opencode-pty"
 
 const dir = path.resolve(import.meta.dirname, "..")
+// UPSTREAM-DIVERGENCE: Preserve upstream target/artifact directory and embedded binary conventions.
+// Deployment stages bin/opencode as tandem; public help and client spawning use Brand.
 const binary = "opencode"
 const outdir = path.resolve(
   dir,
@@ -150,7 +154,8 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
     },
     define: {
       OPENCODE_VERSION: `'${Script.version}'`,
-      OPENCODE_CLI_NAME: "'opencode'",
+      // UPSTREAM-DIVERGENCE: Tandem public command; upstream artifact names stay intact.
+      OPENCODE_CLI_NAME: JSON.stringify(Brand.command),
       OPENCODE_CHANNEL: `'${Script.channel}'`,
       OPENCODE_ARTIFACT: `'cli'`,
       OPENCODE_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "undefined",

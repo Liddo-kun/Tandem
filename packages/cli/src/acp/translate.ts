@@ -326,7 +326,8 @@ export function failure(state: TurnState) {
   if (error?.type === "provider.auth") return new ACPError.AuthRequiredError()
   if (error && error.type !== "aborted" && error.type !== "provider.content-filter") {
     return new ACPError.ServiceFailureError({
-      safeMessage: error.message || "OpenCode prompt failed",
+      // UPSTREAM-DIVERGENCE: Tandem branding.
+      safeMessage: error.message || "Tandem prompt failed",
       service: "session",
       errorName: error.type,
     })

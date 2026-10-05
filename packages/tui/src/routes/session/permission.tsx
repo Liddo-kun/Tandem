@@ -325,7 +325,8 @@ function RejectPrompt(props: {
           <text fg={theme.text.base}>Reject permission</text>
         </box>
         <box paddingLeft={1}>
-          <text fg={theme.text.muted}>Tell OpenCode what to do differently</text>
+          {/* UPSTREAM-DIVERGENCE: Tandem permission-rejection copy. */}
+          <text fg={theme.text.muted}>Tell Tandem what to do differently</text>
         </box>
       </box>
       <box

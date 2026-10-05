@@ -240,7 +240,8 @@ export function TerminalPane(props: {
       }
       if (message.type !== "attached") return
       if (!("inputProtocol" in message) || message.inputProtocol !== 1) {
-        setFailure("Persistent terminal server is out of date; restart OpenCode")
+        // UPSTREAM-DIVERGENCE: Tandem branding.
+        setFailure("Persistent terminal server is out of date; restart Tandem")
         next.close()
         return
       }

@@ -33,6 +33,8 @@ import { Skill } from "@opencode/schema/skill"
 import type { ComposerAttachment, ComposerComment, ComposerOption, ComposerPrompt, ComposerSuggestion } from "../types"
 import type { ComposerEditorModel, ComposerSelectControl } from "./interaction"
 import { isAttachment } from "../prompt-parts"
+// UPSTREAM-DIVERGENCE: Android native range-editing helpers.
+import { getDeleteWordRange, getEditorText, getSelectionRange, setSelectionRange } from "./dom"
 import "../attachments/attachments.css"
 import "./editor.css"
 
@@ -73,6 +75,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
   const view = props.controller.view
   let editor: HTMLDivElement | undefined
   let viewport: HTMLDivElement | undefined
+  // UPSTREAM-DIVERGENCE: Wait for the native editor viewport before measuring available height.
+  const [sizingViewport, setSizingViewport] = createSignal<HTMLDivElement>()
   let controlsViewport!: HTMLDivElement
   let controlsContent!: HTMLDivElement
   const [overflow, setOverflow] = createStore({ start: false, end: false })
@@ -91,6 +95,95 @@ export function ComposerEditor(props: ComposerEditorProps) {
     onCleanup(() => observer.disconnect())
   })
   let localInput = false
+  // UPSTREAM-DIVERGENCE: Android IME-safe range editing, caret reveal and viewport sizing.
+  let composing = false
+  const revealCaret = () => requestAnimationFrame(() => {
+    const selection = window.getSelection()
+    if (!editor || !viewport || !selection?.isCollapsed || !selection.rangeCount) return
+    if (!editor.contains(selection.anchorNode)) return
+    const rect = selection.getRangeAt(0).getBoundingClientRect()
+    const caret = rect.height ? rect : selection.anchorNode?.parentElement
+      ?.querySelector("[data-caret-tail]")?.getBoundingClientRect()
+    if (!caret?.height) return
+    const bounds = viewport.getBoundingClientRect()
+    if (caret.bottom > bounds.bottom - 8) viewport.scrollTop += caret.bottom - bounds.bottom + 8
+    if (caret.top < bounds.top + 8) viewport.scrollTop += caret.top - bounds.top - 8
+  })
+  const mobileEdit = (type: "newline" | "delete-word") => {
+    if (!editor || document.activeElement !== editor || composing || props.disabled || props.readOnly) return
+    const selection = window.getSelection()
+    const offsets = getSelectionRange(editor)
+    if (!selection?.rangeCount || !offsets) return
+    const range = selection.getRangeAt(0)
+    if (type === "delete-word") {
+      const span = getDeleteWordRange(getEditorText(editor), offsets)
+      if (!span) return
+      setSelectionRange(editor, range, span.start, span.end)
+    }
+    if (type === "newline" && offsets.start !== offsets.end) {
+      setSelectionRange(editor, range, offsets.start, offsets.end)
+    }
+    range.deleteContents()
+    if (type === "newline") {
+      const node = document.createTextNode("\n")
+      range.insertNode(node)
+      range.setStart(node, node.length)
+      // Chromium needs a final line box to keep typing after a trailing newline.
+      if (!node.parentElement?.querySelector("[data-caret-tail]")) {
+        // An emptied contenteditable may already have Chromium's placeholder BR.
+        const last = node.parentNode?.lastChild
+        const tail = last instanceof HTMLBRElement ? last : document.createElement("br")
+        tail.dataset.caretTail = ""
+        node.parentNode?.appendChild(tail)
+      }
+    }
+    range.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    editor.dispatchEvent(new InputEvent("input", {
+      bubbles: true,
+      inputType: type === "newline" ? "insertLineBreak" : "deleteWordBackward",
+    }))
+    revealCaret()
+  }
+  createEffect(() => {
+    const mountedViewport = sizingViewport()
+    if (!view.nativeEditing) return
+    // ScrollView supplies its viewport in its own onMount, after our mount hook.
+    const scroll = mountedViewport?.parentElement
+    const dock = editor?.closest<HTMLElement>('[data-component="session-composer-dock"]')
+    const boundary = dock?.parentElement
+    if (scroll && dock && boundary) {
+      // Native zoom/IME resize the session panel, not the editor's 180px cap.
+      // Reserve the measured dock chrome (including attachments/queue), then
+      // shrink only the editor. ResizeObserver sizes are already unzoomed.
+      const heights = new Map<Element, number>()
+      let frame = 0
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) heights.set(entry.target, entry.borderBoxSize[0].blockSize)
+        cancelAnimationFrame(frame)
+        frame = requestAnimationFrame(() => {
+          const available = heights.get(boundary)
+          const dockHeight = heights.get(dock)
+          const scrollHeight = heights.get(scroll)
+          if (available === undefined || dockHeight === undefined || scrollHeight === undefined) return
+          scroll.style.maxHeight = `${Math.max(60, Math.min(180, available - dockHeight + scrollHeight))}px`
+          revealCaret()
+        })
+      })
+      for (const element of [boundary, dock, scroll]) observer.observe(element)
+      onCleanup(() => {
+        observer.disconnect()
+        cancelAnimationFrame(frame)
+      })
+    }
+  })
+  onMount(() => {
+    if (!view.nativeEditing) return
+    const deleteWord = () => mobileEdit("delete-word")
+    window.addEventListener("opencode:keyboard-delete-word", deleteWord)
+    onCleanup(() => window.removeEventListener("opencode:keyboard-delete-word", deleteWord))
+  })
   const updateCursor = () => {
     if (!editor || !window.getSelection()?.isCollapsed) return
     props.controller.onCursor(composerCursor(editor))
@@ -109,7 +202,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
       localInput = false
       return
     }
-    renderComposerEditor(editor, parts)
+    // UPSTREAM-DIVERGENCE: Preserve the Android trailing-newline caret line box on rerender.
+    renderComposerEditor(editor, parts, view.nativeEditing)
   })
 
   return (
@@ -155,7 +249,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
         }}
         onSubmit={(event) => {
           event.preventDefault()
-          if (!props.disabled) props.controller.submit()
+          // UPSTREAM-DIVERGENCE: Android Enter inserts a newline; the send button submits.
+          if (!view.nativeEditing && !props.disabled) props.controller.submit()
         }}
         onDragEnter={props.controller.onDragEnter}
         onDragOver={props.controller.onDragOver}
@@ -182,9 +277,12 @@ export function ComposerEditor(props: ComposerEditorProps) {
           class="min-h-[60px] max-h-[180px]"
           viewportRef={(element) => {
             viewport = element
+            // UPSTREAM-DIVERGENCE: Trigger native sizing after ScrollView provides its viewport.
+            setSizingViewport(element)
             element.tabIndex = -1
           }}
         >
+          {/* UPSTREAM-DIVERGENCE: Android IME Enter/newline and delete-word handling. */}
           <div
             ref={(element) => {
               editor = element
@@ -193,6 +291,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
             data-component="composer-editor"
             role="textbox"
             aria-multiline="true"
+            enterkeyhint={view.nativeEditing ? "enter" : undefined}
             aria-label={i18n.t("ui.promptInput.label")}
             dir={state.mode === "normal" ? "auto" : "ltr"}
             contenteditable={!props.disabled && !props.readOnly}
@@ -209,12 +308,29 @@ export function ComposerEditor(props: ComposerEditorProps) {
             }}
             onInput={(event) => {
               const cursor = composerCursor(event.currentTarget)
-              const prompt = parseComposerEditor(event.currentTarget)
+              // UPSTREAM-DIVERGENCE: Keep Android authored newlines separate from its caret BR.
+              const prompt = parseComposerEditor(event.currentTarget, view.nativeEditing)
               const attachments = props.controller.parts().filter(isAttachment)
               localInput = true
               props.controller.onInput(prompt.map((part) => part.content).join(""), [...prompt, ...attachments], cursor)
             }}
             onKeyDown={(event) => {
+              // UPSTREAM-DIVERGENCE: Android Enter and Ctrl+Backspace use IME-safe native ranges.
+              if (view.nativeEditing && event.key === "Enter") {
+                if (!event.isComposing && !composing && event.keyCode !== 229) {
+                  event.preventDefault()
+                  mobileEdit("newline")
+                }
+                // IME candidate acceptance also must never fall through to submission.
+                return
+              }
+              if (view.nativeEditing && !event.isComposing && !composing && event.keyCode !== 229) {
+                if (event.key === "Backspace" && event.ctrlKey && !event.altKey && !event.metaKey) {
+                  event.preventDefault()
+                  mobileEdit("delete-word")
+                  return
+                }
+              }
               if (!view.draftOnly && props.controller.onKeyDown(event)) return
               const mod = event.metaKey || event.ctrlKey
               if (mod && event.key === "ArrowUp" && !event.shiftKey && !event.altKey) {
@@ -229,19 +345,24 @@ export function ComposerEditor(props: ComposerEditorProps) {
             }}
             onKeyUp={updateCursor}
             onPointerUp={updateCursor}
+            onCompositionStart={() => { composing = true }}
+            onCompositionEnd={() => { composing = false }}
+            onBeforeInput={(event) => {
+              if (!view.nativeEditing || event.isComposing || composing || !event.cancelable) return
+              if (event.inputType === "insertParagraph" || event.inputType === "insertLineBreak") {
+                event.preventDefault()
+                mobileEdit("newline")
+              }
+              if (event.inputType === "deleteWordBackward") {
+                event.preventDefault()
+                mobileEdit("delete-word")
+              }
+            }}
             onPaste={(event) => {
               props.controller.onPaste(event)
               // Programmatic multiline insertion does not reliably reveal the caret.
-              requestAnimationFrame(() => {
-                const selection = window.getSelection()
-                if (!editor || !viewport || !selection?.isCollapsed || !selection.rangeCount) return
-                if (!editor.contains(selection.anchorNode)) return
-                const caret = selection.getRangeAt(0).getBoundingClientRect()
-                if (!caret.height) return
-                const bounds = viewport.getBoundingClientRect()
-                if (caret.bottom > bounds.bottom - 8) viewport.scrollTop += caret.bottom - bounds.bottom + 8
-                if (caret.top < bounds.top + 8) viewport.scrollTop += caret.top - bounds.top - 8
-              })
+              // UPSTREAM-DIVERGENCE: Reuse native caret reveal, including trailing-newline line boxes.
+              revealCaret()
             }}
             onFocus={() => props.controller.dispatch({ type: "focus.editor" })}
           />
@@ -294,6 +415,24 @@ export function ComposerEditor(props: ComposerEditorProps) {
             style={buttons()}
           >
             <div ref={controlsContent} class="flex h-full w-max min-w-full items-center gap-1">
+              {/* UPSTREAM-DIVERGENCE: Persisted Corrector toggle in shared composer controls. */}
+              <Show when={view.corrector} keyed>
+                {(control) => (
+                  <Tooltip value={i18n.t("prompt.corrector.description")}>
+                    <Button
+                      type="button"
+                      variant="ghost-faint"
+                      size="small"
+                      aria-pressed={control.enabled()}
+                      disabled={!control.ready() || view.draftOnly}
+                      classList={{ "opacity-50": !control.enabled() }}
+                      onClick={control.onToggle}
+                    >
+                      {i18n.t("prompt.corrector.title")}
+                    </Button>
+                  </Tooltip>
+                )}
+              </Show>
               <Show when={view.agent} keyed>
                 {(control) => (
                   <ComposerEditorConfiguredSelect
@@ -363,7 +502,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
 
 const mentionParts = new WeakMap<HTMLElement, Exclude<ComposerPrompt[number], ComposerAttachment | { type: "text" }>>()
 
-function renderComposerEditor(editor: HTMLDivElement, prompt: ComposerPrompt) {
+// UPSTREAM-DIVERGENCE: Android renders a trailing-newline line box without adding authored text.
+function renderComposerEditor(editor: HTMLDivElement, prompt: ComposerPrompt, nativeEditing = false) {
   const active = document.activeElement === editor
   editor.replaceChildren(
     ...prompt.flatMap<Node>((part) => {
@@ -390,16 +530,28 @@ function renderComposerEditor(editor: HTMLDivElement, prompt: ComposerPrompt) {
       return [mention]
     }),
   )
+  // UPSTREAM-DIVERGENCE: Keep the native caret visible after a trailing newline.
+  if (nativeEditing && editor.textContent?.endsWith("\n")) {
+    const tail = document.createElement("br")
+    tail.dataset.caretTail = ""
+    editor.append(tail)
+  }
   if (!active) return
   const selection = window.getSelection()
   const range = document.createRange()
   range.selectNodeContents(editor)
   range.collapse(false)
+  // UPSTREAM-DIVERGENCE: Restore the native caret before the synthetic trailing BR.
+  if (editor.lastChild instanceof HTMLElement && editor.lastChild.hasAttribute("data-caret-tail")) {
+    range.setStartBefore(editor.lastChild)
+    range.collapse(true)
+  }
   selection?.removeAllRanges()
   selection?.addRange(range)
 }
 
-function parseComposerEditor(editor: HTMLDivElement) {
+// UPSTREAM-DIVERGENCE: Android preserves authored newline-only drafts.
+function parseComposerEditor(editor: HTMLDivElement, preserveNewlines = false) {
   const parts: Exclude<ComposerPrompt[number], ComposerAttachment>[] = []
   let buffer = ""
   let position = 0
@@ -457,6 +609,8 @@ function parseComposerEditor(editor: HTMLDivElement) {
       return
     }
     if (!(node instanceof HTMLElement)) return
+    // UPSTREAM-DIVERGENCE: Ignore the Android caret line box when parsing authored text.
+    if (node.hasAttribute("data-caret-tail")) return
     if (node.dataset.mention) {
       mention(node)
       return
@@ -473,9 +627,10 @@ function parseComposerEditor(editor: HTMLDivElement) {
     if (node instanceof HTMLElement && ["DIV", "P"].includes(node.tagName) && index < nodes.length - 1) buffer += "\n"
   })
   flush()
+  // UPSTREAM-DIVERGENCE: Do not normalize Android newline-only input to an empty draft.
   if (
     parts.every((part) => part.type === "text") &&
-    parts.every((part) => part.content.replace(/[\n\u200B]/g, "") === "")
+    parts.every((part) => part.content.replace(preserveNewlines ? /\u200B/g : /[\n\u200B]/g, "") === "")
   ) {
     return [{ type: "text" as const, content: "", start: 0, end: 0 }]
   }

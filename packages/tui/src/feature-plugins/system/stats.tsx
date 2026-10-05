@@ -61,8 +61,9 @@ export function StatsPoster(props: { stats: SessionStatsInfo }) {
   return (
     <box width={width()} flexDirection="column" alignItems="center" flexShrink={0} gap={compact() ? 1 : 2}>
       <box width="100%" flexDirection={width() < 44 ? "column" : "row"} justifyContent="space-between">
+        {/* UPSTREAM-DIVERGENCE: Tandem stats title. */}
         <text fg={theme.text.base} attributes={TextAttributes.BOLD}>
-          opencode / stats
+          Tandem / stats
         </text>
         <text fg={theme.text.muted}>{dates()}</text>
       </box>
@@ -131,7 +132,8 @@ export function StatsPoster(props: { stats: SessionStatsInfo }) {
         </For>
       </box>
       <box width="100%" flexDirection="row" justifyContent="flex-end">
-        <text fg={theme.text.base}>opencode.ai</text>
+        {/* UPSTREAM-DIVERGENCE: Tandem project URL. */}
+        <text fg={theme.text.base}>github.com/Liddo-kun/Tandem</text>
       </box>
     </box>
   )

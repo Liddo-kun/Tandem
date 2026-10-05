@@ -7,16 +7,22 @@ export function make(tools: string[]) {
 }
 
 export function render(prompt: string, tools: string[]) {
+  // UPSTREAM-DIVERGENCE: name only tools in the effective native catalog; Code Mode owns its own routing guidance.
   const instructions: string[] = []
   if (tools.includes("shell")) {
     instructions.push(
-      "- Prefer dedicated tools over shell commands; fall back to the shell when a tool cannot do what you need.",
+      "- Prefer available dedicated tools over shell commands; use the shell when explicitly requested, necessary, or more efficient for repetitive work.",
       "- Do not chain shell commands with separators like `echo \"====\";` or `printf '---'`; the output becomes noisy in a way that makes the user's side of the conversation worse.",
     )
   }
   if (tools.includes("write")) {
     instructions.push(
-      "- Use the write tool to create files or completely replace their content. Prefer using the edit tool for targeted changes.",
+      `- Use the write tool to create files or completely replace their content.${tools.includes("edit") ? " Prefer the edit tool for targeted changes." : ""}`,
+    )
+  }
+  if (tools.includes("patch")) {
+    instructions.push(
+      "- Use patch, the combined write/edit/delete/rename tool, for file-oriented changes. Supply patchText with Begin Patch/End Patch and Add File, Update File (optionally Move to), or Delete File sections; prefix added lines with +.",
     )
   }
   if (tools.includes("edit")) {

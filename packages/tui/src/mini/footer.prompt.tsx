@@ -533,8 +533,9 @@ export function createPromptState(input: PromptInput): PromptState {
         display: "/compact",
         description: "compact older session context to free space",
       } satisfies SlashOption,
+      // UPSTREAM-DIVERGENCE: Tandem exit-command help.
       ...EXIT_COMMANDS.map(
-        (name) => ({ kind: "slash", name, display: `/${name}`, description: "close OpenCode" }) satisfies SlashOption,
+        (name) => ({ kind: "slash", name, display: `/${name}`, description: "close Tandem" }) satisfies SlashOption,
       ),
     ]
     const hidden = new Set(builtins.map((item) => item.name))

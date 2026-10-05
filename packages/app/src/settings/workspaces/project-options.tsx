@@ -68,7 +68,10 @@ export const ProjectOptions: Component<{
             {(rename) => <Menu.Item onSelect={rename}>{language.t("common.rename")}</Menu.Item>}
           </Show>
           <Show when={revealProject.available(props.server)}>
-            <Menu.Item onSelect={() => revealProject.reveal(props.server, props.project)}>{language.t(fileManagerApp(platform.os ?? "unknown").actionLabel)}</Menu.Item>
+            {/* UPSTREAM-DIVERGENCE: Keep Android out of desktop-only file-manager OS lookup. */}
+            <Menu.Item onSelect={() => revealProject.reveal(props.server, props.project)}>
+              {language.t(fileManagerApp(platform.platform === "desktop" ? (platform.os ?? "unknown") : "unknown").actionLabel)}
+            </Menu.Item>
           </Show>
           <Menu.Item disabled={unseen() === 0} onSelect={clearNotifications}>
             {language.t("sidebar.project.clearNotifications")}

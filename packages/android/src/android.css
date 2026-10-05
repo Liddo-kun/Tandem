@@ -1,0 +1,13 @@
+html[data-platform="android"] {
+  #root {
+    /* Native side insets are physical; apply them once around the shared shell. */
+    padding-left: var(--safe-area-inset-left, 0px);
+    padding-right: var(--safe-area-inset-right, 0px);
+  }
+  [data-component="connect-server"] {
+    padding-block-start: max(48px, var(--safe-area-inset-top, 0px));
+    padding-block-end: max(32px, var(--safe-area-inset-bottom, 0px));
+    /* System-bar positions are physical, independent of text direction. */
+    padding-inline: 24px;
+  }
+}

@@ -3,10 +3,13 @@ import { Socket } from "effect/unstable/socket"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { httpClient } from "@opencode/util/effect/app-node-platform"
 import { WebSocketConstructor } from "./websocket-constructor.js"
+// UPSTREAM-DIVERGENCE: decorate the injected model HTTP client with owned final-send diagnostics.
+import { RequestDump } from "../plugin/tandem/request-dump/transport.js"
 
 export const requestExecutor = makeGlobalNode({
   service: RequestExecutor.Service,
-  layer: RequestExecutor.layer,
+  // UPSTREAM-DIVERGENCE: keep diagnostics out of @opencode/ai's network executor.
+  layer: RequestDump.executorLayer,
   deps: [httpClient],
 })
 

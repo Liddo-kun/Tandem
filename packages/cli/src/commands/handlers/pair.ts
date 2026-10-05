@@ -6,15 +6,20 @@ import { renderUnicodeCompact } from "uqr"
 import { Commands } from "../commands"
 import { Runtime } from "../../framework/runtime"
 import { ServiceConfig } from "../../services/service-config"
+// UPSTREAM-DIVERGENCE: Explicit server pairing and Tandem command hints.
+import { ServerConnection } from "../../services/server-connection"
+import { Brand } from "@opencode/util/brand"
 
 export default Runtime.handler(
   Commands.commands.pair,
   Effect.fn("cli.pair")(function* (input: Runtime.Input<typeof Commands.commands.pair>) {
-    if ((yield* ServiceConfig.read()).disabled === true)
+    // UPSTREAM-DIVERGENCE: Resolve --server without requiring the implicit background service.
+    const server = Option.getOrUndefined(input.server)
+    if (input.standalone || (server === undefined && (yield* ServiceConfig.read()).disabled === true))
       return yield* Effect.fail(
-        new Error("Pairing requires the background service; run `opencode service unset disabled` first"),
+        new Error(`Pairing requires a persistent server; pass --server or run \`${Brand.command} service unset disabled\` first`),
       )
-    const endpoint = yield* Service.ensure(yield* ServiceConfig.options())
+    const { endpoint } = yield* ServerConnection.resolve({ server })
     const client = OpenCode.make({ baseUrl: endpoint.url, headers: Service.headers(endpoint) })
     const urls = Option.isSome(input.url)
       ? [input.url.value]
@@ -49,7 +54,8 @@ export default Runtime.handler(
         `  ssh -L ${url.port}:${url.hostname}:${url.port} <host>`,
         `  If port ${url.port} is busy locally, forward another port and use it in the link.`,
         "",
-        "  To connect from other devices, run `opencode service set hostname 0.0.0.0`.",
+        // UPSTREAM-DIVERGENCE: Tandem command hint.
+        `  To connect from other devices, run \`${Brand.command} service set hostname 0.0.0.0\`.`,
         "",
       ].join(EOL) + EOL,
     )

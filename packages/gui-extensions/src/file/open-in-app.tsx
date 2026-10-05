@@ -1,4 +1,6 @@
 import { createEffect, createMemo, createSignal, For, Show, type JSX, type ParentProps } from "solid-js"
+// UPSTREAM-DIVERGENCE: Shared navigator-first clipboard fallback for file paths.
+import { writeClipboardText } from "@opencode/ui/clipboard"
 import { createStore } from "solid-js/store"
 import { AppIcon } from "@opencode/ui/app-icon"
 import { Icon } from "@opencode/ui/icon"
@@ -148,8 +150,8 @@ export function useOpenInApp(input: { session: SessionView; path: () => string }
 
   const copyPath = (target = input.path()) => {
     if (!target) return
-    navigator.clipboard
-      .writeText(target)
+    // UPSTREAM-DIVERGENCE: Delegate file-path copying to the navigator-first clipboard fallback.
+    writeClipboardText(target)
       .then(() => {
         showToast({
           variant: "success",

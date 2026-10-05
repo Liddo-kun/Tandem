@@ -8,8 +8,10 @@
 // advancing the tail after each tool result keeps recent conversation prefixes
 // reusable during long agent runs.
 //
-// Manual `cache: CacheHint` placements on individual parts are preserved and
-// count against the four-breakpoint budget; auto only fills remaining slots.
+// UPSTREAM-DIVERGENCE: document Tandem's one-hour manual-hint normalization and breakpoint cap.
+// Manual `cache: CacheHint` placements count against the four-breakpoint budget;
+// auto only fills remaining slots. Tandem's supported one-hour routes normalize
+// manual TTLs and trim excess manual markers in provider invalidation order.
 import { CacheHint, type CachePolicy, type CachePolicyObject } from "./schema/options.js"
 import { LLMRequest, Message, ToolDefinition, type ContentPart, type ToolEntry } from "./schema/messages.js"
 import { effortUpdate } from "./effort-updates.js"
@@ -22,6 +24,8 @@ const AUTO: CachePolicyObject = {
 
 const NONE: CachePolicyObject = {}
 const BREAKPOINT_CAP = 4
+// UPSTREAM-DIVERGENCE: identify Claude's volatile billing block so it never consumes a breakpoint.
+const billing = (text: string) => text.startsWith("x-anthropic-billing-header:")
 
 // Resolution rules:
 //   - undefined   → "auto" — caching is on by default.
@@ -92,9 +96,13 @@ const countToolHints = (tools: ReadonlyArray<ToolEntry>): number =>
 
 const markSystemBoundaries = (system: LLMRequest["system"], hint: CacheHint, budget: Budget): LLMRequest["system"] => {
   if (system.length === 0) return system
+  // UPSTREAM-DIVERGENCE: choose system cache boundaries outside Claude's billing block.
+  const first = system.findIndex((part) => !billing(part.text))
+  const last = system.findLastIndex((part) => !billing(part.text))
   let changed = false
   const next = system.map((part, index) => {
-    if ((index !== 0 && index !== system.length - 1) || part.cache || budget.remaining === 0) return part
+    // UPSTREAM-DIVERGENCE: use the non-billing boundaries rather than raw array endpoints.
+    if ((index !== first && index !== last) || part.cache || budget.remaining === 0) return part
     budget.remaining -= 1
     changed = true
     return { ...part, cache: hint }
@@ -170,6 +178,25 @@ const countHints = (request: LLMRequest) =>
 
 export const applyCachePolicy = (request: LLMRequest): LLMRequest => {
   if (!RESPECTS_INLINE_HINTS.has(request.model.route.id)) return request
+  // UPSTREAM-DIVERGENCE: normalize supported routes to one-hour hints and exclude billing breakpoints.
+  const hour = request.model.route.id !== "bedrock-converse" &&
+    (request.model.id.toLowerCase().includes("claude") || ["openrouter", "alibaba-chat", "alibaba-messages"].includes(request.model.route.id))
+  if (hour) {
+    // Normalize manual hints too, in provider invalidation order. OpenRouter's
+    // chat lowering does not have Anthropic's separate four-breakpoint limiter.
+    const budget = { remaining: BREAKPOINT_CAP }
+    const hint = (cache: CacheHint | undefined) => cache && budget.remaining-- > 0 ? makeHint(3600) : undefined
+    const tools = (items: ReadonlyArray<ToolEntry>): ReadonlyArray<ToolEntry> => items.map((tool) =>
+      tool.type === "namespace" ? { ...tool, tools: tools(tool.tools) } : tool.cache ? new ToolDefinition({ ...tool, cache: hint(tool.cache) }) : tool)
+    const normalizedTools = tools(request.tools)
+    const system = request.system.map((part) => ({ ...part, cache: billing(part.text) ? undefined : hint(part.cache) }))
+    const messages = request.messages.map((message) => new Message({ ...message, content: message.content.map((part) =>
+      "cache" in part && part.cache ? { ...part, cache: hint(part.cache) } : part) }))
+    request = LLMRequest.update(request, { tools: normalizedTools, system, messages })
+  }
+  // The per-request billing hash is never a reusable prefix breakpoint, even if manually marked.
+  if (request.system.some((part) => billing(part.text) && part.cache))
+    request = LLMRequest.update(request, { system: request.system.map((part) => billing(part.text) ? { ...part, cache: undefined } : part) })
   const policy =
     request.model.route.id === "openrouter" && (request.cache === undefined || request.cache === "auto")
       ? openRouterPolicy(request.model.id)
@@ -180,7 +207,8 @@ export const applyCachePolicy = (request: LLMRequest): LLMRequest => {
         : resolve(request.cache)
   if (!policy.tools && !policy.system && !policy.messages) return request
 
-  const hint = makeHint(policy.ttlSeconds)
+  // UPSTREAM-DIVERGENCE: automatic hints share the supported route's one-hour TTL.
+  const hint = makeHint(hour ? 3600 : policy.ttlSeconds)
   const budget = { remaining: Math.max(0, BREAKPOINT_CAP - countHints(request)) }
   const tools = policy.tools ? markLastTool(request.tools, hint, budget) : request.tools
   const system = policy.system ? markSystemBoundaries(request.system, hint, budget) : request.system

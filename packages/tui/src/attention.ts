@@ -32,7 +32,8 @@ type AttentionHost = Attention & {
   dispose(): void
 }
 
-const DEFAULT_TITLE = "OpenCode"
+// UPSTREAM-DIVERGENCE: Tandem notification title.
+const DEFAULT_TITLE = "Tandem"
 const TITLE_LIMIT = 80
 const MESSAGE_LIMIT = 240
 const BUILTIN_SOUNDS: Record<AttentionSoundName, string> = {

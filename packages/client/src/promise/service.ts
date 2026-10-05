@@ -1,4 +1,6 @@
 import { readFile, rm } from "node:fs/promises"
+// UPSTREAM-DIVERGENCE: use centralized Tandem identity for service spawning and registration.
+import { Brand } from "@opencode/util/brand"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import type { DiscoverOptions, Endpoint, Info, EnsureOptions, StopOptions } from "../service.js"
@@ -14,7 +16,8 @@ import { PtyHandoff } from "../pty-handoff.js"
 
 export * from "../service.js"
 
-// Find, start, and stop the local opencode background service.
+// UPSTREAM-DIVERGENCE: describe Tandem's local-service discovery contract.
+// Find, start, and stop the local Tandem background service.
 //
 // The registration file is the complete discovery contract. This module is
 // intentionally implemented with Node APIs so Promise clients do not need
@@ -45,7 +48,8 @@ export async function ensure(options: EnsureOptions = {}): Promise<Endpoint> {
     options.onStart?.(reason, previousVersion)
   }
   const spawnContender = async () => {
-    const [command, ...args] = options.command ?? ["opencode", "serve", "--service"]
+    // UPSTREAM-DIVERGENCE: default managed-service launches to the Tandem command.
+    const [command, ...args] = options.command ?? [Brand.command, "serve", "--service"]
     if (command === undefined) throw new Error("Missing service command")
     try {
       return spawnServiceContender(command, args, await PtyHandoff.environment(options.file ?? fallback(), options.env))
@@ -125,7 +129,8 @@ export async function stop(options: StopOptions = {}) {
 }
 
 function fallback() {
-  return join(process.env["XDG_STATE_HOME"] ?? join(homedir(), ".local", "state"), "opencode", "service.json")
+  // UPSTREAM-DIVERGENCE: discover Tandem's registration instead of the official OpenCode service.
+  return join(process.env["XDG_STATE_HOME"] ?? join(homedir(), ".local", "state"), Brand.app, "service.json")
 }
 
 /** Create HTTP authentication headers for a service endpoint. */

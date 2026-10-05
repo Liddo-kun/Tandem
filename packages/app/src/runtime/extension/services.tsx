@@ -14,6 +14,8 @@ import {
   type Owner,
 } from "solid-js"
 import { createStore, produce, type Store } from "solid-js/store"
+// UPSTREAM-DIVERGENCE: Shared navigator-first clipboard fallback for extensions.
+import { writeClipboardText } from "@opencode/ui/clipboard"
 import { Predicate } from "effect"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { base64Encode } from "@opencode/util/encode"
@@ -146,7 +148,8 @@ export function createExtensionServices() {
       token: System,
       create: () =>
         ({
-          copy: (text) => platform.writeClipboardText?.(text) ?? navigator.clipboard.writeText(text),
+          // UPSTREAM-DIVERGENCE: Delegate extension copying to the navigator-first clipboard fallback.
+          copy: (text) => writeClipboardText(text, platform.writeClipboardText),
           async save(file) {
             if (platform.saveFile) return platform.saveFile({ defaultPath: file.name }, file.content)
             const url = URL.createObjectURL(new Blob([file.content], { type: "application/octet-stream" }))
@@ -185,7 +188,8 @@ export function createExtensionServices() {
         ({
           version: platform.version,
           channel: (import.meta.env.VITE_OPENCODE_CHANNEL ?? "local") as App["channel"],
-          platform: platform.platform,
+          // UPSTREAM-DIVERGENCE: Present Android as the web renderer to the existing extension SDK.
+          platform: platform.platform === "android" ? "web" : platform.platform,
           font: () => requireAttached(current()).font(),
           locale: language.intl,
           direction: language.direction,

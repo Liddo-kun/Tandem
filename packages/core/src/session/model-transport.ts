@@ -18,6 +18,8 @@ import { Socket } from "effect/unstable/socket"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { SessionSchema } from "./schema.js"
 import { webSocketConstructor } from "../effect/app-node-platform.js"
+// UPSTREAM-DIVERGENCE: decorate final connection sends after WS driver and plugin transformations.
+import { RequestDump } from "../plugin/tandem/request-dump/transport.js"
 
 const ROTATE_AFTER_MS = 55 * 60 * 1000
 const CONNECT_TIMEOUT = "15 seconds"
@@ -561,10 +563,13 @@ export const makeLayer = (connector: WebSocketConnector) =>
 
 export const layer = Layer.unwrap(
   Effect.map(Socket.WebSocketConstructor, (constructor) =>
-    makeLayer({
-      open: (input) =>
-        WebSocketTransport.open(input).pipe(Effect.provideService(Socket.WebSocketConstructor, constructor)),
-    }),
+    // UPSTREAM-DIVERGENCE: owned connector diagnostics observe sends on reused sockets too.
+    makeLayer(
+      RequestDump.connector({
+        open: (input) =>
+          WebSocketTransport.open(input).pipe(Effect.provideService(Socket.WebSocketConstructor, constructor)),
+      }),
+    ),
   ),
 )
 

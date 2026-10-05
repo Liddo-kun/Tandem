@@ -40,15 +40,17 @@ const layer = Layer.effect(
                   `  Workspace root folder: ${location.project.directory}`,
                   `  Is directory a git repo: ${location.vcs?.type === "git" ? "yes" : "no"}`,
                   `  Platform: ${process.platform}`,
-                  `  Prefer ${global.tmp} over generic system temporary directories such as /tmp; it is pre-created and approved for external access.`,
+                  // UPSTREAM-DIVERGENCE: runtime scratch and UI-only image guidance share the durable environment source.
+                  `  Use ${global.tmp} for ALL temporary files: intermediate results, throwaway scripts, analysis work, and anything that does not belong in the user's project. It exists and is pre-approved for external access. Use plain /tmp only when the user explicitly requests it.`,
                   "</env>",
                 ].join("\n"),
               ),
+              // UPSTREAM-DIVERGENCE: include saved-image guidance on initial and changed environments.
               render: {
                 initial: (environment) =>
-                  ["Here is some useful information about the environment you are running in:", environment].join("\n"),
+                  ["Here is some useful information about the environment you are running in:", environment, images].join("\n"),
                 changed: (_previous, environment) =>
-                  ["The environment you are running in is now:", environment].join("\n"),
+                  ["The environment you are running in is now:", environment, images].join("\n"),
               },
             }),
           ]),
@@ -58,3 +60,7 @@ const layer = Layer.effect(
 )
 
 export const node = makeLocationNode({ service: Service, layer, deps: [Global.node, Location.node] })
+
+// UPSTREAM-DIVERGENCE: explain session-relative image previews and explicit model image inspection.
+const images = `# Presenting images
+To present a saved image, use ![Description](relative/path.png) with a path resolved against the session working directory. Use forward slashes and URL-encode spaces as %20. The UI reads the saved image for display; do not invent HTTP URLs or inline base64. Markdown image display does not itself inject image bytes into the model's context. To inspect an image, explicitly read it with an available image-capable tool. Inline previews support images only.`

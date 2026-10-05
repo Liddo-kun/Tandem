@@ -30,6 +30,9 @@ import { usePlatform } from "@/runtime/platform/platform"
 import { isMixedContent } from "./browser"
 import { createCameraAvailability } from "./camera"
 import type { Pairing } from "./pairing"
+// UPSTREAM-DIVERGENCE: Pairing-link redemption and owned native LAN discovery.
+import { pairingLink, redeemPairingLink } from "./pairing"
+import { NativeServerDiscovery } from "./native-discovery"
 import "@/settings/settings.css"
 
 const PairingScanner = lazy(() => import("./scanner").then((module) => ({ default: module.PairingScanner })))
@@ -106,6 +109,10 @@ export const DialogServer: Component<{
           }
         >
           <div class="flex w-full min-w-0 flex-col gap-6">
+            {/* UPSTREAM-DIVERGENCE: Native LAN discovery in the shared add-server dialog. */}
+            <Show when={props.mode === "add"}>
+              <NativeServerDiscovery disabled={form.state.busy()} onSelect={form.change.value} />
+            </Show>
             <div class="flex w-full min-w-0 flex-col gap-2">
               <label class="settings-server-dialog-label">{language.t("dialog.server.add.url")}</label>
               <TextInput
@@ -241,6 +248,16 @@ function createFormController(options: { onSelect?: (server: ServerConnection.Ht
 
   const request = useMutation(() => ({
     mutationFn: async () => {
+      // UPSTREAM-DIVERGENCE: Accept a pasted v2 pairing link in the add-server address field.
+      const link = pairingLink(store.values.url)
+      if (link) {
+        const redeemed = await redeemPairingLink(link)
+        if (!redeemed) {
+          setStore("error", language.t("server.connect.link.expired"))
+          return
+        }
+        setStore("values", { ...store.values, url: redeemed.url, password: redeemed.password })
+      }
       const normalized = normalizeServerUrl(store.values.url)
       if (!normalized) {
         reset()
@@ -271,14 +288,22 @@ function createFormController(options: { onSelect?: (server: ServerConnection.Ht
       }
       const result = await checkServerHealth(connection.http)
       if (!result.healthy) {
+        // UPSTREAM-DIVERGENCE: Distinguish reachable credential-required servers from offline servers.
         setStore(
           "error",
           language.t(
-            platform.platform === "web" && isMixedContent(location.href, normalized)
+            result.unauthorized
+              ? "server.connect.credentialsRequired"
+              : platform.platform === "web" && isMixedContent(location.href, normalized)
               ? "server.connect.mixedContent"
               : "dialog.server.add.error",
           ),
         )
+        return
+      }
+      // UPSTREAM-DIVERGENCE: Android requires a v2 server.
+      if (platform.platform === "android" && !result.version?.startsWith("2.")) {
+        setStore("error", language.t("server.connect.v2Required"))
         return
       }
       if (original?.type === "http") {

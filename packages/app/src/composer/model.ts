@@ -25,6 +25,8 @@ import { createComposerHistory } from "./history/store"
 import { createComposerSubmit } from "./submit"
 import { useAttachmentDestination } from "./attachments/destination"
 import { parseClientSlashCommand } from "./client-slash-command"
+// UPSTREAM-DIVERGENCE: Read persisted Corrector preferences for composer controls and submission.
+import { useSettings } from "@/settings/model"
 
 export type ComposerModel = ComposerEditorModel & {
   readonly model: ComposerControls["model"]
@@ -34,8 +36,10 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
   const sdk = useWorkspaceLocation()
   const data = useData()
   const server = useServer()
+  // UPSTREAM-DIVERGENCE: Wait for persisted Corrector preferences before accepting submissions.
   const available = () =>
-    server.conn.type !== "extension" || !server.conn.managed || server.ctx.sdk.connection.status() === "connected"
+    settings.ready() &&
+    (server.conn.type !== "extension" || !server.conn.managed || server.ctx.sdk.connection.status() === "connected")
   const files = useFile()
   const links = useExtensionHost().links
   const extensions = useExtensionAttachment()
@@ -44,6 +48,8 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
   const command = useCommand()
   const language = useLanguage()
   const platform = usePlatform()
+  // UPSTREAM-DIVERGENCE: Persisted Corrector settings back the editor toggle.
+  const settings = useSettings()
   const prompt = adapter.state
   let editor: HTMLDivElement | undefined
 
@@ -226,6 +232,8 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
   const submission = createComposerSubmit({
     adapter,
     mode,
+    // UPSTREAM-DIVERGENCE: Snapshot Corrector preference when submitting.
+    correctorEnabled: settings.general.corrector,
     commands: () => data.location.command.list({ directory: sdk().directory }),
     editor: () => editor,
     queueScroll: () => requestAnimationFrame(() => editor?.scrollIntoView({ block: "nearest" })),
@@ -344,7 +352,15 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
       store: platform.draftStore?.putBlob,
     },
     view: {
+      // UPSTREAM-DIVERGENCE: Enable native range editing only for Android.
+      nativeEditing: platform.platform === "android",
       placeholder,
+      // UPSTREAM-DIVERGENCE: Persisted Corrector toggle in shared composer controls.
+      corrector: {
+        enabled: settings.general.corrector,
+        ready: settings.ready,
+        onToggle: () => settings.general.setCorrector(!settings.general.corrector()),
+      },
       get agent() {
         const agents = adapter.controls().agents
         return agents.visible && agents.options.length > 0

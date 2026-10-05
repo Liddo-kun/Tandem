@@ -1,4 +1,6 @@
 import { Effect, FileSystem, Option, Schedule, Schema } from "effect"
+// UPSTREAM-DIVERGENCE: use centralized Tandem identity for service spawning and registration.
+import { Brand } from "@opencode/util/brand"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import type { DiscoverOptions, Endpoint, EnsureOptions, StopOptions } from "../service.js"
@@ -16,7 +18,8 @@ export * from "../service.js"
 /** Contents of the local service registration file. */
 export type Info = import("../service.js").Info
 
-// Find, start, and stop the local opencode background service.
+// UPSTREAM-DIVERGENCE: describe Tandem's local-service discovery contract.
+// Find, start, and stop the local Tandem background service.
 //
 // The service daemon advertises itself through a registration file in the
 // user's state directory: url, pid, version, and the private password, with
@@ -65,7 +68,8 @@ export const ensure = Effect.fn("service.ensure")(function* (options: EnsureOpti
       options.onStart?.(reason, previousVersion)
     })
   const spawnContender = Effect.gen(function* () {
-    const [command, ...args] = options.command ?? ["opencode", "serve", "--service"]
+    // UPSTREAM-DIVERGENCE: default managed-service launches to the Tandem command.
+    const [command, ...args] = options.command ?? [Brand.command, "serve", "--service"]
     if (command === undefined) return yield* Effect.fail(new Error("Missing service command"))
     const env = yield* Effect.tryPromise(() => PtyHandoff.environment(options.file ?? fallback(), options.env))
     return yield* Effect.try({
@@ -155,7 +159,8 @@ export const stop = Effect.fn("service.stop")(function* (options: StopOptions = 
 
 function fallback() {
   const state = process.env["XDG_STATE_HOME"] ?? join(homedir(), ".local", "state")
-  return join(state, "opencode", "service.json")
+  // UPSTREAM-DIVERGENCE: discover Tandem's registration instead of the official OpenCode service.
+  return join(state, Brand.app, "service.json")
 }
 
 /** Create HTTP authentication headers for a service endpoint. */

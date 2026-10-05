@@ -8,12 +8,14 @@ export function icons(channel: string): Plugin {
   const files = [
     ...Object.entries({
       "favicon.ico": "icon.ico",
-      "apple-touch-icon.png": "ios/AppIcon-60x60@3x.png",
-      "web-app-manifest-192x192.png": "android/mipmap-xxxhdpi/ic_launcher.png",
+      // UPSTREAM-DIVERGENCE: Use shared Tandem touch-icon and manifest assets.
+      "apple-touch-icon.png": "apple-touch-icon.png",
+      "web-app-manifest-192x192.png": "manifest-192.png",
       "web-app-manifest-512x512.png": "icon.png",
     }).map(([name, source]) => ({
       fileName: `${prefix}/${name}`,
-      source: readFileSync(new URL(`../desktop/icons/${selected}/${source}`, import.meta.url)),
+      // UPSTREAM-DIVERGENCE: Source web branding from shared Tandem assets, not desktop channel icons.
+      source: readFileSync(new URL(`../ui/src/assets/brand/${source}`, import.meta.url)),
       type: name.endsWith(".ico") ? "image/x-icon" : "image/png",
     })),
     {
@@ -42,9 +44,11 @@ export function icons(channel: string): Plugin {
     transformIndexHtml: {
       order: "pre",
       handler(html) {
+        // UPSTREAM-DIVERGENCE: Substitute Tandem social-preview metadata alongside favicon URLs.
         return html
           .replace("%OPENCODE_FAVICON%", `/${prefix}/favicon.ico`)
           .replace("%OPENCODE_APPLE_TOUCH_ICON%", `/${prefix}/apple-touch-icon.png`)
+          .replaceAll("%OPENCODE_SOCIAL_ICON%", `/${prefix}/web-app-manifest-512x512.png`)
       },
     },
   }

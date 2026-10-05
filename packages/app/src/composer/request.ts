@@ -1,4 +1,6 @@
 import { encodeFilePath, getFilename } from "@opencode/util/path"
+// UPSTREAM-DIVERGENCE: Share authored Corrector range metadata with the backend plugin.
+import type { TandemAuxiliary } from "@opencode/util/tandem-auxiliary"
 import type { FileSelection } from "@/workspaces/files/model"
 import type {
   AgentPart,
@@ -21,6 +23,8 @@ import {
 type PromptRequest = {
   text: string
   displayText: string
+  // UPSTREAM-DIVERGENCE: Track authored text spans eligible for correction.
+  correctorRanges: TandemAuxiliary.CorrectorRange[]
   files: { uri: string; mime: string; name?: string; mention?: { start: number; end: number; text: string } }[]
   agents: { name: string; mention?: { start: number; end: number; text: string } }[]
   skills: { id: string; name: string; mention?: { start: number; end: number; text: string } }[]
@@ -62,6 +66,16 @@ const isSkillAttachment = (part: Prompt[number]): part is SkillPart => part.type
 const isPathAttachment = (part: Prompt[number]): part is PathAttachmentPart => part.type === "path"
 
 export function buildPromptRequest(input: BuildPromptRequestInput): PromptRequest {
+  // UPSTREAM-DIVERGENCE: Correct authored text only, excluding mentions and attachment/context content.
+  let position = 0
+  const correctorRanges = input.prompt.flatMap((part) => {
+    if (!("content" in part)) return []
+    const start = position
+    position += part.content.length
+    return part.type === "text" && part.content.length && input.text.trim()
+      ? [{ start, end: position }]
+      : []
+  })
   const skills = input.prompt.filter(isSkillAttachment).map((attachment) => ({
     id: attachment.id,
     name: attachment.name,
@@ -143,10 +157,19 @@ export function buildPromptRequest(input: BuildPromptRequestInput): PromptReques
       ...comments.map((comment) => (comment.type === "note" ? formatNoteComment(comment) : formatCommentNote(comment))),
     ].join("\n"),
     displayText: input.text,
+    // UPSTREAM-DIVERGENCE: Send authored correction ranges with the composed request.
+    correctorRanges,
     files: [...files, ...context, ...inline],
     agents,
     skills,
     comments,
     attachments,
   }
+}
+
+// UPSTREAM-DIVERGENCE: Restore model-only queued context outside authored correction ranges.
+/** Restored queued context remains separate from authored text and its correction ranges. */
+export function appendPromptContext(text: string, context: string | undefined) {
+  if (!context) return text
+  return text ? text + (context.startsWith("\n") ? "" : "\n") + context : context
 }

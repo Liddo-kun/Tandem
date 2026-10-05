@@ -67,8 +67,9 @@ export function DialogPair() {
             </For>
           </box>
           <Show when={value.loopback}>
+            {/* UPSTREAM-DIVERGENCE: Tandem remote-service command hint. */}
             <text fg={theme.text.muted} wrapMode="word">
-              Run `opencode service set hostname 0.0.0.0` to access the service remotely.
+              Run `tandem service set hostname 0.0.0.0` to access the service remotely.
             </text>
           </Show>
         </box>

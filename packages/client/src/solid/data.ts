@@ -45,6 +45,8 @@ import {
   isFormAlreadySettledError,
   isFormNotFoundError,
   isPermissionNotFoundError,
+  // UPSTREAM-DIVERGENCE(temporary): upstream bug — background reads of a just-deleted session show false "session not found" errors or bring it back. Remove when upstream fixes it.
+  isSessionNotFoundError,
   type SessionPromptInput,
 } from "../promise"
 import { createStore, produce, reconcile } from "solid-js/store"
@@ -203,10 +205,15 @@ export function createData(config: CreateDataInput) {
   let disposed = false
   onCleanup(() => (disposed = true))
 
+  // UPSTREAM-DIVERGENCE(temporary): upstream bug — background reads of a just-deleted session show false "session not found" errors or bring it back. Remove when upstream fixes it.
+  const deletedSessions = new Set<string>()
+
   function refresh(load: () => Promise<unknown>) {
     if (disposed || (config.connection && config.connection.status() !== "connected")) return
     void load().catch((error) => {
       if (disposed || (config.connection && config.connection.status() !== "connected")) return
+      // UPSTREAM-DIVERGENCE(temporary): see deletedSessions.
+      if (isSessionNotFoundError(error) && deletedSessions.has(error.sessionID)) return
       if (config.onError) return config.onError(error)
       console.error("Failed to refresh client data", error)
     })
@@ -640,6 +647,8 @@ export function createData(config: CreateDataInput) {
         sync.complete(`session.message:${event.data.sessionID}`)
         return
       case "session.deleted":
+        // UPSTREAM-DIVERGENCE(temporary): see deletedSessions.
+        deletedSessions.add(event.data.sessionID)
         removeSession(event.data.sessionID)
         return
       case "session.usage.updated":
@@ -1592,7 +1601,8 @@ export function createData(config: CreateDataInput) {
                   .then((response) => response.data)
               : [],
           ])
-          const sessions = [info, ...children]
+          // UPSTREAM-DIVERGENCE(temporary): see deletedSessions. A read already in flight must not bring deleted sessions back.
+          const sessions = [info, ...children].filter((session) => !deletedSessions.has(session.id))
           batch(() => {
             setStore(
               "session",

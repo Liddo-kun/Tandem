@@ -1,0 +1,35 @@
+{
+  "name": "@opencode/android",
+  "private": true,
+  "version": "2.0.22",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "typecheck": "tsgo -b",
+    "dev": "vite",
+    "build": "vite build",
+    "prepare:android": "python3 generate-icons.py && bun patch-android-generated.ts",
+    "tauri": "bun run prepare:android && tauri",
+    "tauri:v2": "OPENCODE_ANDROID_VARIANT=v2 bun run tauri android",
+    "init:v2": "bun run tauri:v2 init --ci --config src-tauri/tauri.v2.conf.json && OPENCODE_ANDROID_VARIANT=v2 bun run prepare:android",
+    "build:v2": "bun run tauri:v2 build --apk --target aarch64 --config src-tauri/tauri.v2.conf.json"
+  },
+  "dependencies": {
+    "@opencode/app": "workspace:*",
+    "@opencode/session-ui": "workspace:*",
+    "@solid-primitives/storage": "catalog:",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-haptics": "~2",
+    "@tauri-apps/plugin-notification": "~2",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-store": "~2",
+    "solid-js": "catalog:"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vite": "8.2.2"
+  }
+}

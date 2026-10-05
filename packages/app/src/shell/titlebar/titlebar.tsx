@@ -130,13 +130,15 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
         "order-last": bottom(),
       }}
       style={{
+        // UPSTREAM-DIVERGENCE: Android uses wrapper-owned native insets and non-desktop titlebar sizing.
         height:
-          platform.platform === "web"
+          platform.platform !== "desktop"
             ? bottom()
               ? "calc(28px + max(8px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))))"
-              : "calc(28px + max(8px, env(safe-area-inset-top, 0px)))"
+              : "calc(28px + max(8px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px))))"
             : undefined,
-        "padding-top": bottom() ? "0px" : "env(safe-area-inset-top, 0px)",
+        // UPSTREAM-DIVERGENCE: Respect Android wrapper-owned top safe-area overrides.
+        "padding-top": bottom() ? "0px" : "var(--safe-area-inset-top, env(safe-area-inset-top, 0px))",
         "padding-bottom": bottom() ? "var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))" : "0px",
         "min-height": minHeight(),
         // Keep native macOS traffic lights clear even when the desktop window is narrow.
@@ -438,7 +440,8 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
               <div
                 class="h-full flex-1 overflow-hidden flex flex-row items-center gap-1.5 px-2 md:pe-3"
                 classList={{
-                  "pt-[max(0px,calc(8px-env(safe-area-inset-top,0px)))]": !bottom() && !windows(),
+                  // UPSTREAM-DIVERGENCE: Use wrapper-owned insets for titlebar content clearance.
+                  "pt-[max(0px,calc(8px-var(--safe-area-inset-top,env(safe-area-inset-top,0px))))]": !bottom() && !windows(),
                   "pb-[max(0px,calc(8px-var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))))]": bottom(),
                   "pl-4": macTrafficLights(),
                   // Center the 20px app icon over the sidebar's 16px icon column.
@@ -575,7 +578,8 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                                 class="flex h-7 shrink-0 items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-faint hover:bg-v2-background-bg-layer-02 focus-visible:outline-none focus-visible:bg-v2-background-bg-layer-02"
                                 onClick={() => {
                                   setMobileTabs("open", false)
-                                  platform.openExternal("https://opencode.ai/desktop-feedback")
+                                  // UPSTREAM-DIVERGENCE: Tandem product support link.
+                                  platform.openExternal("https://github.com/Liddo-kun/Tandem/issues")
                                 }}
                               >
                                 <Icon name="help" size="small" />

@@ -59,9 +59,8 @@ export type ThinkingInput = typeof Thinking.Encoded
 export type OptionsInput = ProviderOptions & typeof Options.Encoded
 export type ProviderOptionsInput = OptionsInput
 
-export const ContextManagement = Schema.Struct({
-  edits: Schema.Array(
-    Schema.Struct({
+// UPSTREAM-DIVERGENCE: extend compaction context management with Claude's keep-all thinking edit.
+const CompactEdit = Schema.Struct({
       type: Schema.Literal("compact_20260112"),
       trigger: Schema.optional(
         Schema.Struct({
@@ -71,8 +70,10 @@ export const ContextManagement = Schema.Struct({
       ),
       pauseAfterCompaction: Schema.optional(Schema.Boolean),
       instructions: Schema.optional(Schema.String),
-    }),
-  ),
+})
+const ClearThinkingEdit = Schema.Struct({ type: Schema.Literal("clear_thinking_20251015"), keep: Schema.Literal("all") })
+export const ContextManagement = Schema.Struct({
+  edits: Schema.Array(Schema.Union([CompactEdit, ClearThinkingEdit])),
 })
 export type ContextManagement = typeof ContextManagement.Type
 
@@ -343,6 +344,9 @@ const OutputConfigInput = Schema.Struct({
 const Options = Schema.Struct({
   /** Advanced in-band compaction. The caller owns checkpoint persistence and recovery. */
   contextManagement: Schema.optional(ContextManagement),
+  // UPSTREAM-DIVERGENCE: request keep-all thinking only after the final thinking mode resolves.
+  /** Apply only after thinking defaults/overrides have resolved. */
+  clearThinking: Schema.optional(Schema.Boolean),
   thinking: Schema.optional(Thinking),
   effort: Schema.optional(Schema.String),
   service_tier: Schema.optional(AnthropicServiceTier),
@@ -362,12 +366,13 @@ const AnthropicBodyFields = {
   context_management: Schema.optional(
     Schema.Struct({
       edits: Schema.Array(
-        Schema.Struct({
+        // UPSTREAM-DIVERGENCE: serialize keep-all thinking alongside existing compaction edits.
+        Schema.Union([ClearThinkingEdit, Schema.Struct({
           type: Schema.Literal("compact_20260112"),
-          trigger: ContextManagement.fields.edits.value.fields.trigger,
+          trigger: CompactEdit.fields.trigger,
           pause_after_compaction: Schema.optional(Schema.Boolean),
           instructions: Schema.optional(Schema.String),
-        }),
+        })]),
       ),
     }),
   ),
@@ -1074,16 +1079,22 @@ const fromRequest = Effect.fn("AnthropicMessages.fromRequest")(function* (reques
     metadata: options.metadata,
     service_tier: options.service_tier ?? options.serviceTier,
   }
-  if (!management) return body
+  // UPSTREAM-DIVERGENCE: omit clear-thinking when thinking is off and retain compaction edits.
+  const thinkingOn = body.thinking?.type === "enabled" || body.thinking?.type === "adaptive"
+  const edits = (management?.edits ?? []).filter((edit) => edit.type !== "clear_thinking_20251015" || thinkingOn)
+  const clear = options.clearThinking && thinkingOn && !edits.some((edit) => edit.type === "clear_thinking_20251015")
+    ? [{ type: "clear_thinking_20251015" as const, keep: "all" as const }]
+    : []
+  if (edits.length === 0 && clear.length === 0) return body
   return {
     ...body,
     context_management: {
-      edits: management.edits.map((edit) => ({
+      edits: [...clear, ...edits.map((edit) => edit.type === "clear_thinking_20251015" ? edit : ({
         type: edit.type,
         trigger: edit.trigger,
         pause_after_compaction: edit.pauseAfterCompaction,
         instructions: edit.instructions,
-      })),
+      }))],
     },
   }
 })
@@ -1604,25 +1615,50 @@ export const transport = <
   const http = HttpTransport.httpJson<Body, string>({ framing })
   return {
     ...http,
-    prepare: (input: Parameters<typeof http.prepare>[0]) => {
-      const requiredBetas = requiredBetaHeaders(input.body)
-      if (requiredBetas.length === 0) return http.prepare(input)
-      const headers = Headers.fromInput(input.request.http?.headers)
+    // UPSTREAM-DIVERGENCE: reconcile clear-thinking after native body overlays before beta selection.
+    prepare: Effect.fn("AnthropicMessages.prepare")(function* (input: Parameters<typeof http.prepare>[0]) {
+      // Native body overlays resolve after provider options. Reconcile clear-thinking
+      // against that final mode as well, before selecting its beta header.
+      const prepared = input.request.providerOptions?.clearThinking && input.request.http?.body
+        ? yield* Effect.gen(function* () {
+            const resolved = yield* ProviderShared.validateWith(Schema.decodeUnknownEffect(Schema.Struct({
+              thinking: AnthropicBodyFields.thinking,
+              context_management: AnthropicBodyFields.context_management,
+            })))(mergeJsonRecords({ thinking: input.body.thinking, context_management: input.body.context_management }, input.request.http?.body))
+            const on = resolved.thinking?.type === "enabled" || resolved.thinking?.type === "adaptive"
+            const edits = (resolved.context_management?.edits ?? []).filter((edit) => edit.type !== "clear_thinking_20251015")
+            const management = on || edits.length > 0
+              ? { edits: [...(on ? [{ type: "clear_thinking_20251015" as const, keep: "all" as const }] : []), ...edits] }
+              : undefined
+            const overlay = Object.fromEntries(Object.entries(input.request.http?.body ?? {}).filter(([key]) => key !== "context_management"))
+            return {
+              ...input,
+              body: { ...input.body, thinking: resolved.thinking, context_management: management },
+              request: LLMRequest.update(input.request, { http: new HttpOptions({
+                ...input.request.http,
+                body: { ...overlay, ...(management ? { context_management: management } : {}) },
+              }) }),
+            }
+          })
+        : input
+      const requiredBetas = requiredBetaHeaders(prepared.body)
+      if (requiredBetas.length === 0) return yield* http.prepare(prepared)
+      const headers = Headers.fromInput(prepared.request.http?.headers)
       const existingBetas = (headers["anthropic-beta"] ?? "")
         .split(",")
         .map((item) => item.trim())
         .filter(Boolean)
       const betas = new Set([...existingBetas, ...requiredBetas])
-      return http.prepare({
-        ...input,
-        request: LLMRequest.update(input.request, {
+      return yield* http.prepare({
+        ...prepared,
+        request: LLMRequest.update(prepared.request, {
           http: new HttpOptions({
-            ...input.request.http,
+            ...prepared.request.http,
             headers: { ...headers, "anthropic-beta": [...betas].join(",") },
           }),
         }),
       })
-    },
+    }),
   }
 }
 
@@ -1631,7 +1667,10 @@ function requiredBetaHeaders(body: Pick<AnthropicMessagesBody, "messages" | "con
   // model and ignores it where unsupported, while manual-thinking models need
   // it for thinking between tool calls.
   const betas: string[] = ["interleaved-thinking-2025-05-14"]
-  const requestsCompaction = (body.context_management?.edits.length ?? 0) > 0
+  // UPSTREAM-DIVERGENCE: select separate betas for clear-thinking and compaction edits.
+  const requestsCompaction = body.context_management?.edits.some((edit) => edit.type === "compact_20260112")
+  if (body.context_management?.edits.some((edit) => edit.type === "clear_thinking_20251015"))
+    betas.push("context-management-2025-06-27")
   const replaysCompaction = body.messages.some((message) =>
     message.content.some((block) => block.type === "compaction"),
   )

@@ -1,0 +1,6 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Tandem V2",
+  "identifier": "app.liddokun.tandem.v2",
+  "app": { "windows": [{ "label": "main", "title": "Tandem V2" }] }
+}

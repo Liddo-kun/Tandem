@@ -1,4 +1,6 @@
 import { TextField } from "@opencode/ui/text-field"
+// UPSTREAM-DIVERGENCE: Tandem product support links.
+import { Brand } from "@opencode/util/brand"
 import type { captureException } from "@sentry/solid"
 import { Logo } from "@opencode/ui/logo"
 import { Button } from "@opencode/ui/button"
@@ -371,13 +373,15 @@ export const ErrorPage: Component<ErrorPageProps> = (props) => {
         <div class="flex flex-col items-center gap-2 text-xs text-center">
           <div class="flex flex-wrap items-center justify-center gap-1">
             {language.t("error.page.report.prefix")}
+            {/* UPSTREAM-DIVERGENCE: Tandem product support link. */}
             <button
               type="button"
               class="flex items-center text-text-interactive-base gap-1"
-              onClick={() => platform.openExternal("https://opencode.ai/desktop-feedback")}
+              onClick={() => platform.openExternal(Brand.issues)}
             >
               <div>{language.t("error.page.report.discord")}</div>
-              <Icon name="discord" class="text-text-interactive-base" />
+              {/* UPSTREAM-DIVERGENCE: Tandem reports go to GitHub, not OpenCode's Discord. */}
+              <Icon name="github" class="text-text-interactive-base" />
             </button>
           </div>
           <Show when={platform.version}>

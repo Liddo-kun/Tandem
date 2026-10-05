@@ -3,3 +3,18 @@ packages/core/src/database/migration.gen.ts linguist-generated
 packages/core/src/models-dev/snapshot.txt linguist-generated
 packages/core/src/**/*.txt text eol=lf
 packages/httpapi-codegen/test/generated/*.ts text eol=lf
+
+# UPSTREAM-DIVERGENCE: Tandem cross-platform build sources use LF; mobile assets stay binary.
+# Tandem-owned cross-platform build sources and mobile binary assets.
+script/*.ts text eol=lf
+script/*.sh text eol=lf
+packages/android/**/*.sh text eol=lf
+packages/android/**/*.kt text eol=lf
+packages/android/**/*.kts text eol=lf
+*.png binary
+*.ico binary
+*.icns binary
+*.apk binary
+*.aab binary
+*.keystore binary
+*.jks binary

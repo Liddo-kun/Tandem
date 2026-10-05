@@ -1,4 +1,6 @@
 import { createResource } from "solid-js"
+// UPSTREAM-DIVERGENCE: Tandem product links.
+import { Brand } from "@opencode/util/brand"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { ExternalLink } from "@/runtime/platform/external-link"
@@ -77,7 +79,8 @@ export function SettingsAbout(props: { active: boolean }) {
       </div>
 
       <p class="settings-about-faint">
-        <ExternalLink href="https://opencode.ai">
+        {/* UPSTREAM-DIVERGENCE: Tandem product link. */}
+        <ExternalLink href={Brand.repository}>
           <bdi dir="ltr">{language.t("settings.about.website")}</bdi>
         </ExternalLink>
       </p>

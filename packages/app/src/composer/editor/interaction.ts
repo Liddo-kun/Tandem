@@ -30,6 +30,9 @@ export type ComposerSelectControl = {
 }
 
 export type ComposerEditorView = {
+  // UPSTREAM-DIVERGENCE: Optional Android native editing for the shared editor.
+  /** Android IME range editing and newline-only Enter; optional for standalone editors. */
+  nativeEditing?: boolean
   draftOnly?: boolean
   placeholder?: Accessor<string>
   add?: {
@@ -37,6 +40,12 @@ export type ComposerEditorView = {
   }
   agent?: ComposerSelectControl
   variant?: ComposerSelectControl
+  // UPSTREAM-DIVERGENCE: Tandem Corrector toggle contract.
+  corrector?: {
+    enabled: Accessor<boolean>
+    ready: Accessor<boolean>
+    onToggle: () => void
+  }
   submit: {
     available?: Accessor<boolean>
     stopping: Accessor<boolean>

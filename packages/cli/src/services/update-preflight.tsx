@@ -22,7 +22,8 @@ import {
   untrack,
 } from "solid-js"
 
-const stages = ["Keeping your session safe", "Starting the new background service", "Loading OpenCode"] as const
+// UPSTREAM-DIVERGENCE: Tandem branding.
+const stages = ["Keeping your session safe", "Starting the new background service", "Loading Tandem"] as const
 const stageFloor = 480
 const transitionDuration = 420
 const completionHold = 650
@@ -323,9 +324,10 @@ function UpdateFooter(props: {
   const [pulse, setPulse] = createSignal(0)
   const headerFade = createFade()
   const statusSweep = createSweep()
+  // UPSTREAM-DIVERGENCE: Tandem branding.
   const runningHeader = () =>
     phrase(
-      ["OpenCode", colors.muted, true],
+      ["Tandem", colors.muted, true],
       ["is updating", colors.muted],
       ...(props.from
         ? ([
@@ -336,12 +338,13 @@ function UpdateFooter(props: {
       ["to", colors.muted],
       [OPENCODE_VERSION, colors.accent],
     )
+  // UPSTREAM-DIVERGENCE: Tandem completed/paused update copy.
   const completedHeader = phrase(
-    ["OpenCode", colors.muted, true],
+    ["Tandem", colors.muted, true],
     ["updated to", colors.muted],
     [OPENCODE_VERSION, colors.accent],
   )
-  const pausedHeader = phrase(["OpenCode", colors.muted, true], ["update paused", colors.muted])
+  const pausedHeader = phrase(["Tandem", colors.muted, true], ["update paused", colors.muted])
   const outcomeStatus = () =>
     props.outcome() === "success"
       ? [...styled("✓", colors.success), ...styled(" Ready", colors.text)]

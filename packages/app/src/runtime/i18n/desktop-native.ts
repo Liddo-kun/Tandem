@@ -1,3 +1,6 @@
+// UPSTREAM-DIVERGENCE: Overlay Tandem native product copy using existing translation keys.
+import { nativeProductCopy } from "./product-copy"
+
 export const DESKTOP_NATIVE_LOCALES = [
   "en",
   "zh",
@@ -227,7 +230,8 @@ function locale(value: string) {
 // Bun's ICU currently reports Punjabi's Arabic script as the invalid "Aran" code.
 const normalizeScript = (script?: string) => (script === "Aran" ? "Arab" : script)
 
-export const DESKTOP_NATIVE_ENGLISH = {
+// UPSTREAM-DIVERGENCE: Retain upstream English separately for the Tandem product-copy overlay.
+const upstreamEnglish = {
   "desktop.menu.app": "OpenCode",
   "desktop.menu.file": "File",
   "desktop.menu.edit": "Edit",
@@ -301,6 +305,9 @@ export const DESKTOP_NATIVE_ENGLISH = {
   "desktop.picker.error.notSelected": "File was not selected by the picker",
   "desktop.picker.error.sizeLimit": "Selected attachments exceed the {{limit}} MB limit",
 } as const
+
+// UPSTREAM-DIVERGENCE: Apply owned Tandem native product copy.
+export const DESKTOP_NATIVE_ENGLISH = { ...upstreamEnglish, ...nativeProductCopy }
 
 export type DesktopNativeKey = keyof typeof DESKTOP_NATIVE_ENGLISH
 export type DesktopNativeMessages = Record<DesktopNativeKey, string>

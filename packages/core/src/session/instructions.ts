@@ -11,6 +11,9 @@ import { MessageDecodeError } from "./error.js"
 import { SessionMessage } from "./message.js"
 import { SessionSchema } from "./schema.js"
 import { SessionStore } from "./store.js"
+// UPSTREAM-DIVERGENCE: resolve agent and additive instruction policy before Read-triggered injection.
+import { Agent } from "../agent.js"
+import { PluginHooks } from "../plugin/hooks.js"
 
 const InjectedMetadata = Schema.Struct({
   instruction: Schema.Struct({ paths: Schema.Array(Schema.String) }),
@@ -32,6 +35,9 @@ const layer = Layer.effect(
     const fs = yield* FSUtil.Service
     const store = yield* SessionStore.Service
     const location = yield* Location.Service
+    // UPSTREAM-DIVERGENCE: acquire the selected agent and instructions hook for injection policy.
+    const agents = yield* Agent.Service
+    const hooks = yield* PluginHooks.Service
     // Resolved once for the Location layer; the synthetic text and dedup ledger keep
     // absolute paths, but the human-facing description shows paths relative to the project
     // root so opening a subdirectory still describes paths from the project root.
@@ -44,6 +50,18 @@ const layer = Layer.effect(
     const inFlight = yield* Ref.make<Map<SessionSchema.ID, Set<string>>>(new Map())
 
     const load = Effect.fn("SessionInstructions.load")(function* (input: Parameters<Interface["load"]>[0]) {
+      // UPSTREAM-DIVERGENCE: agent-only auxiliary sessions skip instruction claims, reads and admission.
+      // Read runs from an activated tool snapshot; do not create a plugin-layer cycle here.
+      const session = yield* store.get(input.sessionID)
+      if (!session) return
+      const agent = yield* agents.select(session.agent)
+      const policy = yield* hooks.trigger("session", "instructions", {
+        sessionID: input.sessionID,
+        agent: agent.id,
+        mode: "default",
+      })
+      // Decide before claims, filesystem reads, or durable synthetic admission.
+      if (policy.mode === "agent-only") return
       const claimed = yield* Ref.modify(inFlight, (map) => {
         const existing = map.get(input.sessionID) ?? new Set<string>()
         const newlyClaimed = input.paths.filter((path) => !existing.has(path))
@@ -121,5 +139,6 @@ function describePath(root: string, path: string) {
 export const node = makeLocationNode({
   name: "session-instructions",
   layer,
-  deps: [Bus.node, FSUtil.node, Location.node, SessionStore.node],
+  // UPSTREAM-DIVERGENCE: wire agent selection and instruction policy into Read injection.
+  deps: [Bus.node, FSUtil.node, Location.node, SessionStore.node, Agent.node, PluginHooks.node],
 })

@@ -1,4 +1,6 @@
 import type { DesktopNativeKey } from "@/runtime/i18n/desktop-native"
+// UPSTREAM-DIVERGENCE: Tandem product help and issue links.
+import { Brand } from "@opencode/util/brand"
 
 export type DesktopMenuPlatform = "macos" | "windows"
 
@@ -273,19 +275,22 @@ export const DESKTOP_MENU: DesktopMenu[] = [
     id: "help",
     labelKey: "desktop.menu.help",
     items: [
-      { type: "item", labelKey: "desktop.menu.documentation", href: "https://opencode.ai/docs" },
-      { type: "item", labelKey: "desktop.menu.supportForum", href: "https://discord.com/invite/opencode" },
+      // UPSTREAM-DIVERGENCE: Tandem product documentation and support links.
+      { type: "item", labelKey: "desktop.menu.documentation", href: Brand.repository },
+      { type: "item", labelKey: "desktop.menu.supportForum", href: Brand.issues },
       { type: "item", labelKey: "desktop.menu.exportLogs", command: "logs.export" },
       { type: "separator" },
       {
         type: "item",
         labelKey: "desktop.menu.shareFeedback",
-        href: "https://github.com/anomalyco/opencode/issues/new?template=feature_request.yml",
+        // UPSTREAM-DIVERGENCE: Tandem product feedback link.
+        href: `${Brand.issues}/new`,
       },
       {
         type: "item",
         labelKey: "desktop.menu.reportBug",
-        href: "https://github.com/anomalyco/opencode/issues/new?template=bug_report.yml",
+        // UPSTREAM-DIVERGENCE: Tandem product bug-report link.
+        href: `${Brand.issues}/new`,
       },
     ],
   },

@@ -7,10 +7,13 @@ import { Wordmark } from "@opencode/ui/wordmark"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useCheckServerHealth } from "@/runtime/server/health"
-import { useServers } from "@/runtime/server/registry"
+// UPSTREAM-DIVERGENCE: Persist the Android default-server connection key.
+import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { pairingLink, redeemPairingLink, serverAddress } from "./pairing"
 import { isMixedContent } from "./browser"
 import { createCameraAvailability } from "./camera"
+// UPSTREAM-DIVERGENCE: Owned native LAN discovery controls.
+import { NativeServerDiscovery } from "./native-discovery"
 import "./screen.css"
 
 const PairingScanner = lazy(() => import("./scanner").then((module) => ({ default: module.PairingScanner })))
@@ -48,9 +51,16 @@ export function ConnectServerScreen(props: { url?: string } = {}) {
       const http = { url, password: state.password || undefined }
       const result = await check(http)
       if (!result.healthy) {
-        setState("error", connectionError())
+        // UPSTREAM-DIVERGENCE: Distinguish reachable credential-required servers from offline servers.
+        setState("error", result.unauthorized ? language.t("server.connect.credentialsRequired") : connectionError())
         return
       }
+      // UPSTREAM-DIVERGENCE: Require v2 and save the successful connection as Android's default.
+      if (platform.platform === "android" && !result.version?.startsWith("2.")) {
+        setState("error", language.t("server.connect.v2Required"))
+        return
+      }
+      if (platform.platform === "android") await platform.setDefaultServer?.(ServerConnection.Key.make(url))
       servers.add({ type: "http", http })
     },
     onError: () => setState("error", connectionError()),
@@ -59,7 +69,8 @@ export function ConnectServerScreen(props: { url?: string } = {}) {
   return (
     <main data-component="connect-server" aria-labelledby="server-connect-title">
       <div class="server-connect-content">
-        <div class="server-connect-brand" role="img" aria-label="OpenCode">
+        {/* UPSTREAM-DIVERGENCE: Tandem product accessible label. */}
+        <div class="server-connect-brand" role="img" aria-label={language.t("desktop.menu.app")}>
           <Wordmark />
         </div>
         <header>
@@ -83,6 +94,11 @@ export function ConnectServerScreen(props: { url?: string } = {}) {
             </Suspense>
           }
         >
+          {/* UPSTREAM-DIVERGENCE: Native LAN discovery in the shared connection screen. */}
+          <NativeServerDiscovery
+            disabled={request.isPending}
+            onSelect={(url) => setState({ url, error: "" })}
+          />
           <form
             onSubmit={(event) => {
               event.preventDefault()
@@ -154,8 +170,19 @@ export function ConnectServerScreen(props: { url?: string } = {}) {
             </Show>
           </Show>
           <footer>
-            <p>{language.t("server.connect.pair.description")}</p>
-            <code dir="ltr">opencode pair</code>
+            {/* UPSTREAM-DIVERGENCE: Native v2/password/pairing help and Tandem CLI command. */}
+            <Show when={platform.serverSetup}>
+              {(setup) => <>
+                <p>{language.t("server.connect.v2Help")}</p>
+                <p>{language.t("server.connect.passwordHelp")}</p>
+                <p>{language.t("server.connect.pairingHelp")}</p>
+                <code dir="ltr">{setup().serve}</code>
+              </>}
+            </Show>
+            <Show when={!platform.serverSetup || platform.serverSetup.pair}>
+              <p>{language.t("server.connect.pair.description")}</p>
+              <code dir="ltr">{platform.serverSetup?.pair ?? "tandem pair"}</code>
+            </Show>
           </footer>
         </Show>
       </div>

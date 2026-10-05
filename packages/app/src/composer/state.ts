@@ -54,7 +54,8 @@ function createComposerActions(setStore: SetStoreFunction<ComposerStore>) {
       )
     },
     reset() {
-      batch(() => setStore({ prompt: clonePrompt(DEFAULT_PROMPT), cursor: 0, retry: undefined }))
+      // UPSTREAM-DIVERGENCE: Clear Corrector snapshots and queued context with the draft.
+      batch(() => setStore({ prompt: clonePrompt(DEFAULT_PROMPT), cursor: 0, retry: undefined, correctorDisabled: undefined, queuedContext: undefined }))
     },
   }
 }
@@ -109,6 +110,15 @@ function createComposerStateValue(store: ComposerStore, setStore: SetStoreFuncti
     retry: {
       current: () => store.retry,
       set: (retry: NonNullable<ComposerStore["retry"]>) => setStore("retry", retry),
+    },
+    // UPSTREAM-DIVERGENCE: Expose draft Corrector snapshots and restored model-only queue context.
+    correctorDisabled: {
+      current: () => store.correctorDisabled,
+      set: (value: boolean | undefined) => setStore("correctorDisabled", value),
+    },
+    queuedContext: {
+      current: () => store.queuedContext,
+      set: (value: string | undefined) => setStore("queuedContext", value),
     },
     context: {
       items: () => store.context.items,

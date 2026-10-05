@@ -607,14 +607,16 @@ function App() {
     if (!terminalTitleEnabled()) return
 
     if (route.data.type === "home") {
-      renderer.setTerminalTitle("OpenCode")
+      // UPSTREAM-DIVERGENCE: Tandem terminal title.
+      renderer.setTerminalTitle("Tandem")
       return
     }
 
     if (route.data.type === "session") {
       const title = session?.title
       if (!title || isFallbackTitle(title)) {
-        renderer.setTerminalTitle("OpenCode")
+        // UPSTREAM-DIVERGENCE: Tandem fallback terminal title.
+        renderer.setTerminalTitle("Tandem")
         return
       }
 
@@ -985,7 +987,8 @@ function App() {
         ? [
             {
               name: "opencode.update",
-              title: "Update OpenCode",
+              // UPSTREAM-DIVERGENCE: Tandem display copy; command ID stays opencode.update.
+              title: "Update Tandem",
               slash: { name: "update" },
               run: () => updater.open?.("manual"),
               category: "System",
@@ -1091,7 +1094,8 @@ function App() {
         name: "docs.open",
         title: "Open docs",
         run: () => {
-          openUrl("https://opencode.ai/docs").catch(() => {})
+          // UPSTREAM-DIVERGENCE: Help opens the Tandem project.
+          openUrl("https://github.com/Liddo-kun/Tandem").catch(() => {})
           dialog.clear()
         },
         category: "System",

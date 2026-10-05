@@ -57,6 +57,8 @@ import {
 } from "../message/current-tool-state"
 import { AssistantReasoningContent, writeClipboard } from "../message/message-content"
 import { followShellOutput } from "./shell-output"
+// UPSTREAM-DIVERGENCE: Load Tandem's cards for every consumer of the shared registry.
+import { registerTandemTools } from "./tandem-tools"
 
 function ShellSubmessage(props: { text: string; animate?: boolean }) {
   let widthRef: HTMLSpanElement | undefined
@@ -2313,3 +2315,6 @@ ToolRegistry.register({
     )
   },
 })
+
+// UPSTREAM-DIVERGENCE: Register owned cards last so Tandem webfetch overrides the upstream card.
+registerTandemTools(registerTool)

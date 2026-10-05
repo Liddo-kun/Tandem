@@ -12,6 +12,8 @@ import {
   SystemPart,
 } from "@opencode/ai"
 import type { StreamOptions } from "@opencode/ai/route"
+// UPSTREAM-DIVERGENCE: owned wrapper attributes final transport diagnostics to each request.
+import { RequestDump } from "../plugin/tandem/request-dump/transport.js"
 import type {
   SessionCompaction,
   SessionContext,
@@ -39,6 +41,9 @@ import { SessionSchema } from "./schema.js"
 import { SessionSystemPrompt } from "./system-prompt.js"
 import { toLLMMessages } from "./runner/to-llm-message.js"
 import type { SessionMessage } from "./message.js"
+// UPSTREAM-DIVERGENCE: delegate Claude presentation and request-local Bash-search guidance to owned modules.
+import { ClaudePresentation } from "../plugin/tandem/claude/presentation.js"
+import { BashSearch } from "../plugin/tandem/bash-search/plugin.js"
 
 const IMAGE_BYTES_TRIGGER = 25 * 1024 * 1024 // 25 MiB
 const IMAGE_BYTES_TARGET = 15 * 1024 * 1024 // 15 MiB
@@ -107,14 +112,13 @@ export const baseTranscript = (input: {
   const providerMetadataKey = input.model.model.route.providerMetadataKey ?? input.model.model.provider
   return {
     providerMetadataKey,
+    // UPSTREAM-DIVERGENCE: tag only the rendered instruction baseline for Claude's first-user reminder.
     system: [
-      input.agent.system
+      SystemPart.make(input.agent.system
         ? input.agent.system
-        : SessionSystemPrompt.make(input.tools.definitions.map((tool) => tool.name)),
-      input.initial,
-    ]
-      .filter((part) => part.length > 0)
-      .map(SystemPart.make),
+        : SessionSystemPrompt.make(input.tools.definitions.map((tool) => tool.name))),
+      { ...SystemPart.make(input.initial), metadata: { "tandem.instruction-baseline": true } },
+    ].filter((part) => part.text.length > 0),
     messages: toLLMMessages(input.messages, input.model.ref, providerMetadataKey),
   }
 }
@@ -221,8 +225,10 @@ export const layer = Layer.effect(
     >(kind: SessionRequestKind, input: Input, shape: (draft: SessionRequest, tools: Definitions) => Effect.Effect<S>) {
       const session = input.session
       const model = input.model
+      // UPSTREAM-DIVERGENCE: detect Claude across resolved/ref IDs and preserve the snapshot's Bash-search flag.
+      const claude = ClaudePresentation.isClaude(model.model.id) || ClaudePresentation.isClaude(model.ref.id)
       const scope = { sessionID: session.id, agent: input.agent, model: model.ref, kind }
-      const tools = input.tools ?? {
+      const tools: Tool.Snapshot = input.tools ?? {
         definitions: [],
         execute: () => new Tool.Error({ message: "Tools are not available for this request" }),
       }
@@ -246,6 +252,16 @@ export const layer = Layer.effect(
         },
         Object.fromEntries(Array.from(given, ([d, t]) => [t.name, d])),
       )
+      // UPSTREAM-DIVERGENCE: align Claude search prose with the effective request-local catalog.
+      if (claude) {
+        if (tools.bashSearch) {
+          for (const tool of Object.values(shaped.tools ?? {})) tool.description = BashSearch.stripGuidance(tool.description)
+          shaped.system = shaped.system.map((part) => ({ ...part, text: BashSearch.stripGuidance(part.text) }))
+          shaped.system.push(SystemPart.make(BashSearch.guidance() ?? "Use plain grep and find through Bash for searches."))
+        } else if (BashSearch.enabled() && shaped.tools?.shell) {
+          shaped.system.push(SystemPart.make("Bash search is inactive for this request; use the available search tools. " + (BashSearch.guidance(false) ?? "")))
+        }
+      }
       // Match by identity first, then by key. Entries matching neither were invented by a
       // hook and are dropped. `t.name` stays the real name so execution can map renames back.
       const byName = new Map(tools.definitions.map((t) => [t.name, t]))
@@ -255,6 +271,9 @@ export const layer = Layer.effect(
           return t ? [[name, { ...t, description: d.description, inputSchema: d.input }] as const] : []
         }),
       )
+      // UPSTREAM-DIVERGENCE: execute reverse-mapped Claude calls by canonical names despite hook aliases.
+      // Claude responses publish canonical internal names, including definitions aliased by hooks.
+      const executionDefinitions = claude ? new Map(Array.from(hooked.values(), (tool) => [tool.name, tool])) : hooked
       const entries = Object.entries(shaped.options)
       const generation = Object.fromEntries(entries.filter(([k]) => GENERATION_KEYS.has(k))) as GenerationOptionsFields
       const providerOptions = Object.fromEntries(entries.filter(([k]) => !GENERATION_KEYS.has(k)))
@@ -294,13 +313,14 @@ export const layer = Layer.effect(
         modelHook.baseURL !== undefined && modelHook.baseURL !== baseURL
           ? base.model.route.with({ endpoint: { baseURL: modelHook.baseURL } })
           : base.model.route
-      const request = LLMRequest.update(base, {
+      // UPSTREAM-DIVERGENCE: apply owned Claude request presentation after model/header hooks resolve.
+      const request = ClaudePresentation.request(LLMRequest.update(base, {
         model: route === base.model.route ? base.model : LanguageModel.update(base.model, { route }),
         http: new HttpOptions({
           ...base.http,
           headers: Object.keys(modelHook.headers).length === 0 ? undefined : modelHook.headers,
         }),
-      })
+      }), claude, hooked)
       // History selects native windows against the catalog route before hooks run. A newly installed
       // routing hook must not send an existing opaque window to another deployment; `prepare` has no
       // error channel, so like hook failures this surfaces as a defect.
@@ -377,13 +397,15 @@ export const layer = Layer.effect(
       return {
         event: shaped,
         request,
-        options: { ...(http ? { http } : {}), ...(webSocket ? { webSocket } : {}) },
+        // UPSTREAM-DIVERGENCE: keep diagnostic attribution in the owned transport wrapper.
+        options: RequestDump.options(scope, { ...(http ? { http } : {}), ...(webSocket ? { webSocket } : {}) }),
         retry: (event: Parameters<Prepared["retry"]>[0]) =>
           hooks.trigger("session", "retry", event).pipe(Effect.asVoid),
         // Permission.assert and the question tool throw declines as defects so tools cannot
         // catch them and turn a "no" into model-visible output. Recover them here as failures.
         executeTool: (call: Parameters<Prepared["executeTool"]>[0]) =>
-          tools.execute({ ...call, definitions: hooked }).pipe(
+          // UPSTREAM-DIVERGENCE: use canonical execution definitions for reverse-mapped Claude calls.
+          tools.execute({ ...call, definitions: executionDefinitions }).pipe(
             Effect.catchCauseFilter(
               (cause) => {
                 const decline = cause.reasons.flatMap((r) =>

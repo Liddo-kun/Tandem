@@ -3,6 +3,8 @@ export * as ConfigNormalize from "./normalize.js"
 import { isDeepStrictEqual } from "node:util"
 import { isRecord } from "@opencode/ai/utils/record"
 import { Option, Schema } from "effect"
+// UPSTREAM-DIVERGENCE: migrate legacy small_model into Tandem's Corrector agent defaults.
+import { TandemAuxiliary } from "@opencode/util/tandem-auxiliary"
 import { Info } from "@opencode/schema/config"
 import { ConfigAgent } from "@opencode/schema/config/agent"
 import { ConfigCommand } from "@opencode/schema/config/command"
@@ -144,11 +146,17 @@ export function normalize(input: unknown): Result {
       path: ["small_model"],
       message: "omitted unsupported legacy model reference",
     })
-  if (migratedSmallModel)
+  // UPSTREAM-DIVERGENCE: seed Corrector from small_model while preserving explicit agent overrides.
+  if (migratedSmallModel) {
     legacyAgents.title = {
       model: migratedSmallModel,
       ...legacyAgents.title,
     }
+    legacyAgents[TandemAuxiliary.correctorAgent] = {
+      model: migratedSmallModel,
+      ...legacyAgents[TandemAuxiliary.correctorAgent],
+    }
+  }
   const modeAgents = mapValues(decodeMap(input.mode, ConfigAgentV1.Info, ["mode"], diagnostics, decodeValue), (value) =>
     canonical(ConfigAgent.Info, ConfigMigrateV1.migrateAgent({ ...value, mode: "primary" })),
   )

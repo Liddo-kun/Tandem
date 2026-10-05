@@ -16,7 +16,8 @@ type OpenAttachmentPickerOptions = {
   defaultPath?: string
 }
 type SaveFilePickerOptions = { title?: string; defaultPath?: string }
-type PlatformName = "web" | "desktop"
+// UPSTREAM-DIVERGENCE: Recognize the Tandem-owned Android wrapper.
+type PlatformName = "web" | "desktop" | "android"
 type DesktopOS = "macos" | "windows" | "linux"
 
 export type FatalRendererErrorLog = {
@@ -24,7 +25,8 @@ export type FatalRendererErrorLog = {
   url: string
   version?: string
   platform: PlatformName
-  os?: DesktopOS
+  // UPSTREAM-DIVERGENCE: Android renderer errors identify their native OS.
+  os?: DesktopOS | "android"
 }
 
 type PlatformBase = {
@@ -82,8 +84,25 @@ type PlatformBase = {
   /** Set the default server URL to use on app startup (platform-specific) */
   setDefaultServer?(url: ServerConnection.Key | null): Promise<void> | void
 
-  /** Webview zoom level (desktop only) */
+  // UPSTREAM-DIVERGENCE: Optional native Android zoom, haptics, sharing, discovery and resume capabilities.
+  /** Native webview zoom level. */
   webviewZoom?: Accessor<number>
+
+  /** Native page zoom; browsers can omit this capability. */
+  setWebviewZoom?(scale: number): void
+
+  haptic?(style: "light" | "medium" | "heavy" | "success" | "warning" | "error"): void
+  share?(data: { text?: string; url?: string }): Promise<boolean>
+
+  /** Native LAN discovery. A credential-required server is still reachable. */
+  discoverServers?(onServer: (server: { url: string; authenticationRequired: boolean }) => void): Promise<void>
+  cancelServerDiscovery?(): Promise<void>
+
+  /** Native foreground transition; returns an unsubscribe function. */
+  onResume?(callback: () => void): () => void
+
+  /** Platform-specific connection help, kept out of shared product branding. */
+  serverSetup?: { serve: string; pair?: string }
 
   /** Whether the native desktop window is fullscreen */
   windowFullscreen?: Accessor<boolean>
@@ -122,6 +141,8 @@ type PlatformBase = {
 export type Platform = PlatformBase &
   (
     | { platform: "web"; os?: never; windowID?: never }
+    // UPSTREAM-DIVERGENCE: Android uses the shared renderer without a desktop window ID.
+    | { platform: "android"; os: "android"; windowID?: never }
     | {
         platform: "desktop"
         os?: DesktopOS

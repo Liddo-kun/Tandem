@@ -1,4 +1,6 @@
 import { useDirectoryPicker } from "@/workspaces/selection/picker"
+// UPSTREAM-DIVERGENCE: Tandem product support links.
+import { Brand } from "@opencode/util/brand"
 import { useServerActionsController } from "@/servers/registry/controller"
 import { useSettingsCommand } from "@/settings/command"
 import { useSettingsSurface } from "@/settings/surface"
@@ -167,7 +169,8 @@ export function createHomeProjectsController(home: HomeController) {
     },
     utility: {
       settings: openSettings,
-      help: () => platform.openExternal("https://opencode.ai/desktop-feedback"),
+      // UPSTREAM-DIVERGENCE: Tandem product support link.
+      help: () => platform.openExternal(Brand.issues),
     },
   }
 }

@@ -104,13 +104,14 @@ export function RejectField(props: {
     })
   })
 
+  // UPSTREAM-DIVERGENCE: Tandem permission-rejection placeholder.
   return (
     <textarea
       width="100%"
       minHeight={1}
       maxHeight={3}
       wrapMode="word"
-      placeholder="Tell OpenCode what to do differently"
+      placeholder="Tell Tandem what to do differently"
       placeholderColor={props.theme.muted}
       textColor={props.theme.formfieldText}
       focusedTextColor={props.theme.formfieldFocusedText}
@@ -322,7 +323,8 @@ export function RunPermissionBody(props: {
           {title()}
         </text>
         <Show when={!compact() && stage() === "reject"}>
-          <text fg={props.theme.muted}>Tell OpenCode what to do differently</text>
+          {/* UPSTREAM-DIVERGENCE: Tandem permission-rejection copy. */}
+          <text fg={props.theme.muted}>Tell Tandem what to do differently</text>
         </Show>
       </box>
 

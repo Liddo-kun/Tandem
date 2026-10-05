@@ -1,11 +1,14 @@
 import { reconcile, unwrap } from "solid-js/store"
-import { createEffect, createMemo } from "solid-js"
+// UPSTREAM-DIVERGENCE: Cleanup native hardware-zoom event listeners.
+import { createEffect, createMemo, onCleanup } from "solid-js"
 import { Effect, Option, Schema, SchemaGetter } from "effect"
 import { createSimpleContext } from "@opencode/ui/context"
 import { timelinePresets, type TimelineCategory, type TimelineDetail } from "@opencode/session-ui/timeline/detail"
 import { persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import { ScopedKey, type ServerScope } from "@/runtime/server/scope"
+// UPSTREAM-DIVERGENCE: Sync persisted Android zoom with the native wrapper.
+import { usePlatform } from "@/runtime/platform/platform"
 
 export type Settings = typeof settingsSchema.Type
 export type WorkspaceDefaultDestination = Settings["workspaces"]["defaultDestination"]
@@ -19,6 +22,12 @@ export type SoundSettings = Settings["sounds"]
 export const monoDefault = "IBM Plex Mono"
 export const sansDefault = "Inter"
 export const terminalDefault = "JetBrainsMono Nerd Font Mono"
+
+// UPSTREAM-DIVERGENCE: Android zoom uses 80–150%, 2% steps and a 100% default.
+export function normalizeDisplayScale(value: number = 1) {
+  const percent = Number.isFinite(value) ? Math.round(value * 100 / 2) * 2 : 100
+  return Math.min(150, Math.max(80, percent)) / 100
+}
 const monoFallback =
   '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
 const sansFallback = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
@@ -94,9 +103,13 @@ const generalSchema = Persistence.struct({
   mobileDiffWrap: Schema.Boolean,
   terminalPlacement: Schema.Literals(["side", "bottom"]),
   followUpBehavior: Schema.Literals(["queue", "steer"]),
+  // UPSTREAM-DIVERGENCE: Persist the Corrector preference.
+  corrector: Persistence.optional(Schema.Boolean),
 })
 
 const appearanceSchema = Persistence.struct({
+  // UPSTREAM-DIVERGENCE: Persist Android page zoom.
+  displayScale: Persistence.optional(Schema.Number),
   fontSize: Schema.Number,
   mono: Schema.String,
   sans: Schema.String,
@@ -192,6 +205,10 @@ export const settingsPersistence = Persistence.migrate(
   Schema.Struct({
     general: Persistence.optional(
       Schema.Struct({
+        // UPSTREAM-DIVERGENCE: Read retained v1 enhancement preferences when migrating Corrector settings.
+        corrector: Persistence.optional(Schema.Boolean),
+        promptEnhance: Persistence.optional(Schema.Literals(["on", "no-reprompt", "off"])),
+        reprompt: Persistence.optional(Schema.Boolean),
         // Keep invalid explicit values distinct from absent values so legacy preferences cannot replace them.
         timelineDetail: Schema.optional(
           Schema.NullOr(
@@ -217,12 +234,15 @@ export const settingsPersistence = Persistence.migrate(
     Schema.decode({
       decode: SchemaGetter.transform((value) => {
         const general = value.general
-        if (!general || general.timelineDetail !== undefined) return value
+        // UPSTREAM-DIVERGENCE: Migrate Corrector even when upstream timelineDetail is already present.
+        if (!general) return value
         return {
           ...value,
           general: {
             ...general,
-            timelineDetail: {
+            // UPSTREAM-DIVERGENCE: Retain the v1 disabled preference without restoring RePrompt.
+            corrector: general.corrector ?? general.promptEnhance !== "off",
+            timelineDetail: general.timelineDetail !== undefined ? general.timelineDetail : {
               shell: legacyTimelineActivity(general.shellToolPartsExpanded),
               edit: legacyTimelineActivity(general.editToolPartsExpanded),
               thinking: legacyTimelineActivity(
@@ -247,8 +267,11 @@ export const defaultSettings: Settings = {
     mobileDiffWrap: true,
     terminalPlacement: "side",
     followUpBehavior: "steer",
+    // UPSTREAM-DIVERGENCE: Corrector defaults on for new prompts.
+    corrector: true,
   },
-  appearance: { fontSize: 14, mono: "", sans: "", terminal: "", tabLayout: "horizontal" },
+  // UPSTREAM-DIVERGENCE: Android page zoom defaults to 100%.
+  appearance: { displayScale: 1, fontSize: 14, mono: "", sans: "", terminal: "", tabLayout: "horizontal" },
   keybinds: {},
   permissions: { autoApprove: false },
   workspaces: { defaultDestination: "last-used", lastUsed: {} },
@@ -271,7 +294,25 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
   name: "Settings",
   gate: false,
   init: () => {
+    // UPSTREAM-DIVERGENCE: Native Android zoom capability backs persisted appearance settings.
+    const platform = usePlatform()
     const [store, setStore, , ready] = persisted({ key: "settings.v3" }, settingsPersistence, defaultSettings)
+    // UPSTREAM-DIVERGENCE: Sync persisted Android zoom and hardware-key changes with the native inset owner.
+    // Sync the persisted Android scale with the native wrapper's viewport/inset owner.
+    createEffect(() => {
+      if (platform.platform !== "android" || !ready()) return
+      platform.setWebviewZoom?.(normalizeDisplayScale(store.appearance.displayScale))
+    })
+    if (platform.platform === "android") {
+      const hardwareZoom = (event: Event) => {
+        if (!ready() || !(event instanceof CustomEvent)) return
+        const direction = event.detail?.direction
+        if (direction !== -1 && direction !== 1) return
+        setStore("appearance", "displayScale", normalizeDisplayScale(normalizeDisplayScale(store.appearance.displayScale) + direction * 0.02))
+      }
+      window.addEventListener("opencode:hardware-zoom", hardwareZoom)
+      onCleanup(() => window.removeEventListener("opencode:hardware-zoom", hardwareZoom))
+    }
     const showFileTree = withFallback(() => store.general?.showFileTree, defaultSettings.general.showFileTree)
     const showCustomAgents = withFallback(
       () => store.general?.showCustomAgents,
@@ -294,6 +335,11 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         return store
       },
       general: {
+        // UPSTREAM-DIVERGENCE: Expose the persisted Corrector preference and toggle action.
+        corrector: withFallback(() => store.general?.corrector, defaultSettings.general.corrector ?? true),
+        setCorrector(value: boolean) {
+          setStore("general", "corrector", value)
+        },
         releaseNotes: withFallback(() => store.general?.releaseNotes, defaultSettings.general.releaseNotes),
         setReleaseNotes(value: boolean) {
           setStore("general", "releaseNotes", value)
@@ -338,6 +384,11 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         customAgents: showCustomAgents,
       },
       appearance: {
+        // UPSTREAM-DIVERGENCE: Expose normalized Android zoom and its persisted setter.
+        displayScale: () => normalizeDisplayScale(store.appearance.displayScale),
+        setDisplayScale(value: number) {
+          setStore("appearance", "displayScale", normalizeDisplayScale(value))
+        },
         fontSize: withFallback(() => store.appearance?.fontSize, defaultSettings.appearance.fontSize),
         setFontSize(value: number) {
           setStore("appearance", "fontSize", value)

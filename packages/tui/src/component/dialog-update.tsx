@@ -88,9 +88,10 @@ export function DialogUpdate(props: {
   return (
     <box paddingLeft={2} paddingRight={2} gap={1}>
       <box flexDirection="row" justifyContent="space-between">
+        {/* UPSTREAM-DIVERGENCE: Tandem branding. */}
         <text attributes={TextAttributes.BOLD} fg={theme.text.base}>
           {state().type === "installing"
-            ? "Updating OpenCode"
+            ? "Updating Tandem"
             : state().type === "available" || state().type === "failed"
               ? "Update available"
               : "Update"}
@@ -107,8 +108,9 @@ export function DialogUpdate(props: {
                 <Spinner shimmer={theme.text.base}>Checking for updates…</Spinner>
               </Match>
               <Match when={current.type === "available"}>
+                {/* UPSTREAM-DIVERGENCE: Tandem branding. */}
                 <text fg={theme.text.muted}>
-                  An update is available. After installing, you'll be prompted to restart OpenCode.
+                  An update is available. After installing, you'll be prompted to restart Tandem.
                 </text>
               </Match>
               <Match when={current.type === "installing"}>
@@ -122,7 +124,8 @@ export function DialogUpdate(props: {
                 </text>
               </Match>
               <Match when={current.type === "current"}>
-                <text fg={theme.text.muted}>OpenCode is already up to date.</text>
+                {/* UPSTREAM-DIVERGENCE: Tandem branding. */}
+                <text fg={theme.text.muted}>Tandem is already up to date.</text>
               </Match>
               <Match when={current.type === "unavailable"}>
                 <text fg={theme.text.muted} wrapMode="word">

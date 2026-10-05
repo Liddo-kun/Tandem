@@ -1,6 +1,8 @@
 export * as RetainedImage from "./retained-image"
 
 import { Effect, FileSystem } from "effect"
+// UPSTREAM-DIVERGENCE: Central Tandem install identity.
+import { Brand } from "@opencode/util/brand"
 import { randomBytes } from "node:crypto"
 import path from "node:path"
 
@@ -54,13 +56,14 @@ export const relocate = Effect.fnUntraced(function* (directory: string, destinat
  * Whether the running binary was installed by a package manager or the curl installer, the installs
  * bun can hang on. The updater decides the same question from the package manifest it already reads.
  */
+// UPSTREAM-DIVERGENCE: Recognize the Tandem Windows install path for retained service images.
 export function installed(home: string) {
   const runtime = path.basename(process.execPath, path.extname(process.execPath)).toLowerCase()
   if (runtime === "bun" || runtime === "node" || runtime === "nodejs") return false
   const executable = path.resolve(process.execPath)
   return (
     executable.split(path.sep).includes("node_modules") ||
-    executable === path.resolve(home, ".opencode", "bin", "opencode.exe")
+    executable === path.resolve(home, `.${Brand.app}`, "bin", `${Brand.command}.exe`)
   )
 }
 

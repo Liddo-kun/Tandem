@@ -1,4 +1,6 @@
 import { useI18n } from "@opencode/ui/context/i18n"
+// UPSTREAM-DIVERGENCE: Shared navigator-first clipboard fallback for code blocks.
+import { writeClipboardText } from "@opencode/ui/clipboard"
 import { checksum } from "@opencode/util/encode"
 import {
   type ComponentProps,
@@ -398,9 +400,8 @@ function setupCodeCopy(root: HTMLDivElement, getLabels: () => CopyLabels) {
     const code = button.closest('[data-component="markdown-code"]')?.querySelector("code")
     const content = code?.textContent ?? ""
     if (!content) return
-    const clipboard = navigator?.clipboard
-    if (!clipboard) return
-    await clipboard.writeText(content)
+    // UPSTREAM-DIVERGENCE: Delegate code-block copying to the navigator-first clipboard fallback.
+    if (!(await writeClipboardText(content).then(() => true, () => false))) return
     const labels = getLabels()
     setCopyState(button, labels, true)
     const existing = timeouts.get(button)

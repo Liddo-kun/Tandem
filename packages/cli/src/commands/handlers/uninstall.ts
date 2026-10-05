@@ -1,6 +1,8 @@
 import { confirm, intro, log, outro, spinner } from "@clack/prompts"
 import { Service } from "@opencode/client/effect/service"
 import { Global } from "@opencode/util/global"
+// UPSTREAM-DIVERGENCE: Tandem uninstall identity and install paths.
+import { Brand } from "@opencode/util/brand"
 import { Effect, FileSystem, Schedule } from "effect"
 import path from "node:path"
 import { Commands } from "../commands"
@@ -14,7 +16,8 @@ import { errorMessage } from "../../util/error"
 export default Runtime.handler(
   Commands.commands.uninstall,
   Effect.fn("cli.uninstall")(function* (input) {
-    intro("Uninstall OpenCode")
+    // UPSTREAM-DIVERGENCE: Tandem branding.
+    intro(`Uninstall ${Brand.product}`)
     const fs = yield* FileSystem.FileSystem
     const global = yield* Global.Service
     const updater = yield* Updater.Service
@@ -34,7 +37,8 @@ export default Runtime.handler(
     const shell = method === "curl" ? yield* shellConfigs(global.home) : []
 
     log.info(`Installation method: ${method ?? "unknown"}`)
-    log.message("The following global files will be removed (shared by OpenCode versions and channels):")
+    // UPSTREAM-DIVERGENCE: Tandem branding.
+    log.message(`The following global files will be removed (shared by ${Brand.product} versions and channels):`)
     yield* Effect.forEach(directories, (directory) =>
       Effect.gen(function* () {
         if (!(yield* fs.exists(directory.path))) return
@@ -166,11 +170,12 @@ const shellConfigs = Effect.fnUntraced(function* (home: string) {
   )
 })
 
+// UPSTREAM-DIVERGENCE: Remove Tandem PATH entries and labels, preserving OpenCode's shell setup.
 function cleanShellConfig(content: string) {
   const lines = content.split("\n")
   const entry = (line: string) =>
-    /^(?:export PATH=|fish_add_path\s)/.test(line.trim()) && line.includes(".opencode/bin")
+    /^(?:export PATH=|fish_add_path\s)/.test(line.trim()) && line.includes(`.${Brand.app}/bin`)
   return lines
-    .filter((line, index) => !entry(line) && !(line.trim() === "# opencode" && entry(lines[index + 1] ?? "")))
+    .filter((line, index) => !entry(line) && !(line.trim() === `# ${Brand.command}` && entry(lines[index + 1] ?? "")))
     .join("\n")
 }

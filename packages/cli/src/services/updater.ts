@@ -1,4 +1,6 @@
 import { Global } from "@opencode/util/global"
+// UPSTREAM-DIVERGENCE: Tandem install identity and manual-update message.
+import { Brand } from "@opencode/util/brand"
 import { AppProcess } from "@opencode/util/process"
 import { EffectFlock } from "@opencode/util/effect-flock"
 import { OPENCODE_ARTIFACT, OPENCODE_CHANNEL, OPENCODE_LOCAL, OPENCODE_VERSION } from "../version"
@@ -173,11 +175,12 @@ const make = Effect.gen(function* () {
       )
   })
 
+  // UPSTREAM-DIVERGENCE: Detect/remove Tandem's install instead of OpenCode's.
   const curlBinary = path.resolve(
     global.home,
-    ".opencode",
+    `.${Brand.app}`,
     "bin",
-    process.platform === "win32" ? "opencode.exe" : "opencode",
+    process.platform === "win32" ? `${Brand.command}.exe` : Brand.command,
   )
 
   const method = Effect.fnUntraced(function* () {
@@ -512,7 +515,16 @@ const make = Effect.gen(function* () {
     Effect.catch((error) => Effect.logWarning("update check failed", { error }).pipe(Effect.as(undefined))),
   )
 
-  return Service.of({ run, check, apply, method, latest, upgrade, removal })
+  // UPSTREAM-DIVERGENCE: Preserve upstream install detection/removal helpers, but never
+  // expose the official release lookup or installer to Tandem callers or config.
+  return Service.of({
+    ...{ run, check, apply, method, latest, upgrade, removal },
+    run: () => Effect.succeed(undefined),
+    check: () => Effect.succeed({ type: "unavailable" as const, message: Brand.manualUpdateMessage }),
+    latest: () => Effect.fail(new Error(Brand.manualUpdateMessage)),
+    apply: () => Effect.fail(new Error(Brand.manualUpdateMessage)),
+    upgrade: () => Effect.fail(new Error(Brand.manualUpdateMessage)),
+  })
 })
 
 export const layer = Layer.effect(Service, make)

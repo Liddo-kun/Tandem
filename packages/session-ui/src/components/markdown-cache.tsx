@@ -12,6 +12,8 @@ export type MarkdownCacheEntry = {
 
 const max = 200
 const cache = new Map<string, MarkdownCacheEntry>()
+// UPSTREAM-DIVERGENCE: Native wrappers register restricted app-link protocols, including Android Taobao.
+const nativeLinkProtocols = new Map<string, (href: string) => boolean>()
 const pending = new Map<
   string,
   { raw: string; promise: Promise<MarkdownCacheEntry>; controller: AbortController; consumers: Set<symbol> }
@@ -28,6 +30,12 @@ const config = {
 }
 
 if (typeof window !== "undefined" && purifier.isSupported) {
+  // UPSTREAM-DIVERGENCE: Preserve explicitly approved native links without changing browser sanitization.
+  purifier.addHook("uponSanitizeAttribute", (node, data) => {
+    if (!(node instanceof HTMLAnchorElement) || data.attrName !== "href") return
+    const protocol = /^([a-z][a-z\d+.-]*):/i.exec(data.attrValue)?.[1]?.toLowerCase()
+    if (protocol && nativeLinkProtocols.get(protocol)?.(data.attrValue)) data.forceKeepAttr = true
+  })
   purifier.addHook("beforeSanitizeAttributes", (node) => {
     if (node instanceof HTMLAnchorElement) {
       // Local file links never navigate the document; the host decides how to open them.
@@ -60,6 +68,14 @@ if (typeof window !== "undefined" && purifier.isSupported) {
     set.add("noreferrer")
     node.setAttribute("rel", Array.from(set).join(" "))
   })
+}
+
+// UPSTREAM-DIVERGENCE: Android opts into restricted Taobao links through the shared Markdown sanitizer.
+/** Native wrappers opt into a restricted URL capability without weakening browser sanitization. */
+export function allowMarkdownLinkProtocol(protocol: string, accepts: (href: string) => boolean) {
+  const normalized = protocol.toLowerCase()
+  if (!/^[a-z][a-z\d+.-]*$/.test(normalized)) return
+  nativeLinkProtocols.set(normalized, accepts)
 }
 
 export function sanitizeMarkdown(html: string) {

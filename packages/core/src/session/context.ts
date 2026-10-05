@@ -1,5 +1,11 @@
 export * as SessionContext from "./context.js"
 
+// UPSTREAM-DIVERGENCE: select Claude instruction presentation and shell-compatible Bash-search catalogs.
+import { BashSearch } from "../plugin/tandem/bash-search/plugin.js"
+import { ClaudeInstructions } from "../plugin/tandem/claude/instructions.js"
+import { ClaudePresentation } from "../plugin/tandem/claude/presentation.js"
+import { ShellSelect } from "../shell/select.js"
+
 import { Model } from "../model.js"
 import { Permission } from "../permission.js"
 import { Context, Effect, Layer } from "effect"
@@ -16,6 +22,8 @@ import { McpTool } from "../tool/mcp.js"
 import { ReferenceInstructions } from "../reference/instructions.js"
 import { SkillInstructions } from "../skill/instructions.js"
 import { Tool } from "../tool.js"
+// UPSTREAM-DIVERGENCE: consult the additive instructions hook before ambient baseline discovery.
+import { PluginHooks } from "../plugin/hooks.js"
 import { AgentNotFoundError } from "./error.js"
 import { SessionHistory } from "./history.js"
 import { SessionProviderContext } from "./provider-context.js"
@@ -89,6 +97,9 @@ const layer = Layer.effect(
     const skillInstructions = yield* SkillInstructions.Service
     const store = yield* SessionStore.Service
     const registry = yield* Tool.Service
+    // UPSTREAM-DIVERGENCE: acquire shell selection and instruction policy for request-local context.
+    const shells = yield* ShellSelect.Service
+    const hooks = yield* PluginHooks.Service
 
     const resolveModel = (session: SessionSchema.Info) => models.resolve(session, model.available)
 
@@ -124,14 +135,34 @@ const layer = Layer.effect(
       if (session.location.directory !== location.directory || session.location.workspaceID !== location.workspaceID)
         return yield* Effect.interrupt
 
-      yield* mcpTools.flush
+      // UPSTREAM-DIVERGENCE: remove the pre-selection MCP flush; instruction policy now precedes discovery.
+      // Runner/generate callers already await plugin activation before selection.
       const agent = yield* agents.select(session.agent)
       if (!agent.info) return yield* new AgentNotFoundError({ sessionID: session.id, agent: session.agent ?? agent.id })
+      // UPSTREAM-DIVERGENCE: honor agent-only instruction policy before MCP/discovery loading.
+      const policy = yield* hooks.trigger("session", "instructions", {
+        sessionID,
+        agent: agent.id,
+        mode: "default",
+      })
+      yield* mcpTools.flush
       // Session permissions narrow discovery the same way they narrow the tool snapshot.
       const permissions = Permission.merge(agent.info.permissions, session.permissions ?? [])
+      // UPSTREAM-DIVERGENCE: snapshot Bash-search before Code Mode; agent-only sessions get no ambient baseline.
+      const selectedModel = yield* resolveModel(session).pipe(Effect.orElseSucceed(() => undefined))
+      const modelID = selectedModel?.model.id ?? session.model?.id ?? ""
+      const snapshot = () => BashSearch.snapshot(registry, permissions, location.workspaceID === undefined ? modelID : "", shells)
+      if (policy.mode === "agent-only")
+        return {
+          session,
+          agent: { ...agent, info: agent.info },
+          instructions: Instructions.empty,
+          tools: yield* snapshot(),
+        }
       const loaded = yield* Effect.all(
         {
-          tools: registry.snapshot(permissions),
+          // UPSTREAM-DIVERGENCE: load the request-local filtered catalog instead of the raw registry snapshot.
+          tools: snapshot(),
           builtins: builtins.load(),
           discovery: discovery.load(),
           skills: skillInstructions.load(permissions),
@@ -141,21 +172,27 @@ const layer = Layer.effect(
         },
         { concurrency: "unbounded" },
       )
+      // UPSTREAM-DIVERGENCE: extract the upstream-ordered baseline for Claude-only renderer presentation.
+      // Preserve upstream source ordering and durable values; only Claude's renderers differ.
+      const instructions = Instructions.combine([
+        CodeModeInstructions.make(loaded.tools.codeModeCatalog),
+        loaded.mcp,
+        loaded.references,
+        loaded.skills,
+        loaded.discovery,
+        loaded.builtins,
+        loaded.entries,
+      ])
       return {
         session,
         agent: { ...agent, info: agent.info },
         // Ordered from most to least shared across sessions so the baseline stays a reusable
         // prompt-cache prefix: user-level catalog and guidance, then project instructions, then
         // the date and environment, which vary by day and directory.
-        instructions: Instructions.combine([
-          CodeModeInstructions.make(loaded.tools.codeModeCatalog),
-          loaded.mcp,
-          loaded.references,
-          loaded.skills,
-          loaded.discovery,
-          loaded.builtins,
-          loaded.entries,
-        ]),
+        // UPSTREAM-DIVERGENCE: present Claude guidance without altering durable instruction values or ordering.
+        instructions: ClaudePresentation.isClaude(modelID)
+          ? ClaudeInstructions.present(instructions, loaded.tools.bashSearch === true)
+          : instructions,
         tools: loaded.tools,
       }
     })
@@ -204,5 +241,8 @@ export const node = makeLocationNode({
     SessionStore.node,
     SkillInstructions.node,
     Tool.node,
+    // UPSTREAM-DIVERGENCE: wire the instructions hook and shell selection into context loading.
+    PluginHooks.node,
+    ShellSelect.node,
   ],
 })

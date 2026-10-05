@@ -1,0 +1,305 @@
+// Tandem-owned (not in upstream): Android LAN discovery, share and lifecycle bridge.
+package ai.opencode.mobilebridge
+
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Handler
+import android.os.Looper
+import app.tauri.annotation.Command
+import app.tauri.annotation.InvokeArg
+import app.tauri.annotation.TauriPlugin
+import app.tauri.plugin.Invoke
+import app.tauri.plugin.JSArray
+import app.tauri.plugin.JSObject
+import app.tauri.plugin.Plugin
+import java.net.HttpURLConnection
+import java.net.Inet4Address
+import java.net.InetSocketAddress
+import java.net.NetworkInterface
+import java.net.Socket
+import java.net.URL
+import org.json.JSONObject
+import java.util.Collections
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+
+@InvokeArg
+class ShareArgs {
+    var text: String? = null
+    var url: String? = null
+}
+
+private data class ScanEntry(val host: String, val port: Int, val url: String, val authenticationRequired: Boolean)
+private data class WifiAddressInfo(val address: String, val prefixLength: Int)
+// UPSTREAM-DIVERGENCE: Prefer Tandem's parallel-install port while keeping opencode scan compatibility.
+private val tandemScanPorts = listOf(4097, 4096)
+
+@TauriPlugin
+class MobileBridgePlugin(private val activity: Activity) : Plugin(activity) {
+    private val main = Handler(Looper.getMainLooper())
+    private val scanExecutor = Executors.newSingleThreadExecutor()
+
+    @Volatile
+    private var scanCancelled = false
+
+    @Volatile
+    private var scanTask: Future<*>? = null
+
+    @Volatile
+    private var scanGeneration = 0
+
+    override fun onResume() {
+        super.onResume()
+        trigger("resume", JSObject())
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        scanCancelled = true
+        scanTask?.cancel(true)
+        scanExecutor.shutdownNow()
+    }
+
+    @Command
+    fun scanNetwork(invoke: Invoke) {
+        val gen = scanGeneration + 1
+        scanGeneration = gen
+        scanCancelled = false
+        // Notify JS only after resetting cancellation, so an early cancel is not lost.
+        trigger("scanStarted", JSObject())
+        scanTask = scanExecutor.submit {
+            val results = runScan(gen)
+            if (isScanStale(gen)) {
+                main.post { invoke.resolve(JSObject().put("results", JSArray())) }
+                return@submit
+            }
+            main.post {
+                // A plain list would be stringified; Rust expects a JSON array.
+                invoke.resolve(JSObject().put("results", JSArray(results)))
+                trigger("scanComplete", JSObject())
+            }
+        }
+    }
+
+    @Command
+    fun cancelScan(invoke: Invoke) {
+        scanCancelled = true
+        scanGeneration += 1
+        // Let even a queued task run its stale check and resolve the scan invoke.
+        // Future.cancel would skip the task entirely and leave JS awaiting forever.
+        invoke.resolve()
+    }
+
+    @Command
+    fun share(invoke: Invoke) {
+        val args = invoke.parseArgs(ShareArgs::class.java)
+        val parts = listOfNotNull(args.text?.trim()?.takeIf { it.isNotEmpty() }, args.url?.trim()?.takeIf { it.isNotEmpty() })
+        if (parts.isEmpty()) {
+            invoke.resolve(JSObject().put("success", false))
+            return
+        }
+
+        val text = parts.joinToString("\n")
+        val sendIntent = Intent().apply {
+            action = Intent.ACTION_SEND
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+
+        try {
+            activity.startActivity(Intent.createChooser(sendIntent, null))
+            invoke.resolve(JSObject().put("success", true))
+        } catch (_: Throwable) {
+            invoke.resolve(JSObject().put("success", false))
+        }
+    }
+
+    private fun runScan(gen: Int): ArrayList<JSObject> {
+        val info = wifiAddress() ?: return ArrayList()
+
+        val hosts = subnetHosts(info.address, info.prefixLength)
+        if (hosts.isEmpty()) return ArrayList()
+
+        val pool = Executors.newFixedThreadPool(48)
+        val futures = ArrayList<Future<ScanEntry?>>()
+
+        for (host in hosts) {
+            if (isScanStale(gen)) break
+            futures.add(pool.submit<ScanEntry?> { probeHost(host, gen) })
+        }
+
+        val found = ArrayList<JSObject>()
+        for (future in futures) {
+            if (isScanStale(gen)) break
+            val item = try {
+                future.get()
+            } catch (_: Throwable) {
+                null
+            }
+            if (item != null) {
+                val value = JSObject()
+                value.put("host", item.host)
+                value.put("port", item.port)
+                value.put("url", item.url)
+                value.put("authenticationRequired", item.authenticationRequired)
+                found.add(value)
+                main.post {
+                    if (!isScanStale(gen)) trigger("scanResult", value)
+                }
+            }
+        }
+
+        pool.shutdownNow()
+        return found
+    }
+
+    private fun probeHost(host: String, gen: Int): ScanEntry? {
+        if (isScanStale(gen)) return null
+
+        for (port in tandemScanPorts) {
+            if (isScanStale(gen)) return null
+            val socket = Socket()
+            try {
+                socket.connect(InetSocketAddress(host, port), 500)
+                socket.close()
+
+                val base = "http://$host:$port"
+                val authenticationRequired = checkInfo("$base/api/info", gen)
+                if (authenticationRequired != null) {
+                    return ScanEntry(host = host, port = port, url = base, authenticationRequired = authenticationRequired)
+                }
+            } catch (_: Throwable) {
+            } finally {
+                try {
+                    socket.close()
+                } catch (_: Throwable) {
+                }
+            }
+        }
+        return null
+    }
+
+    // null = not a v2 server; true = reachable but needs credentials; false = ready.
+    private fun checkInfo(url: String, gen: Int): Boolean? {
+        repeat(2) {
+            if (isScanStale(gen)) return null
+            val connection = try {
+                URL(url).openConnection() as HttpURLConnection
+            } catch (_: Throwable) {
+                return null
+            }
+
+            val result = try {
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("Accept", "application/json")
+                connection.connectTimeout = 1200
+                connection.readTimeout = 1200
+                connection.connect()
+                val code = connection.responseCode
+                val stream = if (code == 401) connection.errorStream else connection.inputStream
+                val body = stream?.bufferedReader()?.use { it.readText() }
+                val json = JSONObject(body ?: "")
+                when {
+                    code == 401 && json.optString("_tag") == "UnauthorizedError" -> true
+                    code in 200..299 && json.optString("version").startsWith("2.") &&
+                        json.has("pid") && json.has("urls") && json.has("paths") -> false
+                    else -> null
+                }
+            } catch (_: Throwable) {
+                null
+            } finally {
+                connection.disconnect()
+            }
+
+            if (result != null) return result
+        }
+        return null
+    }
+
+    private fun wifiAddress(): WifiAddressInfo? {
+        // Primary: use ConnectivityManager to find the WiFi network's address
+        try {
+            val cm = activity.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            if (cm != null) {
+                val network = cm.activeNetwork
+                if (network != null) {
+                    val caps = cm.getNetworkCapabilities(network)
+                    if (caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                        val props = cm.getLinkProperties(network)
+                        if (props != null) {
+                            for (la in props.linkAddresses) {
+                                val addr = la.address
+                                if (addr is Inet4Address && !addr.isLoopbackAddress) {
+                                    val host = addr.hostAddress ?: continue
+                                    return WifiAddressInfo(host, la.prefixLength)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (_: Throwable) {}
+
+        // Fallback: iterate NetworkInterface, filter for wlan* (Android WiFi)
+        try {
+            val interfaces = Collections.list(NetworkInterface.getNetworkInterfaces())
+            for (ni in interfaces) {
+                if (!ni.isUp || ni.isLoopback) continue
+                val name = ni.name ?: continue
+                if (!name.startsWith("wlan")) continue
+                for (ia in ni.interfaceAddresses) {
+                    val addr = ia.address
+                    if (addr is Inet4Address && !addr.isLoopbackAddress) {
+                        val host = addr.hostAddress ?: continue
+                        return WifiAddressInfo(host, ia.networkPrefixLength.toInt())
+                    }
+                }
+            }
+        } catch (_: Throwable) {}
+
+        return null
+    }
+
+    private fun subnetHosts(ip: String, prefixLength: Int): List<String> {
+        val parts = ip.split('.')
+        if (parts.size != 4) return emptyList()
+
+        val ipInt = (parts[0].toInt() shl 24) or
+                (parts[1].toInt() shl 16) or
+                (parts[2].toInt() shl 8) or
+                parts[3].toInt()
+
+        // Cap at /20 so scans do not take minutes on large enterprise networks.
+        val prefix = prefixLength.coerceIn(20, 30)
+        val mask = (-1 shl (32 - prefix))
+        val network = ipInt and mask
+        val broadcast = network or mask.inv()
+
+        val local24 = ip.substringBeforeLast('.', missingDelimiterValue = "")
+        val primary = ArrayList<String>()
+        val secondary = ArrayList<String>()
+        // Skip network address (+1) and broadcast address (-1)
+        for (addr in (network + 1) until broadcast) {
+            val host = "${(addr ushr 24) and 0xFF}." +
+                    "${(addr ushr 16) and 0xFF}." +
+                    "${(addr ushr 8) and 0xFF}." +
+                    "${addr and 0xFF}"
+            if (host.startsWith("$local24.")) {
+                primary.add(host)
+            } else {
+                secondary.add(host)
+            }
+        }
+        val hosts = ArrayList<String>(primary.size + secondary.size)
+        hosts.addAll(primary)
+        hosts.addAll(secondary)
+        return hosts
+    }
+
+    private fun isScanStale(gen: Int): Boolean {
+        return scanCancelled || scanGeneration != gen || Thread.currentThread().isInterrupted
+    }
+}

@@ -7,6 +7,8 @@ import { showToast } from "@opencode/ui/toast"
 import { createPtyClient } from "@opencode/client/solid"
 import type { FitAddon, Terminal as Term } from "ghostty-web"
 import { type ComponentProps, createEffect, createMemo, onCleanup, onMount, splitProps } from "solid-js"
+// UPSTREAM-DIVERGENCE: Shared navigator-first clipboard fallback for terminal selection.
+import { writeClipboardText } from "@opencode/ui/clipboard"
 import { App, Native, System, useExtension, type ServerRef } from "../sdk"
 import type { TerminalModel } from "./model"
 import type { LocalPTY } from "./state"
@@ -78,7 +80,8 @@ const useTerminalUiBindings = (input: {
   container: HTMLDivElement
   term: Term
   cleanups: VoidFunction[]
-  handlePointerDown: () => void
+  // UPSTREAM-DIVERGENCE: Distinguish native touch from pointer focus events.
+  handlePointerDown: (event: PointerEvent) => void
   handleLinkClick: (event: MouseEvent) => void
 }) => {
   const handleCopy = (event: ClipboardEvent) => {
@@ -108,6 +111,53 @@ const useTerminalUiBindings = (input: {
   const handleTextareaBlur = () => {
     input.term.options.cursorBlink = false
   }
+
+  // UPSTREAM-DIVERGENCE: Native touch scrollback uses Ghostty rows without focusing the IME on swipes.
+  // Ghostty's canvas scrollback is not a DOM scroll container. Convert physical
+  // touch travel to rows using the rendered canvas (including native CSS zoom).
+  let touch: { id: number; y: number; remainder: number; moved: boolean } | undefined
+  const handleTouchStart = (event: TouchEvent) => {
+    const point = event.touches[0]
+    touch = event.touches.length === 1 && point
+      ? { id: point.identifier, y: point.clientY, remainder: 0, moved: false }
+      : undefined
+  }
+  const handleTouchMove = (event: TouchEvent) => {
+    if (!touch || event.touches.length !== 1) return
+    const point = event.touches[0]
+    if (!point || point.identifier !== touch.id) return
+    const height = input.container.querySelector("canvas")?.getBoundingClientRect().height
+    if (!height || !input.term.rows) return
+    const delta = touch.y - point.clientY
+    if (!touch.moved && Math.abs(delta) < 6) return
+    touch.moved = true
+    touch.y = point.clientY
+    event.preventDefault()
+    event.stopPropagation()
+    const rows = touch.remainder + delta / (height / input.term.rows)
+    const amount = Math.trunc(rows)
+    touch.remainder = rows - amount
+    if (amount) input.term.scrollLines(amount)
+  }
+  const handleTouchEnd = (event: TouchEvent) => {
+    // A swipe must not trigger Ghostty's touchend focus/IME or a synthetic click.
+    // Stationary taps and long presses retain the existing focus/selection path.
+    if (touch?.moved) {
+      event.preventDefault()
+      event.stopPropagation()
+    }
+    touch = undefined
+  }
+  input.container.addEventListener("touchstart", handleTouchStart, { passive: true })
+  input.container.addEventListener("touchmove", handleTouchMove, { passive: false })
+  input.container.addEventListener("touchend", handleTouchEnd, { capture: true, passive: false })
+  input.container.addEventListener("touchcancel", handleTouchEnd, { capture: true, passive: false })
+  input.cleanups.push(() => {
+    input.container.removeEventListener("touchstart", handleTouchStart)
+    input.container.removeEventListener("touchmove", handleTouchMove)
+    input.container.removeEventListener("touchend", handleTouchEnd, true)
+    input.container.removeEventListener("touchcancel", handleTouchEnd, true)
+  })
 
   input.container.addEventListener("copy", handleCopy, true)
   input.cleanups.push(() => input.container.removeEventListener("copy", handleCopy, true))
@@ -345,7 +395,9 @@ export const Terminal = (props: TerminalProps) => {
     focus()
     setTimeout(focus, 0)
   }
-  const handlePointerDown = () => {
+  // UPSTREAM-DIVERGENCE: Touch scroll gestures must not focus the terminal and open the IME.
+  const handlePointerDown = (event: PointerEvent) => {
+    if (event.pointerType === "touch") return
     const activeElement = document.activeElement
     if (activeElement instanceof HTMLElement && activeElement !== container && !container.contains(activeElement)) {
       activeElement.blur()
@@ -413,7 +465,9 @@ export const Terminal = (props: TerminalProps) => {
         }
 
         if (event.ctrlKey && event.shiftKey && !event.metaKey && key === "c") {
-          document.execCommand("copy")
+          // UPSTREAM-DIVERGENCE: Copy terminal selection through the navigator-first clipboard fallback.
+          const selection = t.getSelection()
+          if (selection) void writeClipboardText(selection).catch((error: unknown) => debugTerminal("copy failed", error))
           return true
         }
 

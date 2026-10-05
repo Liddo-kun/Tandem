@@ -1,4 +1,6 @@
 import { type ComponentProps, createMemo, Show, splitProps } from "solid-js"
+// UPSTREAM-DIVERGENCE: Shared navigator-first clipboard fallback for tool errors.
+import { writeClipboardText } from "@opencode/ui/clipboard"
 import { createStore } from "solid-js/store"
 import { Card, CardDescription } from "@opencode/ui/card"
 import { Collapsible } from "@opencode/ui/collapsible"
@@ -85,7 +87,8 @@ export function ToolErrorCard(props: ToolErrorCardProps) {
   const copy = async () => {
     const text = cleaned()
     if (!text) return
-    await navigator.clipboard.writeText(text)
+    // UPSTREAM-DIVERGENCE: Delegate tool-error copying to the navigator-first clipboard fallback.
+    if (!(await writeClipboardText(text).then(() => true, () => false))) return
     setState("copied", true)
     setTimeout(() => setState("copied", false), 2000)
   }

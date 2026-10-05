@@ -265,6 +265,9 @@ export const ComposerStore = Persistence.struct({
   ),
   model: Persistence.optional(PromptModel),
   mode: Persistence.optional(Schema.Literals(["normal", "shell"])),
+  // UPSTREAM-DIVERGENCE: Persist draft Corrector snapshots and restored model-only queue context.
+  correctorDisabled: Persistence.optional(Schema.Boolean),
+  queuedContext: Persistence.optional(Schema.String),
   retry: Persistence.optional(
     Schema.Struct({
       id: SessionMessage.ID,
@@ -272,6 +275,8 @@ export const ComposerStore = Persistence.struct({
       providerID: Schema.String,
       modelID: Schema.String,
       variant: Persistence.optional(Schema.String),
+      // UPSTREAM-DIVERGENCE: Retries retain their original Corrector snapshot.
+      correctorDisabled: Persistence.optional(Schema.Boolean),
     }),
   ),
   context: Persistence.struct({ items: Persistence.array(ContextEntry) }),

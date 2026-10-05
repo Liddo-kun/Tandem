@@ -32,6 +32,8 @@ import {
 } from "@opencode/ai"
 import { Auth, Endpoint, RequestExecutor, type AnyRoute, type HttpMiddleware } from "@opencode/ai/route"
 import { ProviderShared } from "@opencode/ai/protocols/shared"
+// UPSTREAM-DIVERGENCE: owned diagnostics follow custom-fetch/auth rewrites to their final fetch.
+import { RequestDumpFetch } from "./plugin/tandem/request-dump/sdk-fetch.js"
 import { Cause, Context, Effect, Layer, Option, Schema, Scope, Stream } from "effect"
 import { makeParser } from "effect/unstable/encoding/Sse"
 import { HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
@@ -203,8 +205,10 @@ function throughMiddleware(
         (sent) =>
           Effect.gen(function* () {
             const web = yield* HttpClientRequest.toWeb(sent)
+            // UPSTREAM-DIVERGENCE: attribute the terminal fetch, not the pre-customFetch request.
+            const sendFinal = yield* RequestDumpFetch.bind(send)
             const response = yield* Effect.tryPromise(async () =>
-              send(web.url, {
+              sendFinal(web.url, {
                 ...init,
                 method: web.method,
                 headers: web.headers,

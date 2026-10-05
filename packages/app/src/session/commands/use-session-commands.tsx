@@ -1,4 +1,6 @@
 import { useCommand, type CommandOption } from "@/shell/commands/command"
+// UPSTREAM-DIVERGENCE: Shared navigator-first clipboard fallback for ID copy commands.
+import { writeClipboardText } from "@opencode/ui/clipboard"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { previewSelectedLines } from "@opencode/session-ui/pierre/selection-bridge"
 import { useFile, selectionFromLines, type FileSelection, type SelectedLineRange } from "@/workspaces/files/model"
@@ -130,7 +132,8 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     const sessionID = actions.session.identity.params.id
     if (!sessionID) return
     try {
-      await (platform.writeClipboardText?.(sessionID) ?? navigator.clipboard.writeText(sessionID))
+      // UPSTREAM-DIVERGENCE: Delegate session ID copying to the navigator-first clipboard fallback.
+      await writeClipboardText(sessionID, platform.writeClipboardText)
       showToast({
         variant: "success",
         icon: "circle-check",
@@ -150,7 +153,8 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     const projectID = actions.session.data.info()?.projectID
     if (!projectID) return
     try {
-      await (platform.writeClipboardText?.(projectID) ?? navigator.clipboard.writeText(projectID))
+      // UPSTREAM-DIVERGENCE: Delegate project ID copying to the navigator-first clipboard fallback.
+      await writeClipboardText(projectID, platform.writeClipboardText)
       showToast({
         variant: "success",
         icon: "circle-check",

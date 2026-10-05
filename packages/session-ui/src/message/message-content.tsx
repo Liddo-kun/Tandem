@@ -28,26 +28,12 @@ import type {
 } from "@opencode/client/promise"
 import type { SessionUserActions, SessionUserAttachmentReference, SessionUserComment } from "../actions"
 import { attached, typeLabel } from "../components/message-file"
+// UPSTREAM-DIVERGENCE: Shared navigator-first clipboard fallback for chat content.
+import { writeClipboardText } from "@opencode/ui/clipboard"
 
 export async function writeClipboard(text: string): Promise<boolean> {
-  const body = typeof document === "undefined" ? undefined : document.body
-  if (body) {
-    const textarea = document.createElement("textarea")
-    textarea.value = text
-    textarea.setAttribute("readonly", "")
-    textarea.style.position = "fixed"
-    textarea.style.opacity = "0"
-    textarea.style.pointerEvents = "none"
-    body.appendChild(textarea)
-    textarea.select()
-    const copied = document.execCommand("copy")
-    body.removeChild(textarea)
-    if (copied) return true
-  }
-
-  const clipboard = typeof navigator === "undefined" ? undefined : navigator.clipboard
-  if (!clipboard?.writeText) return false
-  return clipboard.writeText(text).then(
+  // UPSTREAM-DIVERGENCE: Remove execCommand-first copying; delegate to the navigator-first fallback helper.
+  return writeClipboardText(text).then(
     () => true,
     () => false,
   )

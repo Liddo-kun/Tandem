@@ -135,7 +135,20 @@ export interface SessionRetry {
   decision: SessionRetryDecision
 }
 
+// UPSTREAM-DIVERGENCE: additive instructions hook lets auxiliary agents opt out before baseline/Read loading.
+/** Runs before ambient instruction loading and before Read's automatic instruction injection.
+ * Agent-only keeps the selected agent system prompt and normal transcript, with an empty durable baseline.
+ * Use only for fresh sessions; it does not erase previously admitted instruction history.
+ */
+export interface SessionInstructions {
+  readonly sessionID: Session.ID
+  readonly agent: Agent.ID
+  mode: "default" | "agent-only"
+}
+
 export interface SessionHooks {
+  // UPSTREAM-DIVERGENCE: expose the approved instructions policy hook on the Promise plugin API.
+  readonly instructions: SessionInstructions
   readonly prompt: SessionPrompt
   readonly context: SessionContext
   readonly compaction: SessionCompaction

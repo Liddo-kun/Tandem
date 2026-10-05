@@ -8,8 +8,11 @@ import { Context, Effect, Layer } from "effect"
 import { roots } from "#global-roots"
 import { Flock } from "./flock.js"
 import { makeGlobalNode } from "./effect/app-node.js"
+// UPSTREAM-DIVERGENCE: derive filesystem roots from centralized Tandem identity instead of opencode.
+import { Brand } from "./brand.js"
 
-const app = "opencode"
+// UPSTREAM-DIVERGENCE: place config/data/cache/state/scratch under Tandem's product roots.
+const app = Brand.app
 const { data, cache, config, state, tmp } = roots(app)
 
 const paths = {

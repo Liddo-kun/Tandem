@@ -1,4 +1,6 @@
 import { createBrowserDraftStore } from "@/runtime/persistence/drafts"
+// UPSTREAM-DIVERGENCE: Tandem notification icon.
+import { notificationIcon } from "@opencode/ui/logo"
 import { ServerConnection } from "@/runtime/server/registry"
 import type { Platform } from "./platform"
 
@@ -30,7 +32,8 @@ export function createWebPlatform(version: string) {
 
       const notification = new Notification(title, {
         body: description ?? "",
-        icon: "https://opencode.ai/favicon-96x96-v3.png",
+        // UPSTREAM-DIVERGENCE: Tandem notification icon.
+        icon: notificationIcon,
       })
       notification.onclick = () => {
         window.focus()

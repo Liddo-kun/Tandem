@@ -21,6 +21,8 @@ import {
   Switch,
 } from "solid-js"
 import { createStore } from "solid-js/store"
+// UPSTREAM-DIVERGENCE: Shared navigator-first clipboard fallback for provider URL copying.
+import { writeClipboardText } from "@opencode/ui/clipboard"
 import { useParams } from "@solidjs/router"
 import { ExternalLink } from "@/runtime/platform/external-link"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -509,8 +511,9 @@ function ProviderConnection(props: {
   const copyLink = async () => {
     const url = controller.authorization()?.url
     if (!url) return
+    // UPSTREAM-DIVERGENCE: Delegate provider URL copying to the navigator-first clipboard fallback.
     const copied = await Promise.resolve()
-      .then(() => (platform.writeClipboardText ? platform.writeClipboardText(url) : navigator.clipboard.writeText(url)))
+      .then(() => writeClipboardText(url, platform.writeClipboardText))
       .then(() => true)
       .catch(() => false)
     if (controller.authorization()?.url !== url) return

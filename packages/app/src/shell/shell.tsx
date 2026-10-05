@@ -30,8 +30,9 @@ export default function Layout(props: ParentProps) {
         class="relative bg-v2-background-bg-deep flex-1 min-h-0 min-w-0 flex flex-col select-none [&_input]:select-text [&_textarea]:select-text [&_[contenteditable]]:select-text"
         style={{
           // Native Windows chrome supplies the gap; retain paint clearance for the panels' outer outlines.
+          // UPSTREAM-DIVERGENCE: Respect Android wrapper-owned safe-area inset overrides.
           "--shell-top-inset": bottomTitlebar()
-            ? "max(0px, calc(8px - env(safe-area-inset-top, 0px)))"
+            ? "max(0px, calc(8px - var(--safe-area-inset-top, env(safe-area-inset-top, 0px))))"
             : platform.platform === "desktop" && platform.os === "windows"
               ? "1px"
               : "8px",
@@ -66,7 +67,8 @@ export default function Layout(props: ParentProps) {
           <main
             class="flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col items-start contain-content"
             style={{
-              "padding-top": bottomTitlebar() ? "env(safe-area-inset-top, 0px)" : "0px",
+              // UPSTREAM-DIVERGENCE: Respect Android wrapper-owned safe-area inset overrides.
+              "padding-top": bottomTitlebar() ? "var(--safe-area-inset-top, env(safe-area-inset-top, 0px))" : "0px",
               "padding-bottom":
                 bottomTitlebar() || settings.active()
                   ? "0px"

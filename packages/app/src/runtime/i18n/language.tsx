@@ -14,6 +14,8 @@ import {
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import en from "@/runtime/i18n/en"
+// UPSTREAM-DIVERGENCE: Centralized Tandem product-copy overlays.
+import { productCopy, nativeProductCopy } from "./product-copy"
 import { dict } from "@opencode/ui/i18n/en"
 import {
   createDesktopNativeBundle,
@@ -85,11 +87,15 @@ const StoredLocaleSchema = Schema.Struct({
 
 const INTL = DESKTOP_NATIVE_LOCALE_TAGS
 
-const base = flatten({ ...en, ...dict })
+// UPSTREAM-DIVERGENCE: Tandem product copy supplies the English fallback branding.
+const base = flatten({ ...en, ...dict, ...productCopy, ...nativeProductCopy })
 const dicts = new Map<Locale, Dictionary>([["en", base]])
 
+// UPSTREAM-DIVERGENCE: Apply product copy after locale loading to keep Tandem branding consistent.
 const merge = (app: Promise<Source>, ui: Promise<Source>) =>
-  Promise.all([app, ui]).then(([a, b]) => ({ ...base, ...flatten({ ...a.dict, ...b.dict }) }) as Dictionary)
+  Promise.all([app, ui]).then(
+    ([a, b]) => ({ ...base, ...flatten({ ...a.dict, ...b.dict }), ...productCopy, ...nativeProductCopy }) as Dictionary,
+  )
 
 const loaders: Record<Exclude<Locale, "en">, () => Promise<Dictionary>> = {
   zh: () => merge(import("@/runtime/i18n/zh"), import("@opencode/ui/i18n/zh")),
