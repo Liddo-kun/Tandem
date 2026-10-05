@@ -138,5 +138,5 @@ Only when Jon asks. Updating the tablet itself needs none of this.
 4. `gh release create <tag> --repo Liddo-kun/Tandem --target <commit> --notes-file <notes.md>`, then
    `gh release upload <tag> --repo Liddo-kun/Tandem dist/tandem-release-<version>/*`.
 
-Windows, macOS and musl executables have never been run on those platforms. Copies of the
+macOS and musl executables have never been run on those platforms. Copies of the
 2.0.22-tandem-v2.0 tablet build are in `~/.local/share/tandem-v2/releases/`.
