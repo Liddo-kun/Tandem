@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Idempotent setup of the Android/Tauri build toolchain inside the aarch64 Ubuntu
 # userland on the Y700. Google ships no arm64-Linux NDK/SDK build-tools,
-# so this sources community arm64 builds. Details: script/tablet-android.md.
+# so this sources community arm64 builds. Details: notes/tandem-setup.md.
 #
 # Usage:   bash script/setup-tablet-android.sh
 # Agents:  SUDO_PASSWORD=<pw> bash script/setup-tablet-android.sh   (non-interactive sudo)
@@ -86,4 +86,4 @@ fi
 
 log "done"
 echo "Toolchain ready under $SDK."
-echo "Build explicitly with pinned Bun: bun script/build-tablet-android.ts"
+echo "Build with: bun run tandem:tablet"

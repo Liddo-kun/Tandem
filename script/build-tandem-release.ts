@@ -51,9 +51,9 @@ then stage Tandem artifacts. No iOS, publication, installation or service restar
   --strict                   Require CLI + signed release APK/AAB
   --required-common          Require six common CLI targets + signed release APK/AAB
 
-Generated Android project must already be initialized for the selected variant.
+Set up the generated Android project first with bun run tandem:tablet (--dev for v2).
 Signing uses existing production credentials or the isolated V2 signing helper.
-See notes/tandem-release.md; master schedules builds on this shared tablet.`)
+See notes/tandem-setup.md (Publishing a GitHub release).`)
   process.exit(0)
 }
 
@@ -116,13 +116,13 @@ if (!values["package-only"] && !values["skip-android"]) {
   const id = values["android-variant"] === "v2" ? "app.liddokun.tandem.v2" : "app.liddokun.tandem"
   if (config.identifier !== id) throw new Error(`Android config must identify ${id}`)
   if (!(await Bun.file(path.join(android, "gen/android/app/build.gradle.kts")).exists()))
-    throw new Error("Initialize the Android generated project first; see notes/tandem-release.md")
+    throw new Error("Set up the Android generated project first: bun run tandem:tablet (add --dev for v2)")
   process.env.OPENCODE_ANDROID_VARIANT = values["android-variant"] === "v2" ? "v2" : "production"
   if (!values["debug-android"]) process.env.TANDEM_ANDROID_KEYSTORE_PROPERTIES = await ensureAndroidSigning(root, id)
   if (process.platform === "linux" && process.arch === "arm64") {
     // Same native SDK override as the tablet helper; do not let AGP download x86 aapt2.
     const aapt2 = findAndroidAapt2(process.env.ANDROID_HOME ?? "", { order: "numeric-descending", missing: "throw" })
-    if (!aapt2) throw new Error("No runnable tablet aapt2; see script/tablet-android.md")
+    if (!aapt2) throw new Error("No runnable tablet aapt2; see notes/tandem-setup.md")
     process.env.AAPT2 ??= aapt2
     process.env.APKSIGNER ??= path.join(path.dirname(aapt2), "apksigner")
     process.env.GRADLE_OPTS = [

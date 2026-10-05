@@ -9,10 +9,7 @@
     "dev": "vite",
     "build": "vite build",
     "prepare:android": "python3 generate-icons.py && bun patch-android-generated.ts",
-    "tauri": "bun run prepare:android && tauri",
-    "tauri:v2": "OPENCODE_ANDROID_VARIANT=v2 bun run tauri android",
-    "init:v2": "bun run tauri:v2 init --ci --config src-tauri/tauri.v2.conf.json && OPENCODE_ANDROID_VARIANT=v2 bun run prepare:android",
-    "build:v2": "bun run tauri:v2 build --apk --target aarch64 --config src-tauri/tauri.v2.conf.json"
+    "tauri": "bun run prepare:android && tauri"
   },
   "dependencies": {
     "@opencode/app": "workspace:*",

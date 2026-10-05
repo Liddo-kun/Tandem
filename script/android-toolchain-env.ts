@@ -8,7 +8,7 @@ import path from "node:path"
 // (e.g. a non-login shell, or a long-lived server process started before setup ran).
 //
 // No-op off aarch64 Linux, or when ~/Android/Sdk is absent, so Windows/macOS release
-// runs keep their own toolchain env untouched. See script/tablet-android.md.
+// runs keep their own toolchain env untouched. See notes/tandem-setup.md.
 //
 // Note: Bun.which() snapshots PATH at startup, so callers that gate on a command must pass
 // the live PATH, e.g. Bun.which(cmd, { PATH: process.env.PATH }).

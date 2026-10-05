@@ -1,6 +1,6 @@
 # Todo after v2 implementation
 
-Follow-up work deferred from the [v2 port](v2-port.md).
+Follow-up work deferred from the [v2 port](archive/v2-port.md).
 
 ## Subagents
 
@@ -196,25 +196,11 @@ them with the pristine-upstream code path first. Code: `packages/app/src/session
 
 ## After the switch-over
 
-- [ ] Retire Tandem v1 when Jon no longer needs it: the `tandem-v1` widget and `~/.local/bin/tandem-v1-server`,
+- [ ] Retire Tandem v1 when Jon no longer needs it: `~/.local/bin/tandem-v1-server`,
   `/usr/local/bin/tandem-v1`, the Tandem v1 app (`ai.opencode.android.v1`) and `~/.local/share/tandem-v1/`
   (about 6 GB including the September database backup). Jon decides when.
-- [ ] The daily `~/.local/share/tandem/opencode.db` still holds the migrated v1 tables (about 2.9 GB). Check
-  whether v2 reads them after migration before dropping them and vacuuming.
-- [ ] inotify watches run out with three servers running, because Syncthing uses about 68,000 of the 77,755.
-  Options: keep `node_modules`/build outputs out of Syncthing, or raise the limit at boot (kernel-wide,
-  shared with Android). Jon decides.
 - [ ] v2's ChatGPT login does not offer GPT-6.1 Sol, so `general-sol` uses GPT-5.6 Sol. Recheck after the
   next upstream sync.
-- [ ] Delete the development database's pre-import backup (`opencode.db.before-history-import`, 24 MB) once
-  Jon is happy with the imported history.
-- [ ] The old `tandem-no-chrome` widget (`~/.local/bin/tandem-no-chrome-web`) also uses port 4098, like the
-  development server. Remove it or move it to another port if Jon still wants it.
-
-## Documentation cleanup
-
-- [ ] Trim the stale READMEs under `packages/core/src/plugin/tandem/` (`browser-fetch/`, `claude/`,
-  `imagegen/`; about 650 lines) down to what still describes the current code.
 
 ## Claude narration — lowest priority
 

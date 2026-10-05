@@ -1,76 +1,51 @@
-# Corrector implementation notes
+# Corrector
 
-Corrector is implemented in `packages/core/src/plugin/tandem/prompt-corrector.ts`, with registration
-in `plugin/internal.ts`. No RePrompt duplication or CLI `run` disablement is included. The user guide is
-[PromptEnhance.md](../PromptEnhance.md); what was verified is in [v2-port.md](v2-port.md).
+Corrector copy-edits a prompt before it is admitted to the session: spelling, punctuation,
+capitalization, wrong-word autocorrect and dictation artifacts, including clear technical symbols,
+paths and names. It returns only the corrected message; ambiguous wording stays unchanged. It is on by
+default. The composer **Corrector** button and General settings share one per-client setting,
+`settings.v3.general.corrector` (legacy `promptEnhance` on/no-reprompt migrates to on, off to off).
 
-## Runtime contract
+Code: `packages/core/src/plugin/tandem/prompt-corrector.ts` (registered in `plugin/internal.ts`),
+shared metadata in `packages/util/src/tandem-auxiliary.ts`, client in `packages/app/src/settings/model.tsx`
+and `packages/app/src/session/composer/`.
 
-- Default on. `TANDEM_PROMPT_CORRECTOR=0` (also false/off/no) disables automatic correction.
-- `_MAX` defaults to 600 trimmed UTF-16 characters per authored text range; 0 is uncapped.
-- `_MODEL` accepts `provider/model` (optionally `#variant`). `_VARIANT` overrides its variant.
-- `_DEBUG` defaults off; `_DEBUG_KEEP` defaults to 2, with 0 retaining unlimited debug roots.
-- Model precedence: environment override → configured `tandem-corrector` model (including preserved
-  legacy `small_model`) → retained v1 cheap-model priorities among available models for the session
-  provider → session/default model. Copilot prefers gpt-5-mini; OpenCode prefers gpt-5-nano. Selection
-  is reevaluated per admission rather than cached across config changes.
-- Invalid/unavailable model or variant settings retain the original text. Child execution failure,
-  empty response or failed v1 expansion/bounded-edit checks also retain it. No alternate provider is
-  silently selected after an explicit model fails.
+## Server settings
 
-The pre-admission prompt hook changes authoritative text before attachment materialization and
-durable enqueue. Originals are written only for accepted changes. UI `displayText`, authored range
-ends and following structured mention offsets change together. Protected mentions are excluded from
-correction; surrounding plain-text ranges remain eligible. Files and generated context are untouched.
+Set in the server environment (or the development launcher's `environment.json`).
 
-The shared browser-safe schema is imported as `TandemAuxiliary` from
-`@opencode/util/tandem-auxiliary`. `readCorrectorMetadata` decodes its fields once. Range bounds/order
-are checked against the actual prompt. Missing range metadata means the displayed authored prefix,
-or the full raw text for API callers without presentation metadata; API producers of generated text
-must supply empty/authored ranges or the disabled marker.
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `TANDEM_PROMPT_CORRECTOR` | on | `0`, `false`, `off`, `no` disable (case-insensitive). |
+| `TANDEM_PROMPT_CORRECTOR_MAX` | `600` | Maximum trimmed length (UTF-16) of each authored text range; `0` is uncapped. |
+| `TANDEM_PROMPT_CORRECTOR_MODEL` | unset | Explicit `provider/model`, optionally `#variant`. |
+| `TANDEM_PROMPT_CORRECTOR_VARIANT` | unset | Overrides the selected model's variant. |
+| `TANDEM_PROMPT_CORRECTOR_DEBUG` | off | Keeps visible debug root sessions instead of hidden children. |
+| `TANDEM_PROMPT_CORRECTOR_DEBUG_KEEP` | `2` | Newest inactive debug roots kept; `0` is unlimited. |
 
-Fingerprint encoding is SHA-256, lowercase hexadecimal, over UTF-8 `JSON.stringify` of the ordered
-array of `[start, end, text.slice(start, end)]` tuples. Structured mention spans are subtracted first.
-The fingerprint describes the processed final text/ranges, including rejected/failed/unchanged results.
-It prevents queue reorder replacements from launching another correction. It is not a security token.
+Model selection, reevaluated per prompt: environment override → configured `tandem-corrector` agent
+model (including a migrated `small_model`) → a cheap available model for the session's provider
+(Copilot `gpt-5-mini`, OpenCode `gpt-5-nano`, otherwise a Haiku/Flash/nano priority list) → the
+session model. An invalid explicit model or variant keeps the original text rather than switching
+provider. Only the default model and the 600 limit have been tested live.
 
-## Isolation and lifecycle
+## Behavior and constraints
 
-Corrector defaults install after shared auxiliary defaults and before configured agents. Its final
-context policy installs after ordinary/config hooks, immediately before shared auxiliary policy.
-The final policy replaces system instructions with the retained copy-editor prompt, removes tools,
-and rebuilds user input from the stored raw child message rather than earlier context-hook additions.
-Assistant context remains for normal incomplete-stream continuation. Corrector system overrides do
-not turn it into a coding agent; model overrides remain supported.
-
-Normal corrections create fresh linked `tandem-corrector` children with shared role/owner/bare/disabled
-metadata and an explicit all-tool deny ruleset. Execution uses create → prompt → wait → outcome/context,
-then an operation-scoped acquire/release finalizer removes the child. Interruption of the correction
-operation is not caught as a successful correction; finalization removes the independently running
-child. Parent Stop before admission remains an idle no-op limitation, as documented in
-`tandem-auxiliary-sessions.md`.
-
-Debug mode creates named root sessions at the invoking Location, stops/waits before retention, and
-prunes older inactive Corrector roots. Active debug sessions are tracked across Locations. Process
-death cannot run finalizers; crash-orphan cleanup remains outside this feature. Cleanup errors are
-logged without replacing a completed correction or swallowing operation interruption.
-
-## Client behavior
-
-The persisted setting is `settings.v3.general.corrector`, default true. Both the composer toggle and
-General settings control use English fallback i18n. Legacy `general.promptEnhance` on/no-reprompt
-migrate to true, off to false; the older `reprompt:false` remains correction-on. Android Enter,
-delete-word and page zoom edits are preserved.
-
-The submission snapshots a literal `tandemCorrectorDisabled` true/false before asynchronous image
-handling. Client settings must be hydrated before submission. Queue edit preserves that snapshot;
-reorder preserves the processed text/fingerprint; failed-send restoration and retry keep it. Undo
-restores authored text with its snapshot and carries the old generated suffix separately in persisted
-`queuedContext`, so resend does not recategorize generated notes as authored input. If undo appends to
-an existing draft, the recovered queued setting applies to the combined resubmission. An explicit
-new/reset draft snapshots the current client toggle.
-
-Queue edits invalidate old originals/fingerprints, reconstruct authored ranges, preserve model-only
-notes and avoid repeating old path-reference scaffolding. Ambiguous shifted mention matches are not
-rebound to an arbitrary occurrence. Existing undo restrictions for detached non-mentioned context
-attachments remain; an unavailable undo leaves the queue item in place.
+- Only nonempty authored text ranges are corrected. File, agent and skill mentions are protected;
+  attachments and generated context are untouched. Mention offsets and `displayText` shift with accepted
+  edits. API callers without range metadata expose their whole raw text, so producers of generated text
+  must send empty ranges or `tandemCorrectorDisabled: true`.
+- Accepted text becomes the stored prompt; a changed original is kept in `tandemPromptCorrectorOriginal`.
+  Empty, failed or rejected corrections keep the original. A result is rejected if it grows beyond
+  `1.5 × input + 40` characters or, for inputs up to 4,000 characters, if its case-insensitive edit
+  distance exceeds `max(10, floor(input × 0.65))`.
+- A SHA-256 fingerprint of the processed ranges stops queue reorders and unchanged resubmissions from
+  being corrected again. Editing a queued prompt invalidates it.
+- Submission snapshots the toggle as `tandemCorrectorDisabled` true/false, so toggling later affects new
+  drafts, not already-queued prompts. Queue edit, reorder, steer, undo/resend and failed-send restore keep
+  the snapshot; undo appended to an existing draft keeps the recovered item's setting.
+- Each correction runs in a fresh auxiliary child session (see `auxiliary.ts`): copy-editor system
+  prompt and raw text only, no tools, no instruction files, no recursive correction. Browser-fetch reader
+  prompts bypass Corrector. The child is removed on completion or when the admission is cancelled;
+  process death leaves it behind. Pressing Stop on the parent before admission does nothing.
+- Correcting fragments around mentions can leave awkward punctuation or capitalization.

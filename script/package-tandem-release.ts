@@ -44,7 +44,7 @@ Does not build or install. iOS is not part of this release workflow.
   --repo <owner/name>         Upload repo (default Liddo-kun/Tandem)
 
 Android verification uses AAPT2, APKSIGNER and BUNDLETOOL_JAR (for AAB), plus jarsigner.
-See notes/tandem-release.md for tool paths and separate installation commands.`)
+See notes/tandem-setup.md (Publishing a GitHub release).`)
   process.exit(0)
 }
 

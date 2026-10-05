@@ -5,15 +5,14 @@
 - Source: `/home/jon/code/Tandem-v2`, branch `tandem-v2`, on upstream `40679546d4` (`@opencode/cli`
   2.0.22). Version **2.0.22-tandem-v2.0**, built with Bun 1.4.2. The Claude plugin is
   `/home/jon/code/opencode-anthropic-auth-v2`, branch `tandem-v2`.
-- Daily: `/usr/local/bin/tandem`, server on **4097** (`tandem-web` widget), app **Tandem**
+- Daily: `/usr/local/bin/tandem`, server on **4097**, app **Tandem**
   (`app.liddokun.tandem`, production signing), standard Tandem folders. Release copies (CLI, APK,
   AAB, manifest, checksums) are in `~/.local/share/tandem-v2/releases/2.0.22-tandem-v2.0/`.
-- Tandem v1 fallback: server on **4095** (`tandem-v1` widget), app **Tandem v1**
+- Tandem v1 fallback: server on **4095**, app **Tandem v1**
   (`ai.opencode.android.v1`), folders under `~/.local/share/tandem-v1/`.
-- Development: server on **4098** (`tandem-dev` widget), app **Tandem V2** (`app.liddokun.tandem.v2`),
+- Development: server on **4098**, app **Tandem V2** (`app.liddokun.tandem.v2`),
   folders under `~/.local/share/tandem-v2/development/`.
-- Setup details: [tandem-v2-configuration.md](tandem-v2-configuration.md). Build/install:
-  [tandem-release.md](tandem-release.md).
+- Setup details: [tandem-v2-configuration.md](../tandem-v2-configuration.md). Build/install: `contextL.md`.
 
 Switch-over checks on the installed daily server: a ChatGPT session with the Corrector on ran a shell
 command, and a Claude session delegated to the `general-sol` helper (only `general-sol` and
@@ -78,8 +77,4 @@ The matched benchmark used the native-regression build immediately preceding the
 - The historical first imagegen record remains stuck; new records pass after the metadata fix. The upstream publisher's failure-settlement weakness is documented in the imagegen README.
 - API-key imagegen now uses OpenCode's image API; it has never run live (no OpenAI API key in the development environment). Its results no longer include a changed-prompt caption, request ID or backend model.
 - Windows/macOS/musl executables were built but never run on those platforms.
-- The daily database keeps the migrated v1 tables, so it is about 2.9 GB.
 - Upgrading the Android app from v1 kept none of v1's app settings (saved server, open projects, zoom); the app was connected once and projects are re-added as needed.
-- With the daily, v1 and development servers all running, the tablet can run out of inotify watches
-  (Syncthing alone uses about 68,000 of 77,755). File watching then fails for some folders, which
-  shows up as `failed to subscribe` errors in the server log.

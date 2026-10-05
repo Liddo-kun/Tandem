@@ -1,3 +1,21 @@
+// Tandem-owned (not in upstream): shared bare-session policy for Corrector and browser webfetch.
+/*
+ * Auxiliary work uses normal child sessions; this module does not add another runner or API.
+ * Shared IDs and metadata schemas live in @opencode/util/tandem-auxiliary.
+ * Create a fresh child with explicit role, bare-context, Corrector-disabled, and owner metadata.
+ * Do not inherit or copy the parent's metadata, permissions, agent, or model implicitly.
+ * Literal tandemBareContext=true selects agent-only instructions before ambient discovery and
+ * Read-triggered injection. The selected agent system prompt and requested file content remain.
+ * Defaults run before configuration. They create hidden primary agents, deny Corrector tools,
+ * and give the reader openai/gpt-5.6-sol#medium with only fetch_page and Read allowed.
+ * Policy runs after configuration. It preserves user model/system settings, enforces hidden
+ * primary mode, and denies fetch_page to every non-reader agent.
+ * Feature code must still pass narrow child permissions and validate role, owner, and budgets
+ * inside privileged tool executors; catalog visibility is not authorization.
+ * Prompt admits work and wait observes idle, so callers must inspect outcome and context.
+ * Own children in an operation scope and always await remove in a finalizer on success, failure,
+ * timeout, or cancellation. Process death cannot run finalizers; no orphan cleanup is provided.
+ */
 export * as TandemAuxiliaryPlugin from "./auxiliary.js"
 
 import { define } from "@opencode/plugin/effect/plugin"

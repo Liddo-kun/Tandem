@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
-// Tandem-owned (not in upstream): side-by-side tablet Android build orchestration.
-// Side-by-side Tandem V2 tablet build. Building is the default; setup and installation
-// require explicit flags. See script/tablet-android.md for prerequisites and ownership.
+// Tandem-owned (not in upstream): build (and optionally install) the Tandem Android app natively
+// on the tablet. Builds the daily app by default, or the side-by-side Tandem V2 test app with --dev.
+// See notes/tandem-setup.md for signing and the toolchain.
 
 import { createWriteStream } from "fs"
 import { existsSync } from "fs"
@@ -13,15 +13,23 @@ import { findAndroidAapt2, loadAndroidToolchainEnv } from "./android-toolchain-e
 import { ensureAndroidSigning } from "./android-signing.ts"
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)))
-const bun = process.execPath
 const args = process.argv.slice(2)
+
+// Rerun under the pinned Bun so `bun run tandem:tablet` works from any shell.
+if (Bun.version !== "1.4.2") {
+  const pinned = path.join(os.homedir(), ".local/share/tandem-v2/toolchain/bun-1.4.2/bin/bun")
+  if (!existsSync(pinned)) throw new Error(`Tandem builds need Bun 1.4.2: ${pinned}`)
+  const proc = Bun.spawn([pinned, fileURLToPath(import.meta.url), ...args], { stdio: ["inherit", "inherit", "inherit"] })
+  process.exit(await proc.exited)
+}
+const bun = process.execPath
 
 let doSetup = false
 let doInstall = false
 let overwrite = false
 let release = true
+let dev = false
 let device = process.env["ANDROID_SERIAL"] ?? ""
-let config = path.join(root, "packages/android/src-tauri/tauri.v2.conf.json")
 
 for (let i = 0; i < args.length; i++) {
   const arg = args[i]
@@ -40,17 +48,14 @@ for (let i = 0; i < args.length; i++) {
       doInstall = true
       overwrite = true
       break
-    case "--release":
-      release = true
-      break
     case "--debug":
       release = false
       break
+    case "--dev":
+      dev = true
+      break
     case "--device":
       device = requireValue(arg, args[++i])
-      break
-    case "--config":
-      config = path.resolve(root, requireValue(arg, args[++i]))
       break
     default:
       throw new Error(`Unknown option: ${arg}. Run bun script/build-tablet-android.ts --help`)
@@ -61,7 +66,7 @@ if (process.platform !== "linux" || process.arch !== "arm64") {
   throw new Error("This tablet build requires aarch64 Linux.")
 }
 
-if (Bun.version !== "1.4.2") throw new Error("Run this script with the isolated Bun 1.4.2 toolchain.")
+const config = dev ? path.join(root, "packages/android/src-tauri/tauri.v2.conf.json") : undefined
 const logDir = "/tmp/tandem/v2"
 await fs.mkdir(logDir, { recursive: true })
 process.env["TMPDIR"] = path.join(logDir, "tmp")
@@ -69,17 +74,19 @@ await fs.mkdir(process.env["TMPDIR"], { recursive: true })
 process.env["GRADLE_USER_HOME"] = path.join(logDir, "gradle")
 process.env["XDG_CACHE_HOME"] = path.join(logDir, "cache")
 process.env["BUN_INSTALL_CACHE_DIR"] = path.join(logDir, "bun-install-cache")
-process.env["OPENCODE_ANDROID_VARIANT"] = "v2"
+process.env["OPENCODE_ANDROID_VARIANT"] = dev ? "v2" : "production"
 process.env["PATH"] = [path.dirname(bun), process.env["PATH"]].filter(Boolean).join(path.delimiter)
+const expectedId = dev ? "app.liddokun.tandem.v2" : "app.liddokun.tandem"
 const applicationId = await resolveApplicationId()
-if (applicationId !== "app.liddokun.tandem.v2") {
-  throw new Error(`Expected side-by-side app.liddokun.tandem.v2; build config resolves to ${applicationId}.`)
+if (applicationId !== expectedId) {
+  throw new Error(`Expected ${expectedId}; build config resolves to ${applicationId}.`)
 }
 
 if (doSetup) await runSetup()
 loadAndroidToolchainEnv()
 await preflight()
 if (release) process.env["TANDEM_ANDROID_KEYSTORE_PROPERTIES"] = await ensureAndroidSigning(root, applicationId)
+await ensureAndroidProject()
 
 const variant = release ? "release" : "debug"
 await runStep(
@@ -140,6 +147,31 @@ async function resolveApplicationId() {
   return identifier
 }
 
+// Both apps share Tauri's single generated project, so regenerate it when it belongs to the other app.
+async function ensureAndroidProject() {
+  const project = path.join(root, "packages/android/src-tauri/gen/android")
+  const gradle = Bun.file(path.join(project, "app/build.gradle.kts"))
+  if ((await gradle.exists()) && (await gradle.text()).includes(`namespace = "${applicationId}"`)) return
+  await fs.rm(project, { recursive: true, force: true })
+  await runStep(
+    `Android project for ${applicationId}`,
+    [
+      bun,
+      "run",
+      "--cwd",
+      "packages/android",
+      "tauri",
+      "android",
+      "init",
+      "--ci",
+      "--skip-targets-install",
+      ...(config ? ["--config", config] : []),
+    ],
+    path.join(logDir, "android-init.log"),
+    /error|fail|warning/i,
+  )
+}
+
 async function preflight() {
   const sdk = process.env["ANDROID_HOME"] ?? path.join(os.homedir(), "Android/Sdk")
   const problems: string[] = []
@@ -164,7 +196,7 @@ async function preflight() {
   if (problems.length > 0) {
     throw new Error(
       `Android toolchain is not set up:\n- ${problems.join("\n- ")}\n` +
-        `Explicit toolchain setup: bash script/setup-tablet-android.sh. See script/tablet-android.md`,
+        `Explicit toolchain setup: bash script/setup-tablet-android.sh. See notes/tandem-setup.md`,
     )
   }
 }
@@ -186,6 +218,7 @@ async function install(apk: string) {
   console.log(`\nInstalling to ${serial}...`)
   let res = await capture([adb, "-s", serial, "install", "-r", apk])
   if (res.code !== 0 && /signatures do not match|INSTALL_FAILED_UPDATE_INCOMPATIBLE/i.test(res.stdout + res.stderr)) {
+    if (!dev) throw new Error(`Signature mismatch with the installed daily ${applicationId}; it is never uninstalled.`)
     if (!overwrite) {
       throw new Error(
         `Signature mismatch with installed ${applicationId}. ` +
@@ -239,7 +272,12 @@ async function runStep(name: string, command: string[], log: string, filter: Reg
   })
   const [code] = await Promise.all([proc.exited, pipe(proc.stdout, out, filter), pipe(proc.stderr, out, filter)])
   await new Promise<void>((resolve, reject) => out.end((e: Error | null | undefined) => (e ? reject(e) : resolve())))
-  if (code !== 0) throw new Error(`${name} failed with exit code ${code}. See ${log}`)
+  if (code !== 0) {
+    const hint = (await Bun.file(log).text()).includes("file watch limit")
+      ? "\nThe tablet ran out of inotify watches; see notes/tandem-setup.md (inotify)."
+      : ""
+    throw new Error(`${name} failed with exit code ${code}. See ${log}${hint}`)
+  }
 }
 
 async function pipe(stream: ReadableStream<Uint8Array> | null, out: NodeJS.WritableStream, filter: RegExp | undefined) {
@@ -286,25 +324,23 @@ function requireValue(name: string, value: string | undefined) {
 }
 
 function printHelp() {
-  console.log(`Usage: bun script/build-tablet-android.ts [options]
+  console.log(`Usage: bun run tandem:tablet -- [options]
 
-Builds the side-by-side Tandem V2 release APK natively on aarch64 Linux.
-Requires Bun 1.4.2 and a Tauri config identifying app.liddokun.tandem.v2.
-Local V2 signing files are created only when neither signing file exists.
+Builds the Tandem release APK (app.liddokun.tandem, production key) natively on aarch64 Linux,
+or the side-by-side Tandem V2 test app (app.liddokun.tandem.v2) with --dev. Reruns itself under
+the pinned Bun 1.4.2 and regenerates the shared Android project when it belongs to the other app.
 
 Options:
-  --setup        Run the one-time toolchain setup (script/setup-tablet-android.sh) first
   --install      adb install -r the APK after building
-  --overwrite    Like --install, but uninstall a signature-mismatched app first (erases its data)
-  --debug        Build a debug APK instead of release.
-                 Switching between debug and release signatures needs --overwrite once.
-  --config <f>   Extra Tauri JSON build configuration, relative to repo root
-                 (default: packages/android/src-tauri/tauri.v2.conf.json)
+  --dev          Build the Tandem V2 test app instead of the daily app
+  --overwrite    With --dev: like --install, but uninstall a signature-mismatched test app first
+                 (erases its data). The daily app is never uninstalled.
+  --debug        Build a debug APK instead of release
+  --setup        Run the one-time toolchain setup (script/setup-tablet-android.sh) first
   --device <s>   Target ADB serial (else auto: connects loopback, prefers loopback)
   -h, --help     Show this help
 
 Examples:
-  bun script/build-tablet-android.ts
-  bun script/build-tablet-android.ts --config packages/android/src-tauri/tauri.v2.conf.json
-  bun script/build-tablet-android.ts --install --device 127.0.0.1:5555`)
+  bun run tandem:tablet -- --install
+  bun run tandem:tablet -- --dev --install`)
 }

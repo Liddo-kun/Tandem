@@ -32,7 +32,7 @@ Those candidates come from source review, not live validation. Confirm their con
   recording a short result. First verification is a real agent session with actual tool calls. Build
   as needed to run it; builds/typechecks alone do not establish feature readiness. Do not add or run
   low-level tests unless Jon requests them.
-- Deferred work is in [Todo after v2 implementation](todo-after-v2.md): custom subagent controls,
+- Deferred work is in [Todo after v2 implementation](../todo-after-v2.md): custom subagent controls,
   file-discovery and provider-error investigations, iOS, interactive Chrome control, chat appearance,
   context/cache indicators, manual refresh, mobile title/tab customization and Claude narration.
 - Excluded: RePrompt duplication, custom Android voice/microphone/speech-locale integration, LSP work
