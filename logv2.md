@@ -1,66 +1,14 @@
-# Tandem v2 Changelog and OpenCode Differences
+# Tandem v2 OpenCode Differences
 
 > **This file is only a log of Tandem's customizations to OpenCode, as they exist in the code — like v1's `log.md`.** It is never a place for decisions, approvals, proposals, open questions, pending work or to-dos. Deferred work goes in `notes/todo-after-v2.md`; port planning and evidence go in `notes/`. When a customization is removed or reverted, delete its entry here.
 
-This file is the source for Tandem v2 GitHub release notes and the inventory of what Tandem v2 adds to, or changes in, official OpenCode v2. It starts fresh with the v2 port; v1 history and its divergence inventory stay in the v1 checkout's `log.md`.
+This file is the inventory of what Tandem v2 adds to, or changes in, official OpenCode v2, for upstream syncs. Dated changes, published releases and the feature overview are in [changelogv2.md](changelogv2.md). v1's inventory stays in the v1 checkout's `log.md`.
 
-- [Release history](#release-history): dated changes and published versions.
-- [Tandem feature overview](#tandem-feature-overview): product summary.
-- [Maintenance and GitHub releases](#maintenance-and-github-releases): how to keep this file and the code markers current.
-- [Current OpenCode divergence](#current-opencode-divergence): technical inventory of shared-file edits and fork-owned files for upstream syncs.
-
-## Release history
-
-### Unreleased
-
-Baseline: OpenCode `upstream/v2` at `40679546d4` (2026-10-03, `@opencode/cli` 2.0.22). Version `2.0.22-tandem-v2.0`, installed as the daily Tandem on Jon's tablet on 2026-10-05; no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
-
-#### 2026-10-05
-
-- **Android — Connection help:** the connect screen's help no longer tells users to start the development server on port 4098 or set `OPENCODE_SERVER_PASSWORD`; it mentions the daily port 4097 and pairing links from `tandem pair`. File: `packages/app/src/runtime/i18n/en.ts`.
-- **Documentation — Divergence tracking:** every edit to an upstream-shared file now carries an `UPSTREAM-DIVERGENCE` code comment, with fixes for upstream bugs marked `UPSTREAM-DIVERGENCE(temporary)`. This log replaces the port-time seam list. Agent guidance now requires Jon's agreement before fixing OpenCode upstream bugs.
-
-#### 2026-10-03 to 2026-10-05 — v2 port
-
-Fresh port onto OpenCode v2, adapting working v1 Tandem code rather than replaying v1 patches. Scope: [notes/archive/v2-port.md](notes/archive/v2-port.md); deferred work: [notes/todo-after-v2.md](notes/todo-after-v2.md).
-
-- **Added — Tandem identity and isolated installation:** `tandem` command, Tandem config/data/cache/state roots and local-service discovery, so Tandem runs alongside official OpenCode. Updates are manual; `tandem upgrade` points to GitHub releases. [Identity](#identity-cli-and-local-service).
-- **Added — Android app on v2:** the Tauri/Kotlin shell mounts v2's shared app with native storage, image-safe drafts, LAN discovery (4097, then 4096), password/pairing connection help, page zoom (80–150%, volume keys), Enter-inserts-newline editing, one safe-area/keyboard inset owner, clipboard fallback and restricted Taobao links. A side-by-side **Tandem V2** development app has its own ID. [Android](#android-platform-and-persistence).
-- **Added — Corrector:** default-on copy-editing of each prompt before the main turn, with a per-client composer toggle that is snapshotted into queued prompts. [Corrector](#prompt-corrector).
-- **Added — Claude subscription support:** Claude Pro/Max login through the external auth plugin; Claude Code-shaped prompt, tool names, billing block, one-hour caching and thinking context management; optional shell-based search instead of Glob/Grep. [Claude](#claude-presentation).
-- **Changed — Agent guidance:** GPT and Astra prompts carry Jon's context and communication preferences. Shared guidance adds the runtime scratchpad, saved-image presentation and tighter tool advice. [Guidance](#instructions-and-tool-guidance).
-- **Added — Image generation:** `imagegen` tool, built-in skill and chat thumbnails. [Imagegen](#image-generation-imagegen).
-- **Added — Browser-backed webfetch:** pages are read through a real Chrome session by a hidden reader session, with screenshots and document extraction. [Webfetch](#browser-backed-webfetch).
-- **Added — Request diagnostics:** opt-in `TANDEM_DUMP_REQUEST` captures every final provider request body and WebSocket frame, including retries. [Diagnostics](#provider-requests-and-diagnostics).
-- **Added — Release tooling:** Tandem-named CLI packaging, signed Android APK/AAB and the on-tablet APK build. [Tooling](#repository-docs-and-tooling).
-- **Fixed — Upstream bugs (temporary):** no false "session not found" errors after sessions are deleted (frequent with the Corrector), plus a plugin typing fix. See [Temporary Upstream Bug Fixes](#temporary-upstream-bug-fixes).
-
-### Published releases
-
-None for v2 yet. v1 releases (through `v1.18.25-tandem.1`) are listed in the v1 checkout's `log.md`.
-
-## Tandem feature overview
-
-Current summary as of **2026-10-05**.
-
-| Area | Tandem addition / difference | Reference |
-| --- | --- | --- |
-| Identity and installation | Separate branding, roots, local service, release packaging and manual updates alongside OpenCode | [Identity](#identity-cli-and-local-service) |
-| Android app | Tandem-owned Tauri wrapper, connection/discovery, native storage, zoom, insets, editing and clipboard behavior | [Android](#android-platform-and-persistence) |
-| Prompt assistance | Corrector with a per-client toggle | [Corrector](#prompt-corrector) |
-| Agent behavior | Customized GPT/Astra prompts, scratchpad and tool guidance | [Guidance](#instructions-and-tool-guidance) |
-| Claude integration | Subscription login, Claude Code-shaped presentation, caching/thinking policy, optional Bash search | [Claude](#claude-presentation), [Bash search](#claude-bash-search) |
-| Image generation | Generation/editing, references, masks, native transparency, thumbnails | [Imagegen](#image-generation-imagegen) |
-| Browser access | Browser-backed webfetch with a hidden reader session | [Webfetch](#browser-backed-webfetch) |
-| Diagnostics | Final provider request dumps | [Diagnostics](#provider-requests-and-diagnostics) |
-
-## Maintenance and GitHub releases
+## Maintenance
 
 1. **Mark code:** every edit to an upstream-shared file gets an `UPSTREAM-DIVERGENCE: <why>` comment at the changed code. Files that cannot carry comments are inventoried here instead: JSON manifests, `bun.lock`, generated client output, model-facing prompt text and `AGENTS.md` files. Do not hand-edit generated client files; regenerate from `packages/client` after public contract changes.
 2. **Upstream bugs need Jon's agreement:** do not fix behavior that is broken in pristine upstream without Jon's approval. Approved fixes use `UPSTREAM-DIVERGENCE(temporary)` and are listed in [Temporary Upstream Bug Fixes](#temporary-upstream-bug-fixes). Remove them, with their markers, when an upstream sync brings an equivalent fix.
-3. **With each change:** add a dated Unreleased entry (Added, Changed, Fixed or Removed) describing the user-visible result, including platform/opt-in limits and a commit reference when available. Revise the matching divergence entry when shared-file behavior or fork-owned ownership changes.
-4. **Prepare a release:** review the Git range since the previous v2 Tandem tag against Unreleased entries. Separate Tandem changes from the upstream-baseline note and describe only artifacts actually built.
-5. **Record and publish:** move included entries under `### <tag> — YYYY-MM-DD`, recording the target commit, upstream baseline and GitHub URL, and leave a fresh Unreleased section. Publish only when requested: `gh release create <tag> --repo Liddo-kun/Tandem --target <commit> --notes-file <file>`. Always pass `--repo`, because this checkout also has the OpenCode remote.
+3. **With each change:** revise the matching entry below when shared-file behavior or fork-owned ownership changes, and add a dated entry to [changelogv2.md](changelogv2.md).
 
 ## Current OpenCode divergence
 
@@ -71,7 +19,7 @@ Fork-owned locations: `packages/android/`, `packages/core/src/plugin/tandem/`, `
 ### Repository, Docs And Tooling
 
 - Root guidance replaces upstream's `AGENTS.md` with Tandem scope, isolation, verification, divergence-marking and upstream-bug rules plus a few practical code rules (client generation, dependency direction, test and typecheck location). Upstream's style guide, TUI, branch/PR and Session Core sections are not carried. Platform context lives in `contextL.md` and `contextW.md`. Files: `AGENTS.md`, `packages/app/AGENTS.md` (inventory-only), `contextL.md`, `contextW.md`.
-- Working notes (setup guide, Corrector, to-do list, archived port plan) and the v2 upstream-sync skill. Files: `notes/**/*.md`, `.opencode/skills/tandem-opencode-sync/SKILL.md`, `logv2.md`.
+- Working notes (setup guide, Corrector, to-do list, archived port plan) and the v2 upstream-sync skill. Files: `notes/**/*.md`, `.opencode/skills/tandem-opencode-sync/SKILL.md`, `logv2.md`, `changelogv2.md`.
 - Isolated development launcher (`bun script/tandem-v2.ts <build|serve|cli|source|vite|paths>`) with separate roots, port 4098 and an external password file. Release build/packaging builds upstream CLI targets from `packages/cli`, stages `cli-<target>/bin/opencode` as Tandem-named artifacts (skipping duplicate `cli-darwin-x64-baseline`), and produces signed Android APK/AAB with checksums and a manifest. Also includes the on-tablet APK build, toolchain setup and signing helpers. Root scripts expose these. Files: `script/{tandem-v2,build-tandem-release,package-tandem-release,build-tablet-android,android-signing,android-toolchain-env}.ts`, `script/setup-tablet-android.sh`, `package.json` and `bun.lock` (inventory-only; adds the Android workspace, Tauri packages and the client→util dependency).
 - LF line endings for build and mobile sources, and binary attributes for image/keystore assets. Files: `.gitattributes`.
 
@@ -148,10 +96,12 @@ Fork-owned locations: `packages/android/`, `packages/core/src/plugin/tandem/`, `
 
 ### Temporary Upstream Bug Fixes
 
-Fixes for bugs present in pristine upstream, marked `UPSTREAM-DIVERGENCE(temporary)`. Remove each with its markers when upstream ships an equivalent fix. Neither was fixed in upstream v2 as of `0a46301e36` (2026-10-04).
+Fixes for bugs present in pristine upstream, marked `UPSTREAM-DIVERGENCE(temporary)`. Remove each with its markers when upstream ships an equivalent fix. None was fixed in upstream v2 as of `4aba11e9d5` (2026-10-05).
 
 - **Deleted-session refresh race:** a background metadata read that is still pending when a session is deleted shows a false "Request failed / Session not found" error, or brings the deleted session's metadata back. Ordinary clients can hit this; Tandem's short-lived auxiliary sessions (Corrector, web reader) make it frequent. The client keeps a set of sessions deleted while it runs, ignores missing-session errors for those IDs from background refreshes, and drops them from late metadata/family results. Explicit reads still reject. Files: `packages/client/src/solid/data.ts`.
 - **Promise plugin `DeepMutable`:** branded IDs are mapped into object-like types, so IDs read from an editor cannot be passed back to editor methods. Type-only fix; the external auth plugin needs it to typecheck. Files: `packages/plugin/src/promise/types.ts`.
+- **Reading position lost when switching away** ([anomalyco/opencode#42806](https://github.com/anomalyco/opencode/issues/42806)): upstream only remembers whether you were at the newest messages. Scrolled up, switching tabs and back jumped to the top of the loaded history, and switching sessions and back jumped to the newest messages. Each session now remembers the message at the top of the screen and returns to it. Sessions left at the newest messages still open there. Files: `packages/app/src/session/timeline/virtualizer.tsx`, `packages/app/src/session/timeline/interaction.ts`.
+- **Newest messages hidden when the chat area gets shorter:** upstream keeps the scroll offset when the chat area shrinks, so at the newest messages, the Android keyboard (which shrinks the app) or a shorter window hid the last lines behind the composer. At the newest messages, the chat now stays at the end; scrolled up, it stays where it is. Files: `packages/app/src/session/timeline/interaction.ts`.
 
 ### Upstream Limitations Worked Around In Fork-Owned Code
 

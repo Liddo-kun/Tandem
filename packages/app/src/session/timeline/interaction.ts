@@ -8,6 +8,11 @@ import type { SessionModel } from "../model"
 import { useSessionHashScroll } from "../use-session-hash-scroll"
 import { createTimelineModel } from "./model"
 
+// UPSTREAM-DIVERGENCE(temporary): upstream keeps one follow flag per session screen and re-pins on
+// every session switch, so a session scrolled up from the end reopened at the end
+// (anomalyco/opencode#42806). Sessions remember their own flag across screens; absent follows the end.
+const [follow, setFollow] = createStore<Record<string, false | undefined>>({})
+
 export function createSessionTimelineInteraction(session: SessionModel) {
   const layout = useLayout()
   const location = useLocation()
@@ -19,10 +24,6 @@ export function createSessionTimelineInteraction(session: SessionModel) {
       overflow: false,
       jump: false,
     },
-    follow: {
-      sessionKey: session.identity.sessionKey(),
-      pinned: true,
-    },
     refs: {
       scroller: undefined as HTMLDivElement | undefined,
       content: undefined as HTMLDivElement | undefined,
@@ -31,11 +32,11 @@ export function createSessionTimelineInteraction(session: SessionModel) {
   })
   // The single source of truth for "follow the newest content". The virtualizer pins and unpins
   // it from scroll geometry; everything else only expresses explicit intent.
-  const pinned = () => state.follow.sessionKey !== session.identity.sessionKey() || state.follow.pinned
-  const pin = () => setState("follow", { sessionKey: session.identity.sessionKey(), pinned: true })
+  const pinned = () => follow[session.identity.sessionKey()] !== false
+  const pin = () => setFollow(session.identity.sessionKey(), undefined)
   const unpin = () => {
     if (!scroller || scroller.scrollHeight - scroller.clientHeight <= 1) return
-    setState("follow", { sessionKey: session.identity.sessionKey(), pinned: false })
+    setFollow(session.identity.sessionKey(), false)
   }
   let scroller: HTMLDivElement | undefined
   let dockHeight = 0
@@ -113,6 +114,8 @@ export function createSessionTimelineInteraction(session: SessionModel) {
     follow: {
       unpin,
       toBottom: () => {
+        // UPSTREAM-DIVERGENCE(temporary): entering a session without a hash keeps its remembered position.
+        if (!pinned()) return
         pin()
         scrollToEnd()
       },
@@ -215,7 +218,6 @@ export function createSessionTimelineInteraction(session: SessionModel) {
     on(
       session.identity.sessionKey,
       () => {
-        pin()
         setState("messageID", undefined)
         setState("pendingMessage", undefined)
         setState("scroll", { overflow: false, jump: false })
@@ -228,6 +230,7 @@ export function createSessionTimelineInteraction(session: SessionModel) {
       () => session.identity.params.id,
       (id, previous) => {
         if (!id || !previous || id === previous || state.messageID || state.pendingMessage || location.hash) return
+        if (!pinned()) return
         pin()
         scrollToEnd()
       },
@@ -281,6 +284,20 @@ export function createSessionTimelineInteraction(session: SessionModel) {
       if (stick) scrollToEnd()
       if (scroller) scheduleScrollState(scroller)
       fill()
+    },
+  )
+  // UPSTREAM-DIVERGENCE(temporary): a shorter timeline viewport (a window resize, or the Android
+  // keyboard under adjustResize) kept its offset and hid the newest content while following the end.
+  let scrollerHeight = 0
+  createResizeObserver(
+    () => state.refs.scroller,
+    ({ height }) => {
+      const next = Math.ceil(height)
+      if (next === scrollerHeight) return
+      const resized = scrollerHeight > 0
+      scrollerHeight = next
+      if (resized && pinned()) scrollToEnd()
+      if (scroller) scheduleScrollState(scroller)
     },
   )
   onCleanup(() => {

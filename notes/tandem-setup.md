@@ -132,8 +132,9 @@ Only when Jon asks. Updating the tablet itself needs none of this.
    `manifest.json` and `SHA256SUMS` (logs in `/tmp/tandem/v2/release`). `--required-common` also
    requires Linux, macOS and Windows on arm64 and x64; `--help` lists the skip and package-only options.
    Use a new, empty staging directory.
-3. Write release notes from the previous **Tandem** tag: verified changes only, plus the pinned upstream
-   baseline. Don't use upstream's publish or version scripts.
+3. Write release notes from the previous **Tandem** tag and the Unreleased entries in `changelogv2.md`
+   (verified changes only, plus the pinned upstream baseline), then record the release there. Don't use
+   upstream's publish or version scripts.
 4. `gh release create <tag> --repo Liddo-kun/Tandem --target <commit> --notes-file <notes.md>`, then
    `gh release upload <tag> --repo Liddo-kun/Tandem dist/tandem-release-<version>/*`.
 

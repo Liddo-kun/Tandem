@@ -41,6 +41,8 @@ const cache = new Map<
     toolOpen: Record<string, boolean | undefined>
     patchGroupKeys: Map<string, string>
     presentationKey?: string
+    // UPSTREAM-DIVERGENCE(temporary): see `reading` in createTimelineVirtualizer.
+    reading?: { key: VirtualItem["key"]; delta: number }
   }
 >()
 
@@ -347,6 +349,32 @@ export function createTimelineVirtualizer(input: Input) {
   )
   const virtualRowKeys = createMemo(() => virtualizer.getVirtualItems().map((item) => String(item.key)))
 
+  // UPSTREAM-DIVERGENCE(temporary): reattaching a hidden view resets its scroller to 0, and upstream
+  // restores only the pinned end (anomalyco/opencode#42806). Remember the row at the top of the
+  // viewport when the view hides and return to it when it shows again unpinned.
+  let reading = cached?.reading
+  const captureReading = () => {
+    const offset = virtualizer.scrollOffset
+    const item = offset === null ? undefined : virtualizer.getVirtualItemForOffset(offset)
+    reading = item && offset !== null ? { key: item.key, delta: offset - item.start } : undefined
+  }
+  createEffect(
+    on(
+      active,
+      (value) => {
+        if (!value) captureReading()
+      },
+      { defer: true },
+    ),
+  )
+  const restoreReading = () => {
+    const anchor = reading
+    reading = undefined
+    if (!anchor) return
+    const item = virtualizer.measurementsCache.find((entry) => entry.key === anchor.key)
+    if (item) virtualizer.scrollToOffset(item.start + anchor.delta)
+  }
+
   createEffect(() => {
     if (!active()) return
     const root = listRoot()
@@ -358,6 +386,7 @@ export function createTimelineVirtualizer(input: Input) {
       // its real viewport before restoring the offset and admitting rows.
       reportRect?.({ width: root.offsetWidth, height: root.offsetHeight })
       if (input.pinned()) virtualizer.scrollToEnd()
+      else restoreReading()
       reportOffset?.(root.scrollTop, false)
       settleColdBottom()
     })
@@ -716,12 +745,14 @@ export function createTimelineVirtualizer(input: Input) {
   }
 
   onCleanup(() => {
+    if (active()) captureReading()
     cache.delete(ownerSessionKey)
     cache.set(ownerSessionKey, {
       measurements: virtualizer.takeSnapshot(),
       toolOpen: { ...toolOpen },
       patchGroupKeys,
       presentationKey: input.presentationKey?.(),
+      reading,
     })
     while (cache.size > 16) cache.delete(cache.keys().next().value!)
     coldPending = false
