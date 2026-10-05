@@ -2,16 +2,18 @@
 
 ## Build invocation
 
-From `/home/jon/code/Tandem-v2`, after the Android worker finishes native/frontend configuration and master installs its dependencies:
+From `/home/jon/code/Tandem-v2`, with dependencies installed:
 
 ```sh
 PATH="/home/jon/.local/share/tandem-v2/toolchain/bun-1.4.2/bin:$PATH" \
   bun script/build-tablet-android.ts
 ```
 
-This builds an ARM64 release APK using `packages/android/src-tauri/tauri.v2.conf.json` and `OPENCODE_ANDROID_VARIANT=v2`. It does not install it. `--debug` selects a debug APK; `--config <JSON file>` selects another explicit Tauri override. The merged identifier must be `app.liddokun.tandem.v2`.
+This builds an ARM64 release APK using `packages/android/src-tauri/tauri.v2.conf.json` and `OPENCODE_ANDROID_VARIANT=v2`. It does not install it.
 
-The generated project must first be initialized through the Android package's `init:v2` script, with `loadAndroidToolchainEnv()` applied to its environment. Initialization and builds are master-scheduled operations, not performed by this infrastructure assignment.
+The build exhausts the tablet's normal inotify limit. Raise it only for the build and restore it afterward (the setting is kernel-wide, shared with Android): `sudo sysctl -w fs.inotify.max_user_watches=524288`, then `sudo sysctl -w fs.inotify.max_user_watches=77755`. `--debug` selects a debug APK; `--config <JSON file>` selects another explicit Tauri override. The merged identifier must be `app.liddokun.tandem.v2`.
+
+The generated project must first be initialized through the Android package's `init:v2` script, with `loadAndroidToolchainEnv()` applied to its environment.
 
 Output: `packages/android/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk` (`debug` replaces `release` for debug builds).
 
@@ -40,10 +42,8 @@ Release builds use `/home/jon/.local/share/tandem-v2/android-signing/{release.ke
 
 `setup-tablet-android.sh` retains the established community NDK/SDK and glibc build-tools sources. Run it only when toolchain provisioning is explicitly needed. It can install system packages and shared SDK/Rust components, but no longer rewrites `/etc/profile.d/50-android.sh`. Downloads and extraction use `/tmp/tandem/v2`.
 
-## Integration ownership
+## Notes
 
-The Android worker owns `packages/android/**`, including the V2 config, V2-aware generated metadata, release signing wiring, icons, frontend build and native initialization. The infrastructure expects its `tauri` script to prepare Android metadata before calling Tauri. The worker's existing external signing-properties hook is used directly.
-
-Master owns package/lockfile changes and build scheduling. The newly added Android workspace requires a dependency install after its package manifest is final; this worker does not update the lockfile. An optional root convenience script is `"tandem:tablet": "bun script/build-tablet-android.ts"`; it must be run with pinned Bun on PATH.
+`packages/android/**` holds the V2 config, generated-metadata patcher, release signing wiring, icons, frontend build and native initialization; its `tauri` script prepares Android metadata before calling Tauri. Building the production app instead is described in `notes/tandem-release.md`. An optional root convenience script is `"tandem:tablet": "bun script/build-tablet-android.ts"`; run it with pinned Bun on PATH.
 
 No broad release orchestrator, variant installer, iOS workflow or package-source patcher is copied into `script/`.

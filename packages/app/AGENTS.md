@@ -5,12 +5,12 @@
 
 ## Debugging
 
-- Preserve the daily v1 app/server. The master orchestrator may relaunch the isolated v2 app/server as required for the port's persistence, recovery and deployment acceptance checks.
+- Debug against the development server (4098) and the Tandem V2 app. Leave the daily server (4097), its app and the Tandem v1 fallback (4095) alone unless Jon asks.
 
 ## Local Dev
 
-- Use the root isolated v2 launcher and explicit server URL. Follow `contextL.md` or `contextW.md`; do not use daily service discovery or assume port 4096.
-- `serve` embeds the locally built shared app. For frontend iteration, configure the Vite frontend to connect to the isolated v2 backend.
+- Use the root development launcher and explicit server URL. Follow `contextL.md` or `contextW.md`; do not use daily service discovery or assume port 4096.
+- `serve` embeds the locally built shared app. For frontend iteration, configure the Vite frontend to connect to the development backend.
 
 ## SolidJS
 
@@ -42,7 +42,7 @@
 
 ## Tests
 
-The port's real-workflow verification rule takes precedence: no low-level test writing/running unless Jon requests it. Build as necessary for a real session/client workflow; static checks alone are not acceptance.
+The root real-workflow verification rule takes precedence: no low-level test writing/running unless Jon requests it. Build as necessary for a real session/client workflow; static checks alone are not acceptance.
 
 A test must pay for its upkeep. Before adding one, answer three questions: which observable contract does it protect, which credible regression makes it fail, and why does no existing test already catch that regression. If any answer is missing, do not add the test.
 

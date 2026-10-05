@@ -1,8 +1,8 @@
-# Corrector source handoff
+# Corrector implementation notes
 
 Corrector is implemented in `packages/core/src/plugin/tandem/prompt-corrector.ts`, with registration
-in `plugin/internal.ts`. No RePrompt duplication or CLI `run` disablement is included. Runtime
-acceptance, builds and deployment remain master-owned.
+in `plugin/internal.ts`. No RePrompt duplication or CLI `run` disablement is included. The user guide is
+[PromptEnhance.md](../PromptEnhance.md); what was verified is in [v2-port.md](v2-port.md).
 
 ## Runtime contract
 
@@ -74,30 +74,3 @@ Queue edits invalidate old originals/fingerprints, reconstruct authored ranges, 
 notes and avoid repeating old path-reference scaffolding. Ambiguous shifted mention matches are not
 rebound to an arbitrary occurrence. Existing undo restrictions for detached non-mentioned context
 attachments remain; an unavailable undo leaves the queue item in place.
-
-## Master acceptance steps
-
-1. Build/load the isolated v2 source. Enable final-request diagnostics. Submit a typo/dictation example;
-   inspect durable inbox/delivered text, `displayText`, changed original and final main request.
-2. Confirm the Corrector request contains only copy-editor instructions/raw text, no project/global
-   instructions, catalogs, tools or RePrompt. Normal child is absent from root lists and removed.
-3. Toggle off, submit, toggle on and submit again. Verify persisted client setting across relaunch and
-   literal false/true opt-out snapshots. Check General/composer controls and Android Enter/zoom.
-4. While the main session is busy, queue on/off prompts, toggle again, edit each, reorder, steer, undo
-   and resend. Inspect each snapshot, generated suffix, files and processed fingerprint. Reorder must
-   produce no extra correction requests.
-5. Exercise inline file/agent/skill mentions, repeated mentions, screenshots and path/comment context.
-   Correct surrounding prose; compare attachment identities/content and exact mention substrings at
-   adjusted offsets. Generated attachment/comment text must remain unchanged.
-6. Exercise blanks/context-only input, exactly 600 and over-600 authored ranges, multiple text ranges,
-   unchanged response, rejected answer/expansion and model/variant failure. Unchanged/failed cases
-   must retain text without manufacturing changed-original metadata.
-7. Exercise configured `small_model`, a distinct title-model override, environment model/variant and
-   session fallback. Also exercise standalone `run`; the v1 disablement is intentionally absent.
-8. Cancel the admission operation while a correction waits; inspect child outcome/removal and confirm
-   no parent input was admitted. Do not count parent Stop's known pre-admission no-op as operation
-   cancellation. Exercise DEBUG_KEEP=2 and 0, including concurrent Locations.
-9. Invoke browser-reader flow after master integration. Its internal prompts must launch no Corrector
-   children, independently of the client toggle.
-
-No live acceptance or scope checkbox completion is claimed by this source handoff.

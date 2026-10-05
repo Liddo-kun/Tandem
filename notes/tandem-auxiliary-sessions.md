@@ -1,8 +1,8 @@
 # Tandem auxiliary-session contract
 
-Approved shared foundation for Corrector and browser-backed webfetch. Feature algorithms and real
-acceptance remain worker/master-owned. This contract uses normal session create/admit/execute/history
-and cleanup APIs; it does not introduce a second session engine or alter public HTTP endpoints.
+Shared foundation for Corrector and browser-backed webfetch. It uses normal session
+create/admit/execute/history and cleanup APIs; it does not introduce a second session engine or alter
+public HTTP endpoints.
 
 ## Imports and identities
 
@@ -109,7 +109,7 @@ Register `fetch_page` with `codemode: false`. Its executor must validate browser
 and enforce budgets; catalog filtering is not execution authorization. The invoking feature supplies
 explicit child permissions: Corrector denies all tools; reader allows only fetch/read and any narrowly
 required runtime-scratch external-directory access. The shared default does not grant unrestricted
-external-directory access. Reader's medium text verbosity belongs to the browser worker's request
+external-directory access. Reader's medium text verbosity belongs to the browser fetch feature's request
 hook, preserving explicit user settings; no shared transport/request payload rewrite is installed.
 
 Legacy `small_model` normalization independently supplies `agents["tandem-corrector"].model` and
@@ -133,7 +133,7 @@ at the feature boundary:
 | `tandemPromptCorrectorProcessed` | optional string | SHA-256 fingerprint of correctable text/ranges after processing |
 
 `CorrectorRange` validates nonnegative integer offsets. Bounds, ordering and the fingerprint input
-encoding belong to Corrector; the implemented encoding and source handoff are in `tandem-corrector.md`.
+encoding belong to Corrector; the implemented encoding is described in `tandem-corrector.md`.
 Do not correct generated attachment references/comment notes appended to text. Each range retains
 the per-range trimmed-length limit. After accepted edits, update ranges, presentation `displayText`
 and structured mention offsets together; reject an edit that cannot preserve a mention unambiguously.
@@ -188,18 +188,9 @@ hook is correcting, so `session.interrupt(parentID)` can be an idle no-op. Cance
 operation itself to activate its finalizer. No new parent admission-ownership semantics are supplied.
 Process death cannot execute finalizers; startup orphan cleanup is not implemented by this foundation.
 
-## Shared-file boundaries and acceptance
+## Boundaries
 
-The shared owner controls hook declarations, `plugin/hooks.ts` generic dispatch, session selection/
-instruction injection, auxiliary policy/defaults, config migration and internal registration. Generic
-Effect/Promise registration already forwards the new hook; no HTTP schema/client regeneration is
-required. Corrector/browser workers own their algorithms, feature prompts, child result handling and
-UI plumbing. Coordinate additional `internal.ts` registrations with master.
-
-Final-request diagnostics owns `session/model-request.ts` and AI dump/transport boundaries; this
-foundation does not edit them. Isolation runs before durable instruction preparation and provider
-request assembly. Diagnostics remains a final-provider-facing observer of auxiliary and normal
-requests after transformations.
-
-No runtime acceptance is claimed. Master owns real normal/auxiliary sessions, stored-baseline/Read
-injection inspection, cancellation cleanup, queue-toggle behavior and final-request diagnostics.
+Generic Effect/Promise registration forwards the instructions hook, so no HTTP schema or client
+regeneration is needed. Feature algorithms, prompts and child result handling live with each feature
+(Corrector, browser fetch). Isolation runs before durable instruction preparation and provider request
+assembly; request diagnostics observe auxiliary and normal requests after all transformations.

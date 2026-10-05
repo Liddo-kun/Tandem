@@ -13,11 +13,12 @@ This file is the source for Tandem v2 GitHub release notes and the inventory of 
 
 ### Unreleased
 
-Baseline: OpenCode `upstream/v2` at `40679546d4` (2026-10-03, `@opencode/cli` 2.0.22). Development version `2.0.22-tandem-v2.0`. No v2 release has been published; production cut-over has not happened. Source changes are uncommitted on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/v2-readiness.md](notes/v2-readiness.md).
+Baseline: OpenCode `upstream/v2` at `40679546d4` (2026-10-03, `@opencode/cli` 2.0.22). Version `2.0.22-tandem-v2.0`, installed as the daily Tandem on Jon's tablet on 2026-10-05; no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/v2-readiness.md](notes/v2-readiness.md).
 
 #### 2026-10-05
 
-- **Documentation — Divergence tracking:** every edit to an upstream-shared file now carries an `UPSTREAM-DIVERGENCE` code comment, with fixes for upstream bugs marked `UPSTREAM-DIVERGENCE(temporary)`. This log replaces the port-time seam list in `notes/v2-progress.md`. Agent guidance now requires Jon's agreement before fixing OpenCode upstream bugs.
+- **Android — Connection help:** the connect screen's help no longer tells users to start the development server on port 4098 or set `OPENCODE_SERVER_PASSWORD`; it mentions the daily port 4097 and pairing links from `tandem pair`. File: `packages/app/src/runtime/i18n/en.ts`.
+- **Documentation — Divergence tracking:** every edit to an upstream-shared file now carries an `UPSTREAM-DIVERGENCE` code comment, with fixes for upstream bugs marked `UPSTREAM-DIVERGENCE(temporary)`. This log replaces the port-time seam list. Agent guidance now requires Jon's agreement before fixing OpenCode upstream bugs.
 
 #### 2026-10-03 to 2026-10-05 — v2 port
 

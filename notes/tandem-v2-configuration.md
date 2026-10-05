@@ -1,12 +1,53 @@
 # Tandem v2 setup and retained settings
 
-Source-based setup guide for the pinned v2 worktree. Live checks remain in the
-[progress ledger](v2-progress.md) and feature notes; this document does not establish readiness.
+Setup guide for Tandem on OpenCode v2 on this tablet: the daily install, the Tandem v1 fallback,
+the development server, and the retained settings. What was verified is in [v2-port.md](v2-port.md).
 
-## CLI, server and manual updates
+## Daily server
+
+Since 2026-10-05 the daily Tandem is v2 (switch-over from v1).
+
+| Item | Location |
+| --- | --- |
+| Command | `/usr/local/bin/tandem` (`latest` channel) |
+| Server | port 4097, started by the `tandem-web` Termux widget through `~/.local/bin/tandem-server` |
+| Configuration | `~/.config/tandem/`: `opencode.jsonc`, `service.json` (hostname, port, server password), Jon's global `AGENTS.md`, `skills/`, parked `skills-disabled/` |
+| Data | `~/.local/share/tandem/opencode.db` (history and logins), plus `~/.cache/tandem` and `~/.local/state/tandem` |
+| Scratch | `/tmp/tandem` (browser fetch uses `/tmp/tandem/webfetch/`) |
+| Android app | **Tandem**, `app.liddokun.tandem`, connected to `http://127.0.0.1:4097` |
+
+`tandem-server` runs `tandem serve --service --hostname 0.0.0.0 --port 4097` with no root overrides.
+It unsets `OPENCODE_DB`: v2 converts any v1 database it opens in place, so never export
+`OPENCODE_DB` from `~/.profile`. In service mode the server password comes from `service.json`,
+and the `tandem` CLI attaches to the running service. To connect a new browser or app, run
+`tandem pair` and paste the one-time link into the app's server-address field, or enter the
+password with username `opencode`. `TANDEM_*` flags come from the login environment
+(`~/.profile` sets `TANDEM_CLAUDE_BASH_SEARCH=1`).
+
+`opencode.jsonc` registers the Claude plugin and carries the v1 settings over: auto-compaction off;
+model-pinned `general-sol` (GPT-5.6 Sol, because v2's ChatGPT login does not offer v1's GPT-6.1 Sol)
+and `general-astra` (GPT-6 Astra) helpers instead of the built-in `general`/`explore`, both denying
+todowrite and nested subagents; and denied `firecrawl-crawl`, `firecrawl-map`, `router-admin` and
+`linux-cdp` skills. v1's Opus 4.6 thinking presets and DeepSeek Corrector override were not carried
+over (the first relied on a v1-only plugin; v2 has no DeepSeek login).
+
+`tandem-stop` stops the daily server and Tandem v1; it leaves the development server alone.
+
+## Tandem v1 fallback
+
+v1 still runs side by side: `tandem-v1` widget → `~/.local/bin/tandem-v1-server` →
+`/usr/local/bin/tandem-v1 web --hostname 0.0.0.0 --port 4095`, no password. All its folders moved to
+`~/.local/share/tandem-v1/{config,data,cache,state}`; the launcher points the XDG variables there and
+sets `OPENCODE_DB=opencode-dev.db` and the DeepSeek Corrector override. Its config folder links back
+to `~/.config/tandem/AGENTS.md` and to every other `~/.config` entry, so tools such as `gh` keep
+working in v1 sessions. Connect with the **Tandem v1** app (`ai.opencode.android.v1`). The old v1 APK is
+kept at `~/.local/share/tandem-v1/tandem-android-1.2.6.apk`, with the pre-switch `~/.profile` and
+`~/.bashrc` beside it.
+
+## Development server
 
 Run the following from `/home/jon/code/Tandem-v2`, choosing the needed command rather
-than starting a second server over the current master's process:
+than starting a second server over a running one:
 
 ```sh
 export PATH="/home/jon/.local/share/tandem-v2/toolchain/bun-1.4.2/bin:$PATH"
@@ -53,21 +94,22 @@ runtime scratch is `/tmp/tandem/v2/tandem`. Non-`TANDEM_*` variables such as
 Changes to server settings/plugins take effect on the next coordinated server start;
 the currently running server keeps its loaded environment.
 
+The `tandem-dev` Termux widget starts this server after a reboot. Its config folder links to the
+daily `AGENTS.md`, selected skills and every other `~/.config` entry. Its logins were cleared at the
+switch-over: OAuth refresh tokens rotate, so two servers holding copies of one login break each
+other. Log in separately when the development server is needed again; never copy the daily logins.
+
 Updates are manual: `tandem upgrade` directs users to
 <https://github.com/Liddo-kun/Tandem/releases>; the active CLI updater does not check or
 install upstream releases. Build/package/install commands, signing and staged replacement
 are in [release setup](tandem-release.md) and [tablet APK setup](../script/tablet-android.md).
-Production cut-over requires Jon's agreement. Its eventual server command is
-`tandem serve --hostname 0.0.0.0 --port 4097` with `OPENCODE_SERVER_PASSWORD` configured;
-daily v1's binary, widget, roots and running service remain separate during development.
 
 ## Android connection and controls
 
-Use **Tandem V2**, application ID `app.liddokun.tandem.v2`; production remains
-`app.liddokun.tandem` with its established signing identity. The app requires a **v2
-server**. Enter `http://192.168.1.85:4098` manually on the current tablet LAN (substitute
-the actual host address elsewhere). Discovery prefers 4097 and falls back to 4096;
-it does not discover arbitrary development ports. `/api/info` probes distinguish
+The daily app is **Tandem** (`app.liddokun.tandem`); the development app is **Tandem V2**
+(`app.liddokun.tandem.v2`), with separate data and signing. Both require a **v2 server**.
+Discovery prefers 4097 and falls back to 4096, so it finds the daily server; enter the
+development server (`http://192.168.1.85:4098`) manually. `/api/info` probes distinguish
 password-required reachability from an offline server.
 
 Use username **`opencode`** and the configured server password, or the pairing flow:
@@ -93,7 +135,9 @@ provider chooser and saved choice; no provider is preselected by this port.
 ## Saved provider logins
 
 Use existing saved v2 connections. These are setup/reconnect commands, not steps to
-repeat before each session; all commands below use the pinned PATH from above.
+repeat before each session. The commands below target the development server; for the daily
+server run the same `auth login` arguments as `tandem auth login ...`, which attaches to the running
+service.
 
 ### ChatGPT conversations
 
@@ -140,7 +184,6 @@ an observed prompt-sensitive mitigation, not a general fix or pixel-exact preser
 guarantee. Example: “Reconstruct the entire masked rectangle as the continuation of the
 green triangle on white, including crossing edges; then add the yellow dot. Every other
 editable pixel must show the continuous triangle or white background, with no black patch.”
-See [mask investigation](v2-imagegen-mask-investigation.md).
 
 API-key schema additionally requires width/height (multiples of 16, at most 3840 per
 edge, ratio ≤3:1, 655,360–8,294,400 pixels), with quality `medium|high|xhigh|max`
@@ -151,8 +194,8 @@ itself attach it to a model request; explicit image reading can.
 
 ### External Claude plugin
 
-Register the v2 plugin directory once in isolated `config/tandem/opencode.json`, merging
-with existing configuration (v2 uses **`plugins`**, plural):
+Register the v2 plugin directory in the global configuration (daily `~/.config/tandem/opencode.jsonc`,
+development `config/tandem/opencode.json`), merging with existing settings (v2 uses **`plugins`**, plural):
 
 ```json
 {
@@ -161,7 +204,7 @@ with existing configuration (v2 uses **`plugins`**, plural):
 }
 ```
 
-The directory's `server.ts` exports its v2 plugin; do not register the daily v1 copy or
+The directory's `server.ts` exports its v2 plugin; do not register the v1 copy (`~/code/opencode-anthropic-auth`) or
 a direct TypeScript file URI. Host-compatible dependency setup is documented in
 `/home/jon/code/opencode-anthropic-auth-v2/V2-TRANSPORT.md`. After coordinated reload:
 
@@ -231,8 +274,8 @@ Algorithms take precedence over older worker README/status claims:
 - Core [`provider/chatgpt.ts`](../packages/core/src/plugin/provider/chatgpt.ts) and
   [`tandem/imagegen`](../packages/core/src/plugin/tandem/imagegen/): separate auth,
   credential priority, transport, codec and schema.
-- Core [`tandem/browser-fetch`](../packages/core/src/plugin/tandem/browser-fetch/) and
-  [`tandem/bash-search`](../packages/core/src/plugin/tandem/bash-search/), AI
-  [`request-dump.ts`](../packages/ai/src/tandem/request-dump.ts): retained flags.
+- Core [`tandem/browser-fetch`](../packages/core/src/plugin/tandem/browser-fetch/),
+  [`tandem/bash-search`](../packages/core/src/plugin/tandem/bash-search/) and
+  [`tandem/request-dump`](../packages/core/src/plugin/tandem/request-dump/): retained flags.
 - External auth-v2 `src/{v2,transform,insecure,insecure-provider,auth,refresh}.ts`:
   normal registration and endpoint-scoped transport.

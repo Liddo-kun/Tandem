@@ -7,23 +7,23 @@ description: Use ONLY when reviewing or syncing official OpenCode upstream/v2 in
 
 This project-owned skill applies to `/home/jon/code/Tandem-v2`, branch `tandem-v2`.
 Read root `AGENTS.md`, the current platform's `contextL.md` or `contextW.md`,
-`notes/v2-port.md`, `notes/todo-after-v2.md`, and `notes/v2-progress.md` before planning.
+`logv2.md` (every Tandem customization of OpenCode), `notes/todo-after-v2.md` and `notes/v2-port.md` before planning.
 The port baseline is **`40679546d4db07ba9dfb17160051c9a3109c438f`**, official
 **`upstream/v2`**. Read the nearest package instructions before editing.
 
 ## Approval and isolation
 
-- Documenting this workflow does not advance the baseline. During the port, retain the
-  pin until Jon authorizes a baseline change. A request to discover upstream changes
+- Documenting this workflow does not advance the baseline. Retain the pin until Jon
+  authorizes a baseline change. A request to discover upstream changes
   permits fetching; a fresh coding session alone does not authorize following its tip.
 - Keep `/home/jon/code/Tandem` and the daily/global sync skill read-only. Preserve all
   uncommitted work; do not auto-stash, reset, restore or clean. A dirty worktree blocks
   a merge until its owners and Jon settle the integration plan.
-- Preserve daily `/usr/local/bin/tandem`, port 4097, roots/credentials/database/widget,
-  and Android `app.liddokun.tandem`. Development uses port 4098, the isolated launcher
-  and `app.liddokun.tandem.v2` (**Tandem V2**) with separate data/signing. Never copy
-  daily credentials or run another server against the same credential database.
-- Builds and browser/device workflows are master-scheduled and serialized. Installation,
+- Verify on the development server first: port 4098, the isolated launcher and
+  `app.liddokun.tandem.v2` (**Tandem V2**) with separate data/signing. The daily install
+  (`/usr/local/bin/tandem`, port 4097, `app.liddokun.tandem`) changes only when Jon asks
+  to install. Never copy daily credentials or run another server against the same database.
+- Run builds and browser/device workflows one at a time. Installation,
   service restart, publication, commits and pushes each require applicable explicit
   authorization. A source sync is not production cut-over permission.
 
@@ -121,8 +121,8 @@ git log --oneline -6
 ```
 
 Use merge, not rebase/force-push. Unexpected dirty state or architectural conflicts stop
-the next batch. Coordinate inventory/baseline note updates with the master; record the
-approved new pin only with the integration outcome, not merely because fetch succeeded.
+the next batch. Update `logv2.md` and the baseline references with the integration outcome; record the
+approved new pin only then, not merely because fetch succeeded.
 
 ## Verification and report
 
@@ -142,5 +142,5 @@ including masked OAuth transparency, mask black-fill sensitivity and untested AP
 
 After each batch report commits/theme, conflicts and resolutions, reshaped/removed seams,
 actual workflows/results, blockers and remaining commits. At completion report the
-approved baseline, worktree state and user-testable changes. Do not mark scope checkboxes
-or claim acceptance from source review alone; the master owns ledger integration.
+approved baseline, worktree state and user-testable changes. Do not claim acceptance from
+source review alone.

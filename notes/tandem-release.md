@@ -1,6 +1,6 @@
 # Tandem v2 release tooling
 
-Build and stage with the pinned Bun 1.4.2. Master schedules CLI/Android builds serially on the tablet. These scripts do not install anything or restart a service. iOS is excluded.
+Build and stage with the pinned Bun 1.4.2. Run CLI and Android builds one at a time on the tablet. These scripts do not install anything or restart a service. iOS is excluded.
 
 ```sh
 export PATH="/home/jon/.local/share/tandem-v2/toolchain/bun-1.4.2/bin:$PATH"
@@ -26,7 +26,7 @@ Android input defaults to `packages/android/src-tauri/gen/android/app/build/outp
 
 The generated Android project must already be initialized. For development, use the Android workspace's `init:v2` after loading the toolchain environment; see [tablet infrastructure](../script/tablet-android.md). Production initialization is `bun run --cwd packages/android tauri android init --ci --skip-targets-install` with `OPENCODE_ANDROID_VARIANT=production`. Both variants share the generated project/output tree: serialize them, initialize for the selected identity when necessary, and clean stale Gradle outputs before switching identities.
 
-The orchestrator does not delete/regenerate the native project automatically. The Android package's existing `tauri` preparation step owns generated metadata and signing wiring.
+The release script does not delete/regenerate the native project automatically. The Android package's existing `tauri` preparation step owns generated metadata and signing wiring.
 
 | Variant                        | Application ID           | Signing                                                                                                         |
 | ------------------------------ | ------------------------ | --------------------------------------------------------------------------------------------------------------- |
@@ -47,7 +47,7 @@ export BUNDLETOOL_JAR=/absolute/path/to/bundletool-all.jar
 
 The full build orchestrator loads the existing ARM64 toolchain, selects runnable native aapt2, sets the Gradle aapt2 override, and isolates tablet temporary/cache files under `/tmp/tandem/v2`. Package-only operation does not provision or load Android tools; supply their paths explicitly. For the established APK-only side-by-side tablet build, keep using `bun script/build-tablet-android.ts` (no AAB/bundletool prerequisite).
 
-## Build/stage commands (master-scheduled)
+## Build/stage commands
 
 Build a development CLI only:
 
@@ -87,8 +87,44 @@ gh release create <tag> --repo Liddo-kun/Tandem --target <commit> --notes-file <
 
 Upload either from a new packaging invocation with `--upload <tag> --repo Liddo-kun/Tandem`, or explicitly upload the reviewed staged files with `gh release upload ... --repo Liddo-kun/Tandem`. The packager uploads only the artifacts it just staged plus the manifest/checksums. It does not create releases, and rejects development/debug uploads. `GH_REPO` cannot silently redirect the default repository.
 
-Install separately after approval: stage the selected Unix/Windows executable beside its destination, replace it, then verify the installed version. For Android use an explicitly targeted `adb -s <serial> install -r <verified-signed.apk>`; never uninstall production to bypass a signature mismatch. The existing tablet helper's `--install` is restricted to the development identity. Preserve daily v1 roots/data and a usable rollback; production cut-over and restarting port 4097 require Jon's agreement.
+Install separately after approval: stage the selected Unix/Windows executable beside its destination, replace it, then verify the installed version. For Android use an explicitly targeted `adb -s <serial> install -r <verified-signed.apk>`; never uninstall production to bypass a signature mismatch. The existing tablet helper's `--install` is restricted to the development identity. Restarting the daily server on 4097 requires Jon's agreement.
 
-## Source verification status
+## Updating the installed Tandem on this tablet
 
-See [release tooling handoff](v2-release-tooling-handoff.md) for the source inspection and bounded smoke evidence. Cross-platform builds, full release staging, APK/AAB signature/identity verification against real new outputs, installed-version checks and production cut-over are separate pending acceptance work.
+The daily install (`/usr/local/bin/tandem`, port 4097, `app.liddokun.tandem`) was first built this way on
+2026-10-05. Use pinned Bun on PATH and unset any `OPENCODE_*` variables inherited from a server
+environment, since the build reads `OPENCODE_CHANNEL`/`OPENCODE_VERSION`.
+
+CLI:
+
+```sh
+OPENCODE_CHANNEL=latest OPENCODE_VERSION=<version> bun run --cwd packages/cli build --single
+sudo install -m 755 packages/cli/dist/cli-linux-arm64/bin/opencode /usr/local/bin/tandem.new
+sudo mv /usr/local/bin/tandem.new /usr/local/bin/tandem && tandem --version
+```
+
+The `latest` channel selects `opencode.db` and `service.json`. A development-channel build would
+use the same names, so never point one at the daily roots. The new binary takes effect at the next
+server start (`tandem-stop`, then `tandem-web`).
+
+Android: the production key pair is `packages/android/{release.keystore,keystore.properties}` (ignored
+by Git; the original is in the v1 checkout's `packages/android/`). The generated Android project is
+shared with the development app, so move `packages/android/src-tauri/gen/android` aside, then with
+the Android toolchain environment loaded and `OPENCODE_ANDROID_VARIANT=production`:
+
+```sh
+bun run --cwd packages/android tauri android init --ci --skip-targets-install
+bun run --cwd packages/android prepare:android
+bun script/build-tandem-release.ts --skip-cli --version <version> --out <new staging directory>
+```
+
+Then move the development project back. The build needs the temporary inotify raise described in
+[tablet APK setup](../script/tablet-android.md), and `BUNDLETOOL_JAR` for the AAB check. Check the APK's
+application ID and that its signing certificate SHA-256 is
+`90af42e463563021e8dcc7b9203aa6cb8852b123806b5450a9e9c95c10f8d10b` before `adb install -r`.
+
+## Verification status
+
+Production 2.0.22-tandem-v2.0 (CLI and signed APK/AAB) was built, installed and exercised on the
+tablet on 2026-10-05; copies are in `~/.local/share/tandem-v2/releases/`. Windows, macOS and musl
+executables were built during the port but never run on those platforms.

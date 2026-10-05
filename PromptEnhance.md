@@ -78,5 +78,4 @@ admission operation is the relevant cleanup boundary.
 Source: [`prompt-corrector.ts`](packages/core/src/plugin/tandem/prompt-corrector.ts),
 [`settings/model.tsx`](packages/app/src/settings/model.tsx), and
 [`session/composer`](packages/app/src/session/composer/). Detailed implementation and
-recorded workflows remain in [the source handoff](notes/tandem-corrector.md) and
-[live Corrector note](notes/v2-corrector-live.md); this guide is not an acceptance sign-off.
+the runtime contract are in [Corrector implementation notes](notes/tandem-corrector.md).
