@@ -204,6 +204,9 @@
   [data-titlebar-tab][data-title-overflow="true"]:not([data-editing="true"]) [data-slot="tab-link"] {
     /* UPSTREAM-DIVERGENCE: Touch shows the close button's opaque backdrop, so end a short title fade at its edge. */
     --tab-title-fade-offset: 18px;
+    /* UPSTREAM-DIVERGENCE: Android WebView leaves a masked title stale (blank or a stray fragment) when its tab
+       resizes inside the overflowing, scrolling strip; its own layer repaints the mask with the tab. */
+    will-change: transform;
     --tab-title-fade-direction: to right;
     -webkit-mask-image: linear-gradient(
       var(--tab-title-fade-direction),

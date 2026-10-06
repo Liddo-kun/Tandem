@@ -272,9 +272,37 @@ export function TitlebarTabStrip(props: {
   const command = useCommand()
   const vertical = () => props.orientation === "vertical"
   let listRef!: HTMLDivElement
+  // UPSTREAM-DIVERGENCE: The horizontal strip's scroller, for revealing the current tab.
+  let scrollRef!: HTMLDivElement
   const [visibility, setVisibility] = createStore<Record<string, boolean>>({})
   const visibleTabs = createMemo(() => props.tabs.filter((tab) => tab.type === "draft" || visibility[tabKey(tab)]))
   const visibleTabIds = () => visibleTabs().map(tabKey)
+
+  // UPSTREAM-DIVERGENCE: The mobile strip scrolls instead of shrinking tabs, so bring the current tab into view
+  // when it changes from outside the strip (e.g. a session opened from Home) or earlier tabs appear and push it
+  // aside. Session tabs render once their session loads; the edges keep clear of the strip's fades.
+  createEffect(() => {
+    const current = props.currentTab
+    const visible = visibleTabIds()
+
+    if (vertical() || !current) return
+    const key = tabKey(current)
+
+    if (!visible.includes(key)) return
+    requestAnimationFrame(() => {
+      const slot = Array.from(listRef.querySelectorAll<HTMLElement>("[data-titlebar-tab-slot]")).find(
+        (element) => element.dataset.tabKey === key,
+      )
+
+      if (!slot) return
+      const fade = 24
+      const box = slot.getBoundingClientRect()
+      const view = scrollRef.getBoundingClientRect()
+
+      if (box.left < view.left + fade) scrollRef.scrollLeft -= view.left + fade - box.left
+      else if (box.right > view.right - fade) scrollRef.scrollLeft += box.right - (view.right - fade)
+    })
+  })
 
   command.register("titlebar-tab-cycle", () => [
     {
@@ -311,6 +339,7 @@ export function TitlebarTabStrip(props: {
       classList={{ "min-h-0 overflow-hidden": vertical() }}
     >
       <div
+        ref={scrollRef}
         data-slot={vertical() ? "vertical-tabs-scroll" : "titlebar-tabs-scroll"}
         class="flex min-w-0 no-scrollbar [app-region:no-drag]"
         classList={{
