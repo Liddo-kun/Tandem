@@ -8,7 +8,7 @@ description: Use ONLY when reviewing or syncing official OpenCode upstream/v2 in
 This project-owned skill applies to `/home/jon/code/Tandem-v2`, branch `tandem-v2`.
 Read root `AGENTS.md`, the current platform's `contextL.md` or `contextW.md`,
 `logv2.md` (every Tandem customization of OpenCode) and `notes/todo-after-v2.md` before planning.
-The port baseline is **`40679546d4db07ba9dfb17160051c9a3109c438f`**, official
+The port baseline is **`80c4a6b7c873050f66457a95a71f90a4df5d4fa0`**, official
 **`upstream/v2`**. Read the nearest package instructions before editing.
 Root `AGENTS.md` is Tandem's own: keep it when upstream changes theirs, and carry over only changes to
 the practical code rules it keeps.
@@ -49,7 +49,7 @@ and the baseline in the scope/context notes. If authorized to discover newer ups
 ```sh
 git fetch --no-tags upstream v2
 git rev-parse upstream/v2
-git log --topo-order --reverse --oneline 40679546d4db07ba9dfb17160051c9a3109c438f..upstream/v2
+git log --topo-order --reverse --oneline 80c4a6b7c873050f66457a95a71f90a4df5d4fa0..upstream/v2
 ```
 
 Fetching only discovers a candidate. Present its full SHA, changes affecting retained

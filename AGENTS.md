@@ -1,7 +1,7 @@
 # Tandem guidance
 
 - Read `contextL.md` on Linux or `contextW.md` on Windows once at session startup.
-- This repository is Tandem: OpenCode v2 (`upstream/v2`, pinned at `40679546d4`) plus Tandem's customizations, on branch `tandem-v2`. It has been the daily Tandem since the 2026-10-05 switch-over. The previous Tandem (v1) checkout, `/home/jon/code/Tandem`, is kept as a fallback and reference: do not modify it, its runtime or its data.
+- This repository is Tandem: OpenCode v2 (`upstream/v2`, pinned at `80c4a6b7c8`) plus Tandem's customizations, on branch `tandem-v2`. It has been the daily Tandem since the 2026-10-05 switch-over. The previous Tandem (v1) checkout, `/home/jon/code/Tandem`, is kept as a fallback and reference: do not modify it, its runtime or its data.
 - `logv2.md` inventories Tandem's customizations of OpenCode. `notes/todo-after-v2.md` holds deferred work.
 - Prefer equivalent upstream behavior, then configuration/public plugins. Keep Tandem logic in owned modules and keep shared-code seams narrow. Direct GPT prompt-file edits are accepted.
 - Mark every edit to an upstream-shared file with an `UPSTREAM-DIVERGENCE: <why>` comment at the changed code, and record it in `logv2.md`. Files that cannot carry comments (JSON, lockfiles, generated client output, model-facing prompt text, AGENTS.md) are listed in `logv2.md` only. Preserve existing markers.
