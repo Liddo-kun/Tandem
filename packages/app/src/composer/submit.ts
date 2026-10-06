@@ -7,8 +7,7 @@ import type { ImageAttachmentPart, Prompt } from "./state"
 import { clonePrompt, promptLength } from "./prompt-parts"
 import type { ComposerAdapter, ComposerDelivery, ComposerSelection, ComposerSession } from "./adapter"
 import { createComposerSubmission } from "./submission-state"
-// UPSTREAM-DIVERGENCE: Restore queued context without including it in authored correction ranges.
-import { appendPromptContext, buildPromptRequest } from "./request"
+import { buildPromptRequest, noteComment } from "./request"
 import { setCursorPosition } from "./editor/dom"
 import { blobDataUrl, resolveBlobUrl } from "@/runtime/persistence/drafts"
 import { isAttachment } from "./prompt-parts"
@@ -26,9 +25,8 @@ type ComposerSubmission = {
   images: ImageAttachmentPart[]
   selection: ComposerSelection
   delivery: ComposerDelivery
-  // UPSTREAM-DIVERGENCE: Snapshot Corrector state and queued context per submission.
+  // UPSTREAM-DIVERGENCE: Snapshot Corrector state per submission.
   correctorDisabled: boolean
-  queuedContext?: string
 }
 
 type ComposerSubmitInput = {
@@ -48,6 +46,8 @@ type ComposerSubmitInput = {
   clientCommand?: (text: string) => (() => void | Promise<void>) | undefined
   notify: {
     missingSelection: () => void
+    unqueueable: () => void
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- a rejected send is opaque; the notifier formats it
     failed: (kind: "shell" | "command" | "prompt", error: unknown) => void
   }
   comments: {
@@ -64,9 +64,11 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
     const prompt = clonePrompt(input.adapter.state.current())
     const text = submissionText(prompt)
     const clientCommand = input.mode() === "normal" ? input.clientCommand?.(text) : undefined
+
     if (clientCommand) {
       if (submitting.has(input.adapter.state)) return
       submitting.add(input.adapter.state)
+
       try {
         clearClientCommand(input, prompt)
         await clientCommand()
@@ -75,8 +77,10 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
       } finally {
         submitting.delete(input.adapter.state)
       }
+
       return
     }
+
     const submission = createComposerSubmission({
       target: input.adapter.state,
       prompt,
@@ -88,12 +92,24 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
             : { ...item, selection: item.selection ? { ...item.selection } : undefined },
         ),
     })
+
     const read = readSubmission(input, submission.prompt, submission.context, text, options?.alternate ?? false)
+
     if (!read) {
       if (input.adapter.working() && input.adapter.kind === "active-session") void input.adapter.interrupt()
+
       return
     }
+
+    // Like the TUI, a shell command runs now or not at all; it cannot wait in the queue.
+    if (read.mode === "shell" && read.delivery === "queue") {
+      input.notify.unqueueable()
+
+      return
+    }
+
     if (submitting.has(input.adapter.state)) return
+
     // Images restored from a draft or history carry ids only; the optimistic message shows their URLs.
     const value = {
       ...read,
@@ -104,6 +120,7 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
         })),
       ),
     }
+
     submitting.add(input.adapter.state)
     const comments = input.comments.capture()
     // Capture command intent before starting a session in a worktree whose catalog has not loaded.
@@ -114,6 +131,7 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
         input.adapter.kind === "active-session"
           ? { session: input.adapter.session(), cleanupReady: Promise.resolve() }
           : await input.adapter.start(value.selection, submission, handoffMessage(value))
+
       if (!started) return
       const session = started.session
 
@@ -124,8 +142,10 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
       if (value.mode === "normal" && !command) {
         session.handoff?.set(handoffMessage(value))
         const optimisticBusy = !input.adapter.working()
+
         if (optimisticBusy && input.adapter.kind === "new-session")
           session.data.session.setStatus(session.id, "running")
+
         const sending = sendPrompt(session, value, input.adapter.controls().model.selection.trackSessionCommit, () => {
           if (optimisticBusy && input.adapter.kind === "active-session")
             session.data.session.setStatus(session.id, "running")
@@ -133,12 +153,12 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
           () => ({ ok: true as const }),
           (error) => ({ ok: false as const, error }),
         )
+
         await started.cleanupReady
         await started.complete?.()
         input.adapter.submitted()
-        submission.context
-          .filter((item) => !!item.comment?.trim())
-          .forEach((item) => submission.target().context.remove(item.key))
+        // Like the TUI, sent context goes with the prompt rather than riding along on the next one.
+        submission.context.forEach((item) => submission.target().context.remove(item.key))
         input.comments.clear()
         clearSubmission(input, submission)
         void sending.then((result) => {
@@ -147,6 +167,7 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
               if (optimisticBusy) session.data.session.setStatus(session.id, "idle")
             })
         })
+
         return
       }
 
@@ -157,6 +178,7 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
       if (value.mode === "shell") {
         clearSubmission(input, submission)
         void sendShell(session, value).catch((error) => failSubmission(input, session, "shell", error, restore))
+
         return
       }
 
@@ -165,6 +187,7 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
         void sendCommand(session, value, command, input.adapter.controls().model.selection.trackSessionCommit).catch(
           (error) => failSubmission(input, session, "command", error, restore, value.id),
         )
+
         return
       }
     } finally {
@@ -183,6 +206,14 @@ function clearClientCommand(input: ComposerSubmitInput, prompt: Prompt) {
   input.adapter.state.mode.set("normal")
   input.setMode("normal")
   input.closePopover()
+}
+
+function selectionModel(selection: ComposerSelection) {
+  const model: ComposerSelection["model"] & { variant?: string } = { ...selection.model }
+
+  if (selection.variant) model.variant = selection.variant
+
+  return model
 }
 
 function submissionText(prompt: Prompt) {
@@ -209,35 +240,23 @@ function handoffMessage(value: ComposerSubmission): SessionMessageUser {
       ),
       comments: value.context.flatMap((item): PromptComment[] => {
         const comment = item.comment?.trim()
+
         if (!comment) return []
-        if (item.type === "note")
-          return [
-            {
-              type: "note",
-              origin: item.origin,
-              label: item.label,
-              icon: item.icon,
-              subject: item.subject,
-              ...(item.href ? { href: item.href } : {}),
-              ...(item.live ? { live: { ...item.live } } : {}),
-              comment,
-            },
-          ]
+
+        if (item.type === "note") return [noteComment(item, comment)]
+
         return [
           {
             path: item.path,
             comment,
-            ...(item.selection ? { selection: { ...item.selection } } : {}),
-            ...(item.preview !== undefined ? { preview: item.preview } : {}),
-            ...(item.commentOrigin ? { origin: item.commentOrigin } : {}),
+            selection: item.selection && { ...item.selection },
+            preview: item.preview,
+            origin: item.commentOrigin,
           },
         ]
       }),
       agent: value.selection.agent,
-      model: {
-        ...value.selection.model,
-        ...(value.selection.variant ? { variant: value.selection.variant } : {}),
-      },
+      model: selectionModel(value.selection),
     },
     time: { created: Date.now() },
   }
@@ -251,20 +270,27 @@ function readSubmission(
   alternate: boolean,
 ): ComposerSubmission | undefined {
   const mode = input.mode()
+
   if (mode === "shell" && !text.trim()) return
   const images = prompt.filter((part): part is ImageAttachmentPart => part.type === "image")
+  // Like the TUI's blank Enter, file chips alone send nothing; they wait for text.
   const comments = context.filter((item) => !!item.comment?.trim()).length
+
   if (!text.trim() && !prompt.some(isAttachment) && comments === 0) return
 
   const controls = input.adapter.controls()
   const model = controls.model.selection.current()
   const agent = controls.agents.current
+
   if (!model || !agent) {
     input.notify.missingSelection()
+
     return
   }
+
   const variant = controls.model.selection.variant.current()
   const retry = input.adapter.state.retry.current()
+
   const retryID =
     retry &&
     retry.agent === agent &&
@@ -287,10 +313,9 @@ function readSubmission(
       variant,
     },
     delivery: input.delivery?.(alternate) ?? "steer",
-    // UPSTREAM-DIVERGENCE: Restored/retried prompts retain their original Corrector setting and context.
+    // UPSTREAM-DIVERGENCE: Restored/retried prompts retain their original Corrector setting.
     correctorDisabled: input.adapter.state.correctorDisabled.current() ??
       (retryID ? retry?.correctorDisabled : undefined) ?? !(input.correctorEnabled?.() ?? true),
-    queuedContext: input.adapter.state.queuedContext.current(),
   }
 }
 
@@ -308,14 +333,14 @@ function restoreSubmission(
   comments: PromptHistoryComment[],
 ) {
   const restored = submission.restore()
+
   if (!restored) return false
   // The prompt is back in the composer; its history entry would only keep attachments referenced.
   input.removeFromHistory(value.prompt, value.mode, comments)
   restored.target.set(restored.prompt, promptLength(restored.prompt))
   restored.target.mode.set(value.mode)
-  // UPSTREAM-DIVERGENCE: Restore the failed submission's Corrector snapshot and queued context.
+  // UPSTREAM-DIVERGENCE: Restore the failed submission's Corrector snapshot.
   restored.target.correctorDisabled.set(value.correctorDisabled)
-  restored.target.queuedContext.set(value.queuedContext)
   restored.target.context.replaceComments(
     restored.context
       .filter((item) => !!item.comment?.trim())
@@ -343,6 +368,17 @@ function restoreSubmission(
             },
       ),
   )
+  restored.context.forEach((item) => {
+    if (item.type === "file" && !item.comment?.trim())
+      restored.target.context.add({
+        type: "file",
+        path: item.path,
+        selection: item.selection,
+        name: item.name,
+        description: item.description,
+      })
+  })
+
   // A recovered follow-up changes the payload, so it must use a new admission ID.
   if (value.mode === "normal" && restored.prompt === submission.prompt) {
     restored.target.retry.set({
@@ -355,6 +391,7 @@ function restoreSubmission(
       correctorDisabled: value.correctorDisabled,
     })
   }
+
   if (!submission.current(input.adapter.state)) return true
 
   input.comments.restore(comments)
@@ -362,11 +399,13 @@ function restoreSubmission(
   input.closePopover()
   requestAnimationFrame(() => {
     const editor = input.editor()
+
     if (!editor) return
     editor.focus()
     setCursorPosition(editor, promptLength(value.prompt))
     input.queueScroll()
   })
+
   return true
 }
 
@@ -376,7 +415,9 @@ async function sendShell(session: ComposerSession, value: ComposerSubmission) {
 
 function findCommand(commands: ReturnType<ComposerSubmitInput["commands"]>, text: string) {
   const parsed = parseSlashCommand(text)
+
   if (!parsed || !commands?.some((item) => item.name === parsed.name)) return
+
   return { command: parsed.name, arguments: parsed.input }
 }
 
@@ -387,13 +428,19 @@ async function sendCommand(
   track?: ModelSelection["trackSessionCommit"],
 ) {
   const request = await buildSubmissionRequest(session, value)
+
   // Like queued prompts, queued commands must not apply the composer's selection to active work.
   if (value.delivery === "steer") await applySelection(session, value.selection, track)
   await session.api.command({
     sessionID: session.id,
     name: command.command,
     text: command.arguments,
-    files: request.files.map((file) => ({ uri: file.uri, name: file.name, mention: file.mention })),
+    files: request.files.map((file) => ({
+      uri: file.uri,
+      name: file.name,
+      description: file.description,
+      mention: file.mention,
+    })),
     agents: request.agents,
     skills: request.skills,
     delivery: value.delivery,
@@ -406,11 +453,14 @@ async function applySelection(
   track?: ModelSelection["trackSessionCommit"],
 ) {
   const cancel = track?.(session.id, selection)
+
   try {
     const current = session.current()
+
     if (current?.agent !== selection.agent) {
       await session.api.switchAgent({ sessionID: session.id, agent: selection.agent })
     }
+
     // The server deduplicates unchanged selections; cached SSE state may still be behind an earlier switch.
     await session.api.switchModel({
       sessionID: session.id,
@@ -429,6 +479,7 @@ async function sendPrompt(
   onAdmit: () => void,
 ) {
   const request = await buildSubmissionRequest(session, value)
+
   // Switching agent or model reconfigures the session immediately, and with it
   // the remainder of a running turn. A steer targets that turn, so its
   // selection applies now; a queued follow-up must not reconfigure the turn it
@@ -443,7 +494,12 @@ async function sendPrompt(
     sessionID: session.id,
     delivery: value.delivery,
     text: request.text,
-    files: request.files.map((file) => ({ uri: file.uri, name: file.name, mention: file.mention })),
+    files: request.files.map((file) => ({
+      uri: file.uri,
+      name: file.name,
+      description: file.description,
+      mention: file.mention,
+    })),
     agents: request.agents,
     skills: request.skills,
     metadata: {
@@ -454,12 +510,10 @@ async function sendPrompt(
       comments: request.comments,
       attachments: request.attachments,
       agent: value.selection.agent,
-      model: {
-        ...value.selection.model,
-        ...(value.selection.variant ? { variant: value.selection.variant } : {}),
-      },
+      model: selectionModel(value.selection),
     },
   }
+
   const sending = session.data.session.prompt(admission).catch(() => session.data.session.prompt(admission))
   onAdmit()
   await sending
@@ -472,28 +526,28 @@ async function buildSubmissionRequest(session: ComposerSession, value: ComposerS
       dataUrl: await blobDataUrl(attachment.blob, attachment.mime),
     })),
   )
-  // UPSTREAM-DIVERGENCE: Append restored queue context after computing authored correction ranges.
-  const request = buildPromptRequest({
+
+  return buildPromptRequest({
     prompt: value.prompt,
     context: value.context,
     images,
     text: value.text,
     sessionDirectory: session.directory,
   })
-  // UPSTREAM-DIVERGENCE: Preserve restored model-only queue context on resubmission.
-  return { ...request, text: appendPromptContext(request.text, value.queuedContext) }
 }
 
 function failSubmission(
   input: ComposerSubmitInput,
   session: ComposerSession,
   kind: "shell" | "command" | "prompt",
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- a rejected send is opaque; the notifier formats it
   error: unknown,
   restore: () => boolean,
   messageID?: string,
   rollback?: () => void,
 ) {
   if (messageID && session.admitted(messageID)) return
+
   if (messageID) session.handoff?.clear(messageID)
   rollback?.()
   restore()

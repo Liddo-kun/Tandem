@@ -46,6 +46,7 @@ const RESPECTS_INLINE_HINTS = new Set([
   "alibaba-messages",
   "anthropic-messages",
   "anthropic-compatible-messages",
+  "bedrock-mantle-messages",
   "cloudflare-ai-gateway-messages",
   "google-vertex-messages",
   "meta-messages",

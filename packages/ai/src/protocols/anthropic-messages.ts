@@ -589,7 +589,7 @@ const serverToolResultType = (name: string): AnthropicServerToolResultType | und
   return undefined
 }
 
-const lowerServerToolResult = Effect.fn("AnthropicMessages.lowerServerToolResult")(function* (
+const lowerServerToolResult = Effect.fnUntraced(function* (
   part: ToolResultPart,
   providerMetadataKey: string,
 ) {
@@ -662,7 +662,7 @@ const citationsFromMetadata = (metadata: MediaPart["metadata"]): AnthropicDocume
 
 const isHttpUrl = (value: string) => /^https?:\/\//i.test(value.trim())
 
-const lowerMedia = Effect.fn("AnthropicMessages.lowerMedia")(function* (
+const lowerMedia = Effect.fnUntraced(function* (
   part: MediaPart,
   breakpoints?: Cache.Breakpoints,
 ) {
@@ -852,7 +852,7 @@ const splitsLocalToolResults = (messages: LLMRequest["messages"], index: number)
   return pending.size > 0
 }
 
-const lowerNativeSystemUpdate = Effect.fn("AnthropicMessages.lowerNativeSystemUpdate")(function* (
+const lowerNativeSystemUpdate = Effect.fnUntraced(function* (
   message: LLMRequest["messages"][number],
   breakpoints: Cache.Breakpoints,
 ) {
@@ -867,7 +867,7 @@ const lowerNativeSystemUpdate = Effect.fn("AnthropicMessages.lowerNativeSystemUp
   }
 })
 
-const lowerMessages = Effect.fn("AnthropicMessages.lowerMessages")(function* (
+const lowerMessages = Effect.fnUntraced(function* (
   request: LLMRequest,
   breakpoints: Cache.Breakpoints,
 ) {
@@ -994,6 +994,9 @@ const lowerMessages = Effect.fn("AnthropicMessages.lowerMessages")(function* (
   return messages
 })
 
+// TODO: Move per-model capability heuristics (`supportsEffortUpdates`, `supportsNativeSystemUpdates`,
+// `supportsThinkingBlockBinding`) into explicit model/provider `compatibility` metadata so the protocol
+// only reads `request.model.compatibility`.
 // Per-turn effort started with Claude Opus 5 and every Claude 5.1 model; later versions of any family inherit it.
 const supportsEffortUpdates = (model: LLMRequest["model"]) => {
   const override = model.compatibility?.supportsEffortUpdates
@@ -1311,7 +1314,7 @@ const onContentBlockStart = (
   return [{ ...state, lifecycle: Lifecycle.stepStart(state.lifecycle, events) }, [...events, result]]
 }
 
-const onContentBlockDelta = Effect.fn("AnthropicMessages.onContentBlockDelta")(function* (
+const onContentBlockDelta = Effect.fnUntraced(function* (
   state: ParserState,
   event: AnthropicEvent & { readonly delta: AnthropicStreamDelta },
 ) {
@@ -1379,7 +1382,7 @@ const onContentBlockDelta = Effect.fn("AnthropicMessages.onContentBlockDelta")(f
   return [state, NO_EVENTS] satisfies StepResult
 })
 
-const onContentBlockStop = Effect.fn("AnthropicMessages.onContentBlockStop")(function* (
+const onContentBlockStop = Effect.fnUntraced(function* (
   state: ParserState,
   event: AnthropicEvent,
 ) {
@@ -1450,7 +1453,7 @@ const onMessageDelta = (
   ]
 }
 
-const onMessageStop = Effect.fn("AnthropicMessages.onMessageStop")(function* (state: ParserState) {
+const onMessageStop = Effect.fnUntraced(function* (state: ParserState) {
   if (Object.keys(state.compactions).length)
     return yield* ProviderShared.eventError(ADAPTER, "Response ended with an incomplete compaction block")
   const result = yield* ToolStream.finishAll(ADAPTER, state.tools)

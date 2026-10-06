@@ -7,6 +7,8 @@ import type {
   ContextItem,
   FileAttachmentPart,
   ImageAttachmentPart,
+  NoteComment,
+  NoteContextItem,
   PathAttachmentPart,
   Prompt,
   SkillPart,
@@ -25,7 +27,13 @@ type PromptRequest = {
   displayText: string
   // UPSTREAM-DIVERGENCE: Track authored text spans eligible for correction.
   correctorRanges: TandemAuxiliary.CorrectorRange[]
-  files: { uri: string; mime: string; name?: string; mention?: { start: number; end: number; text: string } }[]
+  files: {
+    uri: string
+    mime: string
+    name?: string
+    description?: string
+    mention?: { start: number; end: number; text: string }
+  }[]
   agents: { name: string; mention?: { start: number; end: number; text: string } }[]
   skills: { id: string; name: string; mention?: { start: number; end: number; text: string } }[]
   comments: PromptComment[]
@@ -42,8 +50,11 @@ type BuildPromptRequestInput = {
 
 const absolute = (directory: string, path: string) => {
   if (path.startsWith("/")) return path
+
   if (/^[A-Za-z]:[\\/]/.test(path) || /^[A-Za-z]:$/.test(path)) return path
+
   if (path.startsWith("\\\\") || path.startsWith("//")) return path
+
   return `${directory.replace(/[\\/]+$/, "")}/${path}`
 }
 
@@ -55,15 +66,38 @@ const mention = /(^|[\s([{"'])@(\S+)/g
 const parseCommentMentions = (comment: string) => {
   return Array.from(comment.matchAll(mention)).flatMap((match) => {
     const path = (match[2] ?? "").replace(/[.,!?;:)}\]"']+$/, "")
+
     if (!path) return []
+
     return [path]
   })
 }
 
 const isFileAttachment = (part: Prompt[number]): part is FileAttachmentPart => part.type === "file"
+
 const isAgentAttachment = (part: Prompt[number]): part is AgentPart => part.type === "agent"
+
 const isSkillAttachment = (part: Prompt[number]): part is SkillPart => part.type === "skill"
+
 const isPathAttachment = (part: Prompt[number]): part is PathAttachmentPart => part.type === "path"
+
+/** The sent form of a note: its optional link and live subject travel only when present. */
+export function noteComment(item: NoteContextItem, comment: string) {
+  const note: NoteComment = {
+    type: "note",
+    origin: item.origin,
+    label: item.label,
+    icon: item.icon,
+    subject: item.subject,
+    comment,
+  }
+
+  if (item.href) note.href = item.href
+
+  if (item.live) note.live = { ...item.live }
+
+  return note
+}
 
 export function buildPromptRequest(input: BuildPromptRequestInput): PromptRequest {
   // UPSTREAM-DIVERGENCE: Correct authored text only, excluding mentions and attachment/context content.
@@ -81,12 +115,15 @@ export function buildPromptRequest(input: BuildPromptRequestInput): PromptReques
     name: attachment.name,
     mention: { start: attachment.start, end: attachment.end, text: attachment.content },
   }))
+
   const files = input.prompt.filter(isFileAttachment).map((attachment) => {
     const path = absolute(input.sessionDirectory, attachment.path)
+
     return {
       uri: attachment.url ?? `file://${encodeFilePath(path)}${fileQuery(attachment.selection)}`,
       mime: attachment.mime ?? "text/plain",
       name: attachment.filename ?? getFilename(attachment.path),
+      description: attachment.description,
       mention: { start: attachment.start, end: attachment.end, text: attachment.content },
     }
   })
@@ -98,36 +135,36 @@ export function buildPromptRequest(input: BuildPromptRequestInput): PromptReques
 
   const used = new Set(files.map((file) => file.uri))
   const comments: PromptComment[] = []
+
   const mentioned = (comment: string) =>
     parseCommentMentions(comment).flatMap((path) => {
       const uri = `file://${encodeFilePath(absolute(input.sessionDirectory, path))}`
+
       if (used.has(uri)) return []
       used.add(uri)
+
       return [{ uri, mime: "text/plain", name: getFilename(path) }]
     })
+
   const context = input.context.flatMap((item) => {
     if (item.type === "note") {
       const comment = item.comment.trim()
+
       if (!comment) return []
-      comments.push({
-        type: "note",
-        origin: item.origin,
-        label: item.label,
-        icon: item.icon,
-        subject: item.subject,
-        ...(item.href ? { href: item.href } : {}),
-        ...(item.live ? { live: { ...item.live } } : {}),
-        comment,
-      })
+      comments.push(noteComment(item, comment))
+
       return mentioned(comment)
     }
+
     const path = absolute(input.sessionDirectory, item.path)
     const uri = `file://${encodeFilePath(path)}${fileQuery(item.selection)}`
     const comment = item.comment?.trim()
+
     if (!comment && used.has(uri)) return []
     used.add(uri)
 
-    const file = { uri, mime: "text/plain", name: getFilename(item.path) }
+    const file = { uri, mime: "text/plain", name: item.name ?? getFilename(item.path), description: item.description }
+
     if (!comment) return [file]
 
     comments.push({
@@ -137,6 +174,7 @@ export function buildPromptRequest(input: BuildPromptRequestInput): PromptReques
       preview: item.preview,
       origin: item.commentOrigin,
     })
+
     return [file, ...mentioned(comment)]
   })
 
@@ -145,6 +183,7 @@ export function buildPromptRequest(input: BuildPromptRequestInput): PromptReques
     mime: attachment.mime,
     name: attachment.sourcePath ?? attachment.filename,
   }))
+
   // Like comments, path references reach the model as text and the message UI through metadata.
   const attachments = input.prompt
     .filter(isPathAttachment)
@@ -167,9 +206,3 @@ export function buildPromptRequest(input: BuildPromptRequestInput): PromptReques
   }
 }
 
-// UPSTREAM-DIVERGENCE: Restore model-only queued context outside authored correction ranges.
-/** Restored queued context remains separate from authored text and its correction ranges. */
-export function appendPromptContext(text: string, context: string | undefined) {
-  if (!context) return text
-  return text ? text + (context.startsWith("\n") ? "" : "\n") + context : context
-}

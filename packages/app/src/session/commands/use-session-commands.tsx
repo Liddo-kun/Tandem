@@ -8,6 +8,8 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { useLayout } from "@/shell/state/layout"
 import { useComposerState } from "@/composer/persistence"
 import { useServerSDK } from "@/runtime/server/client"
+import { useData } from "@/runtime/server/current"
+import { formatServerError } from "@/runtime/server/errors"
 import { useSettings } from "@/settings/model"
 import { showToast } from "@/shell/notifications/toast"
 import { fetchSessionExport, saveSessionExport, sessionExportFilename } from "@/session/commands/export"
@@ -36,6 +38,8 @@ export type SessionCommandContext = {
   navigateMessageByOffset: (offset: number) => void
   revert: Pick<SessionRevert, "undo" | "redo">
   focusInput: () => void
+  // The composer's model, which a compaction runs with.
+  model: () => { id: string; providerID: string; variant?: string } | undefined
 }
 
 const withCategory = (category: string) => {
@@ -52,6 +56,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   const language = useLanguage()
   const prompt = useComposerState()
   const serverSDK = useServerSDK()
+  const data = useData()
   const settings = useSettings()
   const platform = usePlatform()
   const layout = useLayout()
@@ -247,7 +252,9 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
 
     if (!sessionID) return
 
-    await serverSDK.api.session.compact({ sessionID })
+    await data.session.compact({ sessionID, model: actions.model() }).catch((cause: unknown) => {
+      showToast({ title: formatServerError(cause, language.t, language.t("common.requestFailed")) })
+    })
   }
 
   const fork = () => {
