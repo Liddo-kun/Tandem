@@ -200,6 +200,8 @@ function MessageTimelineView(
     editing: false,
     menuOpen: false,
     pendingRename: false,
+    // UPSTREAM-DIVERGENCE(temporary): Delete waits for the options menu to close; see onCloseAutoFocus.
+    pendingDelete: false,
   })
   let titleRef: HTMLInputElement | undefined
 
@@ -456,6 +458,15 @@ function MessageTimelineView(
                             class="session-options-menu w-max"
                             style={{ "min-width": "0" }}
                             onCloseAutoFocus={(event) => {
+                              // UPSTREAM-DIVERGENCE(temporary): Open the delete dialog once the menu has closed,
+                              // like Rename; on touch, the tap's trailing click otherwise lands on the new
+                              // dialog's backdrop and dismisses it.
+                              if (title.pendingDelete) {
+                                event.preventDefault()
+                                setTitle("pendingDelete", false)
+                                props.action.showDelete(id)
+                                return
+                              }
                               if (!title.pendingRename) return
                               event.preventDefault()
                               setTitle("pendingRename", false)
@@ -478,7 +489,7 @@ function MessageTimelineView(
                             <Show when={!parentID()}>
                               {/* TODO: Need a session archive API. */}
                               <Menu.Separator />
-                              <Menu.Item onSelect={() => props.action.showDelete(id)}>
+                              <Menu.Item onSelect={() => setTitle({ pendingDelete: true, menuOpen: false })}>
                                 {language.t("common.delete")}…
                               </Menu.Item>
                             </Show>

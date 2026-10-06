@@ -29,6 +29,8 @@ export function TabNavItem(props: {
   fallbackTitle?: string
   onRename: (title: string) => Promise<void>
   onClose: () => void
+  // UPSTREAM-DIVERGENCE: Tandem adds Delete to the session tab's context menu.
+  onDelete?: () => void
   onNavigate: () => void
   active?: boolean
   suppressNavigation?: boolean
@@ -38,7 +40,7 @@ export function TabNavItem(props: {
   orientation?: "horizontal" | "vertical"
 }) {
   const language = useLanguage()
-  const [menu, setMenu] = createStore({ open: false, rename: false })
+  const [menu, setMenu] = createStore({ open: false, rename: false, delete: false })
   const [editing, setEditing] = createSignal(false)
   const [titleOverflowing, setTitleOverflowing] = createSignal(false)
   let tabRoot!: HTMLDivElement
@@ -342,6 +344,14 @@ export function TabNavItem(props: {
       <Menu.Context.Portal>
         <Menu.Context.Content
           onCloseAutoFocus={(event) => {
+            // UPSTREAM-DIVERGENCE: Like Rename, Delete opens its dialog only after the menu closes; on touch, the
+            // tap's trailing click would otherwise land on the new dialog's backdrop and dismiss it.
+            if (menu.delete) {
+              event.preventDefault()
+              setMenu("delete", false)
+              props.onDelete?.()
+              return
+            }
             if (!menu.rename) return
             event.preventDefault()
             setMenu("rename", false)
@@ -352,6 +362,12 @@ export function TabNavItem(props: {
             {language.t("common.rename")}
           </Menu.Item>
           <Menu.Item onSelect={props.onClose}>{language.t("common.closeTab")}</Menu.Item>
+          <Show when={props.onDelete}>
+            <Menu.Separator />
+            <Menu.Item disabled={!props.session} onSelect={() => setMenu("delete", true)}>
+              {language.t("common.delete")}…
+            </Menu.Item>
+          </Show>
         </Menu.Context.Content>
       </Menu.Context.Portal>
     </Menu.Context>

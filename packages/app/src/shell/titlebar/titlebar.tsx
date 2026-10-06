@@ -25,9 +25,6 @@ import type { ComposerState } from "@/composer/persistence"
 import "./titlebar.css"
 import { TitlebarRightMount } from "@/shell/titlebar/right-slot"
 import { MobileDrawer, MobileDrawerContent, MobileDrawerLabel, MobileDrawerTrigger } from "@/shell/mobile-drawer"
-import { sessionTabTitle } from "./tab-title"
-import { SessionTabAvatar } from "@/shell/layout/session-tab-avatar"
-import { SessionProgressIndicatorV2 } from "@opencode/session-ui/v2/session-progress-indicator-v2"
 import { useSettingsDialog } from "@/settings/command"
 import { rootSession } from "@/shell/routes/session"
 import { Status } from "@opencode/gui-extensions/sdk"
@@ -413,23 +410,6 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
             })
 
             const [mobileTabs, setMobileTabs] = createStore({ open: false, settings: false })
-            const currentProject = createMemo(() => {
-              const tab = currentTab()
-              const value = session()
-              if (!tab || !value) return
-              const conn = global.servers.list().find((item) => ServerConnection.key(item) === tab.server)
-              return conn ? global.ensureServerCtx(conn).projects.forSession(value) : undefined
-            })
-            const currentTitle = () => {
-              const tab = currentTab()
-              if (!tab) return language.t("home.title")
-              if (tab.type === "draft") return language.t("session.tab.session")
-              const value = session()
-              return sessionTabTitle(
-                value ? value.title : tabs.info[tabKey(tab)]?.title,
-                language.t("session.tab.session"),
-              )
-            }
             createEffect(() => {
               path()
               mobile()
@@ -468,53 +448,14 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                         openSettings()
                       }}
                     >
+                      {/* UPSTREAM-DIVERGENCE: Tandem shows every tab in a swipeable strip on mobile, so the
+                          drawer trigger shrinks to a menu button instead of a current-tab title button. */}
                       <MobileDrawerTrigger
                         data-slot="mobile-tabs-trigger"
-                        class="flex h-7 min-w-0 flex-1 items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-base focus-visible:outline-none [app-region:no-drag]"
+                        class="flex size-7 shrink-0 items-center justify-center rounded-[6px] text-v2-icon-icon-muted focus-visible:outline-none [app-region:no-drag]"
                         aria-label={language.t("titlebar.tabs")}
                       >
-                        <Show when={currentTab()} fallback={<Icon name="grid-plus" class="shrink-0" />}>
-                          {(tab) => (
-                            <span
-                              data-slot="project-avatar-slot"
-                              class="flex size-4 shrink-0 items-center justify-center"
-                            >
-                              <Show
-                                when={session()}
-                                fallback={
-                                  tab().type === "draft" ? (
-                                    <Icon name="edit" />
-                                  ) : (
-                                    <Show
-                                      when={preparing()}
-                                      fallback={
-                                        <span
-                                          class="block size-4 rounded-[3px] border border-v2-border-border-muted"
-                                          aria-hidden="true"
-                                        />
-                                      }
-                                    >
-                                      <SessionProgressIndicatorV2 />
-                                    </Show>
-                                  )
-                                }
-                              >
-                                {(value) => (
-                                  <SessionTabAvatar
-                                    project={currentProject()}
-                                    directory={value().location.directory}
-                                    sessionId={value().id}
-                                    server={tab().server}
-                                  />
-                                )}
-                              </Show>
-                            </span>
-                          )}
-                        </Show>
-                        <span data-slot="mobile-tab-title" dir="auto" class="min-w-0 flex-1 truncate text-start">
-                          {currentTitle()}
-                        </span>
-                        <span class="shrink-0 text-v2-text-text-muted">{tabsStore.length}</span>
+                        <Icon name="menu" />
                       </MobileDrawerTrigger>
                       <MobileDrawerContent>
                         <MobileDrawerLabel class="sr-only">{language.t("titlebar.tabs")}</MobileDrawerLabel>
@@ -589,6 +530,28 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                           </div>
                         </div>
                       </MobileDrawerContent>
+                      <TitlebarTabStrip
+                        tabs={tabsStore}
+                        currentTab={currentTab()}
+                        onNavigate={(tab, el) => {
+                          tabs.select(tab)
+                          el?.scrollIntoView({ behavior: "instant", block: "nearest", inline: "nearest" })
+                        }}
+                        onClose={(tab) => {
+                          const index = tabsStore.findIndex((item) => tabKey(item) === tabKey(tab))
+                          if (index !== -1) tabsStoreActions.closeTab(index)
+                        }}
+                        onReorder={(keys) => tabsStoreActions.reorder(keys)}
+                      />
+                      <IconButton
+                        type="button"
+                        variant="ghost-muted"
+                        size="large"
+                        class="shrink-0"
+                        icon={<Icon name="plus" />}
+                        onClick={openNewTab}
+                        aria-label={language.t("command.session.new")}
+                      />
                     </MobileDrawer>
                   }
                 >

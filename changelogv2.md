@@ -13,6 +13,8 @@ Baseline: OpenCode `upstream/v2` at `40679546d4` (2026-10-03, `@opencode/cli` 2.
 - **Changed — Models:** the `general-sol` helper and the webfetch reader use GPT-6.1 Sol (the reader was GPT-5.6 Sol). [Webfetch](logv2.md#browser-backed-webfetch).
 - **Fixed — New sessions in a worktree project (temporary upstream fix):** a session started in `Tandem-v2` with the workspace set to "Local" now runs in `Tandem-v2`. Because `Tandem-v2` is a git worktree of the v1 checkout, upstream silently started it in `~/code/Tandem`. See [Temporary Upstream Bug Fixes](logv2.md#temporary-upstream-bug-fixes).
 - **Changed — Native compaction for OpenAI by default:** OpenAI sessions compact with Codex's encrypted in-band compaction instead of a written summary, with no configuration needed. Setting `providers.openai.settings.compaction` to `{ "type": "summary" }` restores the summary. [Diagnostics](logv2.md#provider-requests-and-diagnostics).
+- **Changed — Android tabs:** on the tablet and phone, every tab shows in a strip at the top, as in v1, instead of one current-tab button. Tabs keep a 150px minimum so titles stay readable, the strip scrolls sideways by swipe, and each tab has its close button; a menu button opens the tabs drawer (Home, Settings, Help) and a plus button starts a new session. Long-pressing a session tab offers Delete… alongside Rename and Close tab. [Android](logv2.md#android-platform-and-persistence).
+- **Fixed — Delete from the session options menu on touch (temporary upstream fix):** tapping Delete… in a session's ⋯ menu now shows the confirmation; before, it opened and closed instantly. See [Temporary Upstream Bug Fixes](logv2.md#temporary-upstream-bug-fixes).
 
 ### 2026-10-05
 

@@ -17,6 +17,7 @@ import { createTabComposerState } from "@/composer/persistence"
 import { base64Encode } from "@opencode/util/encode"
 import { showToast } from "@/shell/notifications/toast"
 import { adjacentTabKey, mergeVisibleTabOrder } from "./tab-order"
+import { useTabSessionDelete } from "./tab-delete"
 import type { SessionInfo } from "@opencode/client/promise"
 
 function SessionTabSlot(props: {
@@ -29,6 +30,7 @@ function SessionTabSlot(props: {
   preparing: boolean
   fallbackTitle?: string
   onRename: (title: string) => Promise<void>
+  onDelete: () => void
   onNavigate: (element: HTMLDivElement) => void
   onClose: () => void
 }) {
@@ -51,7 +53,8 @@ function SessionTabSlot(props: {
       data-orientation={props.orientation}
       class="relative flex"
       classList={{
-        "w-56 min-w-7 max-w-56 flex-shrink": props.orientation === "horizontal",
+        // UPSTREAM-DIVERGENCE: Keep mobile tab titles legible; the strip scrolls instead of shrinking tabs to icons.
+        "w-56 min-w-7 max-md:min-w-[150px] max-w-56 flex-shrink": props.orientation === "horizontal",
         "w-full shrink-0": props.orientation === "vertical",
       }}
     >
@@ -65,6 +68,7 @@ function SessionTabSlot(props: {
         preparing={props.preparing}
         fallbackTitle={props.fallbackTitle}
         onRename={props.onRename}
+        onDelete={props.onDelete}
         onNavigate={() => props.onNavigate(ref)}
         onClose={props.onClose}
         active={props.active}
@@ -88,6 +92,9 @@ function SessionTabEntry(props: {
 }) {
   const tabs = useTabs()
   const language = useLanguage()
+  const global = useGlobal()
+  // UPSTREAM-DIVERGENCE: Tandem's tab context menu can delete the tab's session.
+  const deleteSession = useTabSessionDelete()
   const sdk = createMemo(() => props.serverCtx?.sdk ?? null)
   const pending = createMemo(() => tabs.pendingSession(props.tab.server, props.tab.sessionId))
   const cachedSession = createMemo(() => props.serverCtx?.data.session.get(props.tab.sessionId))
@@ -174,6 +181,12 @@ function SessionTabEntry(props: {
             : (persisted()?.title ?? (missingSession() ? language.t("session.tab.unknown") : undefined))
         }
         onRename={rename}
+        onDelete={() => {
+          const value = session()
+          const ctx = props.serverCtx
+          const conn = global.servers.list().find((item) => ServerConnection.key(item) === props.tab.server)
+          if (value && ctx && conn) deleteSession(conn, ctx, value)
+        }}
         onNavigate={props.onNavigate}
         onClose={props.onClose}
       />
@@ -210,7 +223,8 @@ function DraftTabSlot(props: {
       data-orientation={props.orientation}
       class="relative flex"
       classList={{
-        "w-56 min-w-7 max-w-56 flex-shrink": props.orientation === "horizontal",
+        // UPSTREAM-DIVERGENCE: Keep mobile tab titles legible; the strip scrolls instead of shrinking tabs to icons.
+        "w-56 min-w-7 max-md:min-w-[150px] max-w-56 flex-shrink": props.orientation === "horizontal",
         "w-full shrink-0": props.orientation === "vertical",
       }}
     >
@@ -296,8 +310,10 @@ export function TitlebarTabStrip(props: {
                   ? [new PointerActivationConstraints.Distance({ value: 8 })]
                   : [new PointerActivationConstraints.Distance({ value: 4 })],
               preventActivation: (event) =>
-                event.target instanceof Element &&
-                !!event.target.closest('[data-slot="tab-close"], [contenteditable="true"]'),
+                // UPSTREAM-DIVERGENCE: A touch swipe on the horizontal strip scrolls it; reorder from the vertical list.
+                (event.pointerType === "touch" && !vertical()) ||
+                (event.target instanceof Element &&
+                  !!event.target.closest('[data-slot="tab-close"], [contenteditable="true"]')),
             }),
           ]}
           modifiers={[
