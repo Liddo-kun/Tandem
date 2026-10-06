@@ -58,6 +58,7 @@ export function createNewSessionComposerAdapter(props: {
           : undefined
       await pending?.ready
       const sessionDirectory = await resolveSessionDirectory({
+        currentDirectory,
         projectDirectory,
         worktree,
         branch,
@@ -195,6 +196,7 @@ function createMessageHandoff(key: string, sessionID: string, event: ServerSDK["
 }
 
 async function resolveSessionDirectory(input: {
+  currentDirectory: string
   projectDirectory: string
   worktree: string
   branch?: string
@@ -202,7 +204,9 @@ async function resolveSessionDirectory(input: {
   serverSDK: ReturnType<typeof useServerSDK>
   language: ReturnType<typeof useLanguage>
 }) {
-  if (input.worktree === "main") return input.projectDirectory
+  // UPSTREAM-DIVERGENCE(temporary): "Local" keeps the selected folder. Upstream substituted the repo's main
+  // checkout, so a git worktree opened as its own project silently started sessions in the main checkout.
+  if (input.worktree === "main") return input.currentDirectory
   if (input.worktree !== "create") return input.worktree
 
   return createWorktree({
