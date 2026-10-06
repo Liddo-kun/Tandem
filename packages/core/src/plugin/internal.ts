@@ -103,12 +103,12 @@ import { VcsGitPlugin } from "./vcs/git.js"
 import { VerbosityPlugin } from "./verbosity.js"
 import { WarmingPlugin } from "./warming.js"
 import { WellKnownPlugin } from "../wellknown/plugin.js"
-// UPSTREAM-DIVERGENCE: register Tandem-owned auxiliary, browser, imagegen, Bash-search and Claude plugins.
+// UPSTREAM-DIVERGENCE: register Tandem-owned auxiliary, browser, imagegen, OpenAI compaction, Bash-search and Claude plugins.
 import { TandemAuxiliaryPlugin } from "./tandem/auxiliary.js"
 import { PromptCorrectorPlugin } from "./tandem/prompt-corrector.js"
 import { BrowserFetchPlugin } from "./tandem/browser-fetch/plugin.js"
 import { ImagegenPlugin } from "./tandem/imagegen/plugin.js"
-import { ImagegenAuth } from "./tandem/imagegen/auth.js"
+import { OpenAICompactionPlugin } from "./tandem/openai-compaction.js"
 import { BashSearch } from "./tandem/bash-search/plugin.js"
 import { ClaudePlugin } from "./tandem/claude/plugin.js"
 import { ToolGuidancePlugin } from "./tandem/tool-guidance/plugin.js" // UPSTREAM-DIVERGENCE: keep tool wording in a Tandem-owned transform.
@@ -236,6 +236,8 @@ const pre = [
   VcsHgPlugin.Plugin,
   ModelsDevPlugin,
   ...ProviderPlugins,
+  // UPSTREAM-DIVERGENCE: default OpenAI to native compaction after provider plugins choose their policies.
+  OpenAICompactionPlugin.Plugin,
   ...WebSearchPlugins,
   PatchTool.Plugin,
   // Render model prompts after the patch plugin selects the available editing tools.
@@ -255,7 +257,6 @@ const pre = [
   WebFetchTool.Plugin,
   // UPSTREAM-DIVERGENCE: install browser-backed fetch and authenticated image generation.
   BrowserFetchPlugin.Plugin,
-  ImagegenAuth.AuthPlugin,
   ImagegenPlugin.Plugin,
   WebSearchTool.Plugin,
   WriteTool.Plugin,

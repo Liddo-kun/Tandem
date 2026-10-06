@@ -199,8 +199,6 @@ them with the pristine-upstream code path first. Code: `packages/app/src/session
 - [ ] Retire Tandem v1 when Jon no longer needs it: `~/.local/bin/tandem-v1-server`,
   `/usr/local/bin/tandem-v1`, the Tandem v1 app (`ai.opencode.android.v1`) and `~/.local/share/tandem-v1/`
   (about 6 GB including the September database backup). Jon decides when.
-- [ ] v2's ChatGPT login does not offer GPT-6.1 Sol, so `general-sol` uses GPT-5.6 Sol. Recheck after the
-  next upstream sync.
 
 ## Claude narration — lowest priority
 

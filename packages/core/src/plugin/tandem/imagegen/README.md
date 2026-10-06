@@ -10,27 +10,21 @@ Credential priority is:
 
 1. The latest stored `openai` API key.
 2. `OPENAI_API_KEY`.
-3. The active `tandem-openai-images` OAuth connection using method `codex`.
+3. The active `openai` connection when it is the Codex ChatGPT login (`chatgpt-browser`
+   or `chatgpt-headless`), the same login the conversation uses. Its `accountID`
+   metadata becomes the `ChatGPT-Account-Id` header.
 
-The normal OpenAI conversation OAuth credential is not used. The separate image
-integration does not register chat models or change the active conversation login.
+The "Sign in with ChatGPT" token-sharing login (`chatgpt-token-sharing`) is not
+accepted by Codex Images, so it does not enable the tool.
 
-- `TANDEM_IMAGEGEN=0|false|off|no` disables the tool and bundled skill. The auth integration remains available. The default is enabled when credentials exist.
+- `TANDEM_IMAGEGEN=0|false|off|no` disables the tool and bundled skill. The default is enabled when credentials exist.
 - `TANDEM_IMAGEGEN_OAUTH_MODEL` is the host model for masked OAuth Responses edits. Default: `gpt-5.5`.
 - `TANDEM_IMAGEGEN_JPEG_QUALITY` controls the optional opaque display copy. It is clamped to 1–100. Default: `90`.
 
-The OAuth flow uses manual callback mode. Start the `OpenAI Images (ChatGPT)` / `codex`
-integration, authorize its URL, then submit the complete
-`http://localhost:1455/auth/callback?...` URL within five minutes. No callback server
-is started, so a connection-refused browser page is expected. Do not run another
-Codex listener on port 1455 during authorization. Attempts are in memory and must be
-completed on the same running host and Location. Invalid or expired submissions may
-require a new attempt.
-
-OAuth refresh is delegated to the integration host. Image calls serialize refresh
-and persistence per credential within one process. Separate processes sharing a
-credential database are not coordinated. JWT claims are routing hints only. Never
-log callback URLs, authorization codes, or tokens.
+Sign-in and token refresh belong to the upstream OpenAI provider plugin. Image calls
+resolve the active connection through the integration host and serialize refresh and
+persistence per credential within one process. Separate processes sharing a credential
+database are not coordinated. Never log tokens.
 
 ## Tool contract
 
@@ -42,13 +36,15 @@ transparent editable pixels.
 API-key mode also requires width and height. Each must be a positive multiple of 16
 and at most 3840; aspect ratio is limited to 3:1 and total area to
 655360–8294400 pixels. Quality is `medium`, `high`, `xhigh`, or `max`, defaulting to
-`high`. It uses `gpt-image-2.5-sunburst` through OpenCode's public image API.
+`high`. It requests `gpt-image-2.5-sunburst` directly from OpenAI's
+`/v1/images/generations` and `/v1/images/edits` endpoints.
 
 OAuth generation and unmasked edits use native Codex Images with backend-managed
 size, quality, and serving model. Masked OAuth edits use the Responses image tool.
 Masked OAuth edits with transparency are rejected. Requested values and
 backend-reported values remain separate; absent backend values are omitted from
-durable metadata.
+durable metadata. A `revised_prompt` returned by the backend is always shown, even
+when it matches the prompt sent.
 
 The full PNG is saved under `<session directory>/imagegen/` without overwriting
 existing files. An optional same-dimension JPEG display copy is made for opaque
@@ -62,7 +58,6 @@ schema; an already-advertised call fails and asks the caller to retry. A user-de
 ## Implementation
 
 - `plugin.ts` owns credential selection, dynamic tool and skill registration, permissions, refresh locking, schema selection, and path-only results.
-- `auth.ts` registers manual PKCE login and token refresh for `tandem-openai-images`.
 - `imagegen.ts` validates inputs, calls the API-key or OAuth transport, verifies PNG and alpha data, and saves artifacts.
 - `photon.ts` lazily loads the packaged Photon codec.
 - `description.md` and `imagegen-skill.md` are model-facing bundled text.
@@ -70,7 +65,7 @@ schema; an already-advertised call fails and asks the caller to retry. A user-de
 
 ## Debugging
 
-If the tool is absent, check the active credential type and `TANDEM_IMAGEGEN` value.
+If the tool is absent, check the active OpenAI credential's method and `TANDEM_IMAGEGEN`.
 API-key mode advertises required `width` and `height`; OAuth mode does not. Transport
 errors identify authorization, rejected requests, invalid output, mask mismatch, or
 missing alpha. Inspect the saved PNG and tool metadata for observed dimensions,

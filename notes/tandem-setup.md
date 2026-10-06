@@ -22,9 +22,10 @@ from `~/.profile`. The `tandem` CLI attaches to the running service. To connect 
 (`~/.profile` sets `TANDEM_CLAUDE_BASH_SEARCH=1`). The app's LAN discovery tries 4097, then 4096.
 
 `opencode.jsonc` registers the Claude plugin, turns auto-compaction off, replaces the built-in
-`general`/`explore` helpers with model-pinned `general-sol` (GPT-5.6 Sol; v2's ChatGPT login lacks
-GPT-6.1 Sol) and `general-astra` (GPT-6 Astra), both denying todowrite and nested subagents, and denies
-the `firecrawl-crawl`, `firecrawl-map`, `router-admin` and `linux-cdp` skills.
+`general`/`explore` helpers with model-pinned `general-sol` (GPT-6.1 Sol) and `general-astra` (GPT-6
+Astra), both denying todowrite and nested subagents, sets OpenAI's native compaction (also Tandem's
+built-in default), and denies the `firecrawl-crawl`, `firecrawl-map`, `router-admin` and `linux-cdp`
+skills.
 
 Updates are manual: `tandem upgrade` points to <https://github.com/Liddo-kun/Tandem/releases>.
 
@@ -66,8 +67,7 @@ development server run `bun script/tandem-v2.ts cli auth login ... --server http
 
 | Login | Arguments | Notes |
 | --- | --- | --- |
-| ChatGPT conversations | `openai --method chatgpt-token-sharing` | Does not authorize image generation. |
-| OpenAI Images | `tandem-openai-images --method codex` | Open the URL, then paste the **full** `http://localhost:1455/auth/callback?...` URL within five minutes. "Connection refused" there is expected; don't run another Codex login on port 1455 meanwhile. |
+| OpenAI (ChatGPT Pro/Plus) | `openai --method chatgpt-browser` | The Codex login, as in v1: conversations (WebSocket, every GPT from 5.5 up) and image generation. Its browser callback listens on `localhost:1455`. Don't use `chatgpt-token-sharing` ("Sign in with ChatGPT"): it offers fewer models, plain HTTP and summary compaction only, and no images. |
 | Claude | `anthropic --method claude-pro-max` | Needs the plugin below. Paste the full callback URL, `code#state` or `code=...&state=...` within ten minutes; a bare code is rejected. |
 
 The Claude plugin is registered in the global config (daily `~/.config/tandem/opencode.jsonc`,

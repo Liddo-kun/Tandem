@@ -4,7 +4,14 @@ Dated user-visible changes and published releases of Tandem v2, and the source f
 
 ## Unreleased
 
-Baseline: OpenCode `upstream/v2` at `40679546d4` (2026-10-03, `@opencode/cli` 2.0.22). Version `2.0.22-tandem-v2.1`, installed as the daily Tandem on Jon's tablet on 2026-10-06 (`2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
+Baseline: OpenCode `upstream/v2` at `40679546d4` (2026-10-03, `@opencode/cli` 2.0.22). Version `2.0.22-tandem-v2.3`, installed as the daily Tandem on Jon's tablet on 2026-10-06 (`2.0.22-tandem-v2.1` and `v2.2` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
+
+### 2026-10-06
+
+- **Changed — OpenAI login:** OpenAI is signed in with the Codex login, "ChatGPT Pro/Plus (browser)" (`chatgpt-browser`), as in v1, instead of "Sign in with ChatGPT" token sharing. This restores every GPT from 5.5 up (including GPT-6 Sol and GPT-6.1 Sol), WebSocket transport and native compaction. Upstream code; only the login changed. [Setup](notes/tandem-setup.md#logins).
+- **Changed — Image generation uses the main OpenAI login:** the separate "OpenAI Images (ChatGPT)" login is gone; with no API key, `imagegen` uses the conversation's Codex login. API-key mode calls OpenAI's image endpoints directly again, so it reports the request ID and backend model as in v1. A revised prompt is shown whenever the backend returns one, even when unchanged; ordinary ChatGPT generations and edits get none, because Codex's direct image service never returns one. [Imagegen](logv2.md#image-generation-imagegen).
+- **Changed — Models:** the `general-sol` helper and the webfetch reader use GPT-6.1 Sol (the reader was GPT-5.6 Sol). [Webfetch](logv2.md#browser-backed-webfetch).
+- **Changed — Native compaction for OpenAI by default:** OpenAI sessions compact with Codex's encrypted in-band compaction instead of a written summary, with no configuration needed. Setting `providers.openai.settings.compaction` to `{ "type": "summary" }` restores the summary. [Diagnostics](logv2.md#provider-requests-and-diagnostics).
 
 ### 2026-10-05
 

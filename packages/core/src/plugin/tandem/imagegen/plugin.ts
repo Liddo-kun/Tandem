@@ -12,7 +12,6 @@ import { Location } from "../../../location.js"
 import { FileAccess } from "../../../file-access.js"
 import { Permission } from "../../../permission.js"
 import { ImageGen } from "./imagegen.js"
-import { ImagegenAuth } from "./auth.js"
 import { KeyedMutex } from "../../../effect/keyed-mutex.js"
 
 const Common = {
@@ -38,8 +37,14 @@ const ApiInput = Schema.Struct({
   }),
 })
 const integrationID = Integration.ID.make("openai")
+// The Codex ChatGPT logins registered by the OpenAI provider plugin. Token sharing is not accepted by Codex Images.
+const codexMethods = new Set(["chatgpt-browser", "chatgpt-headless"])
 // Shared across Location plugin instances. The host rereads and persists inside this lock.
 const resolution = KeyedMutex.makeUnsafe<string>()
+
+function codex(value: Credential.Value | undefined): value is Credential.OAuth {
+  return value?.type === "oauth" && codexMethods.has(value.methodID) && !!value.access
+}
 
 function failure(error: unknown) {
   return new Tool.Error({ message: error instanceof Error ? error.message : "Image generation failed", error })
@@ -56,7 +61,7 @@ export const Plugin = define({
     const permission = yield* Permission.Service
     const lock = Semaphore.makeUnsafe(1)
 
-      // Read current v2 credentials without refreshing during tool/skill discovery.
+    // Read current v2 credentials without refreshing during tool/skill discovery.
     const resolve = Effect.fn("ImagegenPlugin.resolve")(function* () {
       if (ImageGen.disabledByFlag()) return undefined
       const stored = (yield* credentials.list(integrationID)).findLast(
@@ -64,10 +69,10 @@ export const Plugin = define({
       )
       if (stored?.value.type === "key") return { mode: "api" as const, key: stored.value.key }
       if (process.env.OPENAI_API_KEY) return { mode: "api" as const, key: process.env.OPENAI_API_KEY }
-      const connection = yield* ctx.integration.connection.active(ImagegenAuth.integrationID)
+      const connection = yield* ctx.integration.connection.active(integrationID)
       if (connection?.type !== "credential") return undefined
       const value = (yield* credentials.get(Credential.ID.make(connection.id)))?.value
-      if (!ImagegenAuth.compatible(value)) return undefined
+      if (!codex(value)) return undefined
       return { mode: "oauth" as const, value, connection }
     })
     let mode = (yield* resolve())?.mode
@@ -88,7 +93,8 @@ export const Plugin = define({
           const live = yield* resolve()
           if (!live)
             return yield* new Tool.Error({
-              message: "Image generation is disabled or no image credential is available. Connect OpenAI Images (ChatGPT) or an OpenAI API key.",
+              message:
+                "Image generation is disabled or no image credential is available. Sign in to OpenAI with ChatGPT Pro/Plus or add an OpenAI API key.",
             })
           if (live.mode !== advertised) {
             yield* reload()
@@ -106,13 +112,14 @@ export const Plugin = define({
               resolution.withLock(live.connection.id),
               Effect.mapError(failure),
             )
-            if (!ImagegenAuth.compatible(refreshed))
-              return yield* new Tool.Error({ message: "OpenAI Images credential changed or was removed. Reconnect OpenAI Images (ChatGPT)." })
+            if (!codex(refreshed))
+              return yield* new Tool.Error({
+                message: "The OpenAI ChatGPT login changed or was removed. Sign in to OpenAI with ChatGPT Pro/Plus again.",
+              })
             return {
               mode: "oauth" as const,
               access: refreshed.access,
-              clientID: ImagegenAuth.clientID,
-              accountId: typeof refreshed.metadata?.accountId === "string" ? refreshed.metadata.accountId : undefined,
+              accountID: typeof refreshed.metadata?.accountID === "string" ? refreshed.metadata.accountID : undefined,
             }
           })
           const paths = yield* Effect.forEach(input.image_paths ?? [], (file) => access.authorizeRead(file, context))
@@ -142,10 +149,7 @@ export const Plugin = define({
             catch: failure,
           })
           const size = ImageGen.pngDimensions(image.png) ?? null
-          const revisedPrompt =
-            image.revisedPrompt?.trim() && image.revisedPrompt.trim() !== request.prompt.trim()
-              ? image.revisedPrompt
-              : null
+          const revisedPrompt = image.revisedPrompt?.trim() ? image.revisedPrompt : null
           const metadata = {
             ...saved,
             size,
@@ -180,7 +184,7 @@ export const Plugin = define({
               creds.mode === "api"
                 ? `Requested: ${request.width}x${request.height}, quality ${request.quality}, model ${ImageGen.IMAGE_MODEL}.`
                 : "OAuth model, size and quality are backend-managed; request fields do not verify the serving model.",
-              revisedPrompt ? `Image prompt used (revised by the model): ${JSON.stringify(revisedPrompt)}` : "",
+              revisedPrompt ? `Revised prompt: ${JSON.stringify(revisedPrompt)}` : "",
             ]
               .filter(Boolean)
               .join("\n"),
@@ -238,7 +242,7 @@ export const Plugin = define({
       .subscribe(Credential.Event.Updated)
       .pipe(Stream.runForEach(reload), Effect.forkScoped({ startImmediately: true }))
     yield* bus.subscribe(Credential.Event.Switched).pipe(
-      Stream.filter((event) => event.data.integrationID === integrationID || event.data.integrationID === ImagegenAuth.integrationID),
+      Stream.filter((event) => event.data.integrationID === integrationID),
       Stream.runForEach(reload),
       Effect.forkScoped({ startImmediately: true }),
     )

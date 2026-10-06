@@ -26,6 +26,7 @@ export const IMAGE_MODEL = "gpt-image-2.5-sunburst"
 // image model is backend-managed; this request field does not verify its identity.
 const OAUTH_IMAGE_MODEL = "gpt-image-2"
 const OAUTH_HOST_MODEL = process.env.TANDEM_IMAGEGEN_OAUTH_MODEL || "gpt-5.5"
+const API_BASE = "https://api.openai.com/v1"
 const OAUTH_IMAGES_BASE = "https://chatgpt.com/backend-api/codex/images"
 const OAUTH_RESPONSES_URL = "https://chatgpt.com/backend-api/codex/responses"
 
@@ -81,17 +82,11 @@ interface ApiCreds {
 interface OauthCreds {
   mode: "oauth"
   access: string
-  accountId?: string
-  /** Explicit legacy transport adapter; never inferred from token-sharing credentials. */
-  clientID: string
+  accountID?: string
 }
 export type Creds = ApiCreds | OauthCreds
 
 export async function run(args: Args, creds: Creds, signal: AbortSignal): Promise<GeneratedImage> {
-  if (creds.mode === "oauth" && creds.clientID !== "app_EMoamEEZ73f0CkXaXp7hrann")
-    throw new Error(
-      "Codex Images requires the separate OpenAI Images (ChatGPT) login or an OpenAI API key; conversation token-sharing credentials are not compatible.",
-    )
   validate(args)
   await validateMask(args)
   if (creds.mode === "oauth" && args.mask_path && args.transparent)
@@ -101,7 +96,7 @@ export async function run(args: Args, creds: Creds, signal: AbortSignal): Promis
   let image: GeneratedImage
   if (creds.mode === "api") {
     validateApiArgs(args)
-    image = await generateApiKey(args, creds, signal)
+    image = await (args.image_paths?.length ? editApiKey(args, creds, signal) : generateApiKey(args, creds, signal))
   } else {
     image = await (args.mask_path ? editOAuth(args, creds, signal) : nativeOAuth(args, creds, signal))
   }
@@ -150,35 +145,53 @@ function requestId(res: Response): string | undefined {
   )
 }
 
-// ---- API-key transport: OpenCode's public image API ----
+// ---- API-key transport: REST /v1/images/{generations,edits} ----
 
 async function generateApiKey(args: ApiArgs, creds: ApiCreds, signal: AbortSignal): Promise<GeneratedImage> {
-  const { ai } = await import("@opencode/ai/promise")
-  const { OpenAI } = await import("@opencode/ai/providers")
-  const images = await Promise.all((args.image_paths ?? []).map((file) => ai.file(file, { signal })))
-  const response = await ai.image.generate(
-    {
-      model: OpenAI.configure({ apiKey: creds.key }).image(IMAGE_MODEL),
-      prompt: args.prompt,
-      n: 1,
-      size: `${args.width}x${args.height}`,
-      format: "png",
-      images: images.length ? images : undefined,
-      mask: args.mask_path ? await ai.file(args.mask_path, { signal }) : undefined,
-      providerOptions: {
-        quality: args.quality,
-        background: args.transparent ? "transparent" : "opaque",
-        moderation: "low",
-      },
-    },
-    { signal },
-  )
-  if (!response.image) throw new Error("OpenAI returned no image data")
-  return {
-    png: Buffer.from(await ai.bytes(response.image, { signal })),
-    transport: "images",
-    reported: reportedSettings(response.providerMetadata?.openai ?? {}),
+  const body = {
+    model: IMAGE_MODEL,
+    prompt: args.prompt,
+    size: `${args.width}x${args.height}`,
+    quality: args.quality,
+    background: args.transparent ? "transparent" : "opaque",
+    output_format: "png",
+    moderation: "low",
   }
+  const res = await fetch(`${API_BASE}/images/generations`, {
+    method: "POST",
+    signal,
+    headers: { Authorization: `Bearer ${creds.key}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw await httpError(res, "image generation")
+  return { ...decodeImageResponse(await res.json()), transport: "images", requestId: requestId(res) }
+}
+
+async function editApiKey(args: ApiArgs, creds: ApiCreds, signal: AbortSignal): Promise<GeneratedImage> {
+  const form = new FormData()
+  form.append("model", IMAGE_MODEL)
+  form.append("prompt", args.prompt)
+  form.append("size", `${args.width}x${args.height}`)
+  form.append("quality", args.quality)
+  form.append("background", args.transparent ? "transparent" : "opaque")
+  form.append("output_format", "png")
+  form.append("moderation", "low")
+  for (const file of args.image_paths ?? [])
+    form.append("image[]", new Blob([await readBlobPart(file)], { type: mimeFromPath(file) }), path.basename(file))
+  if (args.mask_path)
+    form.append(
+      "mask",
+      new Blob([await readBlobPart(args.mask_path)], { type: "image/png" }),
+      path.basename(args.mask_path),
+    )
+  const res = await fetch(`${API_BASE}/images/edits`, {
+    method: "POST",
+    signal,
+    headers: { Authorization: `Bearer ${creds.key}` },
+    body: form,
+  })
+  if (!res.ok) throw await httpError(res, "image edit")
+  return { ...decodeImageResponse(await res.json()), transport: "images", requestId: requestId(res) }
 }
 
 const ImageResponse = Schema.Struct({
@@ -234,7 +247,7 @@ async function nativeOAuth(args: Args, creds: OauthCreds, signal: AbortSignal): 
     Accept: "application/json",
     originator: "opencode",
   }
-  if (creds.accountId) headers["ChatGPT-Account-Id"] = creds.accountId
+  if (creds.accountID) headers["ChatGPT-Account-Id"] = creds.accountID
   const operation = images.length ? "edits" : "generations"
   const res = await fetch(`${OAUTH_IMAGES_BASE}/${operation}`, {
     method: "POST",
@@ -304,7 +317,7 @@ async function oauthOneImage(
     Accept: "text/event-stream",
     originator: "opencode",
   }
-  if (creds.accountId) headers["ChatGPT-Account-Id"] = creds.accountId
+  if (creds.accountID) headers["ChatGPT-Account-Id"] = creds.accountID
   const res = await fetch(OAUTH_RESPONSES_URL, { method: "POST", signal, headers, body: JSON.stringify(body) })
   if (!res.ok || !res.body) throw await httpError(res, "image generation")
   return { ...(await readImageFromSSE(res.body)), transport: "responses", requestId: requestId(res) }
@@ -491,6 +504,15 @@ async function readFile(file: string): Promise<Buffer> {
   } catch {
     throw new Error(`could not read image file: ${file}`)
   }
+}
+
+// Copy into a fresh ArrayBuffer-backed view so it satisfies BlobPart (a raw
+// Buffer is typed over ArrayBufferLike, which BlobPart does not accept).
+async function readBlobPart(file: string): Promise<Uint8Array<ArrayBuffer>> {
+  const buf = await readFile(file)
+  const view = new Uint8Array(buf.byteLength)
+  view.set(buf)
+  return view
 }
 
 async function exists(file: string): Promise<boolean> {

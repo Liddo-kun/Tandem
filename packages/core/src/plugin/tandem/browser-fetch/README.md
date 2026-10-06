@@ -11,7 +11,7 @@ with browser cookies; PDFs use `pdftotext -layout` when available.
 - Desktop CDP defaults to `127.0.0.1:9223`. `TANDEM_BROWSER_FETCH_ENDPOINT=host:port` selects an existing endpoint and disables automatic Android fallback.
 - `TANDEM_BROWSER_FETCH_LAUNCHER` defaults to `~/.local/bin/chromium-x`.
 - Android CDP defaults to `127.0.0.1:9222`. `TANDEM_BROWSER_FETCH_ANDROID_ENDPOINT=host:port` selects an existing endpoint.
-- `agents["web-fetcher"]` may override the model, system prompt, and request settings. Its default model is `openai/gpt-5.6-sol#medium`, with medium text verbosity.
+- `agents["web-fetcher"]` may override the model, system prompt, and request settings. Its default model is `openai/gpt-6.1-sol#medium`, with medium text verbosity.
 - PDF text extraction needs `pdftotext` from `poppler-utils`. Without it, the downloaded path is still returned.
 
 ## Implementation
