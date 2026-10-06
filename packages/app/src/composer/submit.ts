@@ -70,6 +70,16 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
       submitting.add(input.adapter.state)
 
       try {
+        // Client commands such as /btw answer with the session's model, so apply the composer's selection first,
+        // following the same steer rule as server commands.
+        const selection = currentSelection(input)
+
+        if (input.adapter.kind === "active-session" && selection && (input.delivery?.(false) ?? "steer") === "steer")
+          await applySelection(
+            input.adapter.session(),
+            selection,
+            input.adapter.controls().model.selection.trackSessionCommit,
+          )
         clearClientCommand(input, prompt)
         await clientCommand()
       } catch (error) {
@@ -278,25 +288,22 @@ function readSubmission(
 
   if (!text.trim() && !prompt.some(isAttachment) && comments === 0) return
 
-  const controls = input.adapter.controls()
-  const model = controls.model.selection.current()
-  const agent = controls.agents.current
+  const selection = currentSelection(input)
 
-  if (!model || !agent) {
+  if (!selection) {
     input.notify.missingSelection()
 
     return
   }
 
-  const variant = controls.model.selection.variant.current()
   const retry = input.adapter.state.retry.current()
 
   const retryID =
     retry &&
-    retry.agent === agent &&
-    retry.providerID === model.provider.id &&
-    retry.modelID === model.id &&
-    (retry.variant ?? "default") === (variant ?? "default")
+    retry.agent === selection.agent &&
+    retry.providerID === selection.model.providerID &&
+    retry.modelID === selection.model.modelID &&
+    (retry.variant ?? "default") === (selection.variant ?? "default")
       ? retry.id
       : undefined
 
@@ -307,15 +314,25 @@ function readSubmission(
     context,
     text,
     images,
-    selection: {
-      agent,
-      model: { modelID: model.id, providerID: model.provider.id },
-      variant,
-    },
+    selection,
     delivery: input.delivery?.(alternate) ?? "steer",
     // UPSTREAM-DIVERGENCE: Restored/retried prompts retain their original Corrector setting.
     correctorDisabled: input.adapter.state.correctorDisabled.current() ??
       (retryID ? retry?.correctorDisabled : undefined) ?? !(input.correctorEnabled?.() ?? true),
+  }
+}
+
+function currentSelection(input: ComposerSubmitInput): ComposerSelection | undefined {
+  const controls = input.adapter.controls()
+  const model = controls.model.selection.current()
+  const agent = controls.agents.current
+
+  if (!model || !agent) return
+
+  return {
+    agent,
+    model: { modelID: model.id, providerID: model.provider.id },
+    variant: controls.model.selection.variant.current(),
   }
 }
 

@@ -56,6 +56,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
   const location = useLocation()
   const mobile = createMediaQuery("(max-width: 767px)")
   const bottom = createMemo(() => mobile() && settings.general.mobileTitlebarPosition() === "bottom")
+  const mobileTop = createMemo(() => platform.platform === "web" && mobile() && !bottom())
 
   const mac = createMemo(() => platform.platform === "desktop" && platform.os === "macos")
   const windows = createMemo(() => platform.platform === "desktop" && platform.os === "windows")
@@ -148,10 +149,18 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
           platform.platform !== "desktop"
             ? bottom()
               ? "calc(28px + max(8px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))))"
-              : "calc(28px + max(8px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px))))"
+              : mobileTop()
+                ? "calc(28px + 16px + env(safe-area-inset-top, 0px))"
+                : "calc(28px + max(8px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px))))"
             : undefined,
+        // iOS blurs page content just below the status bar in Home Screen web apps, so keep the phone titlebar row
+        // 16px clear of the safe area, as ChatGPT's phone header does.
         // UPSTREAM-DIVERGENCE: Respect Android wrapper-owned top safe-area overrides.
-        "padding-top": bottom() ? "0px" : "var(--safe-area-inset-top, env(safe-area-inset-top, 0px))",
+        "padding-top": bottom()
+          ? "0px"
+          : mobileTop()
+            ? "calc(16px + env(safe-area-inset-top, 0px))"
+            : "var(--safe-area-inset-top, env(safe-area-inset-top, 0px))",
         "padding-bottom": bottom() ? "var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))" : "0px",
         "min-height": minHeight(),
         // Keep native macOS traffic lights clear even when the desktop window is narrow.
@@ -488,7 +497,8 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                 class="h-full flex-1 overflow-hidden flex flex-row items-center gap-1.5 px-2 md:pe-3"
                 classList={{
                   // UPSTREAM-DIVERGENCE: Use wrapper-owned insets for titlebar content clearance.
-                  "pt-[max(0px,calc(8px-var(--safe-area-inset-top,env(safe-area-inset-top,0px))))]": !bottom() && !windows(),
+                  "pt-[max(0px,calc(8px-var(--safe-area-inset-top,env(safe-area-inset-top,0px))))]":
+                    !bottom() && !windows() && !mobileTop(),
                   "pb-[max(0px,calc(8px-var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))))]": bottom(),
                   "pl-4": macTrafficLights(),
                   // Center the 20px app icon over the sidebar's 16px icon column.
