@@ -79,11 +79,13 @@ export function MobileViewTabs(props: {
 
   const drawer = createMemo(() => (store.drawer ? props.views.find(store.drawer) : undefined))
 
-  const tab = createMemo(() =>
-    props.current === "session" || props.views.tabs().some((entry) => entry.key === props.current)
-      ? props.current
-      : "more",
+  // UPSTREAM-DIVERGENCE: Every view is its own tab instead of hiding menu and drawer views behind More.
+  // Menu views replace the conversation like tabs; drawer views open their sheet directly.
+  const views = createMemo(() =>
+    [...props.views.tabs(), ...props.views.menu()].toSorted((a, b) => a.mobile.order - b.mobile.order),
   )
+
+  const tab = () => props.current
 
   let trigger: HTMLButtonElement | undefined
 
@@ -94,42 +96,47 @@ export function MobileViewTabs(props: {
       data-slot="session-mobile-view-navigation"
     >
       <Tabs value={tab()} variant="line" class="!h-auto min-w-0 flex-1" data-slot="session-mobile-view-tabs">
-        <Tabs.List aria-label={language.t("session.view.select")} class="!h-9 !gap-0 !px-0 before:!hidden">
+        {/* UPSTREAM-DIVERGENCE: Tabs keep their label width and the bar scrolls sideways when they do not fit. */}
+        <Tabs.List
+          aria-label={language.t("session.view.select")}
+          class="!h-9 !gap-0 !px-0 overflow-x-auto no-scrollbar before:!hidden"
+        >
           <Tabs.Trigger
             value="session"
-            class="min-w-0 flex-1"
+            class="min-w-max flex-1"
             classes={{ button: "w-full justify-center" }}
             onClick={() => props.onSelect("session")}
           >
             {language.t("session.tab.session")}
           </Tabs.Trigger>
-          <For each={props.views.tabs()}>
-            {(entry) => (
-              <Tabs.Trigger
-                value={entry.key}
-                class="min-w-0 flex-1"
-                classes={{ button: "w-full justify-center" }}
-                onClick={() => props.onSelect(entry.key)}
-              >
-                {entry.mobile.title}
-              </Tabs.Trigger>
-            )}
+          <For each={views()}>
+            {(entry) =>
+              entry.mobile.kind === "drawer" ? (
+                <Tabs.Trigger
+                  value={entry.key}
+                  ref={(element: HTMLButtonElement) => {
+                    trigger = element
+                  }}
+                  class="min-w-max flex-1"
+                  classes={{ button: "w-full justify-center" }}
+                  aria-haspopup="dialog"
+                  aria-expanded={store.open && store.drawer === entry.key}
+                  onClick={() => setStore({ open: true, loaded: true, drawer: entry.key })}
+                >
+                  {entry.mobile.title}
+                </Tabs.Trigger>
+              ) : (
+                <Tabs.Trigger
+                  value={entry.key}
+                  class="min-w-max flex-1"
+                  classes={{ button: "w-full justify-center" }}
+                  onClick={() => props.onSelect(entry.key)}
+                >
+                  {entry.mobile.title}
+                </Tabs.Trigger>
+              )
+            }
           </For>
-          <Show when={props.views.menu().length}>
-            <Tabs.Trigger
-              value="more"
-              ref={(element: HTMLButtonElement) => {
-                trigger = element
-              }}
-              class="min-w-0 flex-1"
-              classes={{ button: "w-full justify-center" }}
-              aria-haspopup="dialog"
-              aria-expanded={store.open}
-              onClick={() => setStore({ open: true, loaded: true, drawer: undefined })}
-            >
-              {language.t("session.tab.more")}
-            </Tabs.Trigger>
-          </Show>
         </Tabs.List>
       </Tabs>
       <Show when={store.loaded}>

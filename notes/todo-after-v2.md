@@ -207,17 +207,6 @@ Old sources: `packages/app/src/pages/session.tsx` (`mobileTabs`, `mobileActionsM
 V2 candidate: the app's session header/navigation and GUI-extension mobile views. Do not impose the
 old fixed two-tab split on v2 without checking its current navigation.
 
-### All mobile session views as tabs
-
-- [ ] Show every mobile session view as its own tab in the bar under the session tabs instead of behind
-  upstream's "More…" drawer: Session, Changes, Files, Terminal, Usage and Session details (Jon,
-  2026-10-06; deferred until after the upstream sync).
-
-Since `80c4a6b7c8` the bar shows only Session and Changes plus "More…"; Files, Terminal (`kind: "menu"`
-views) and Usage open from the drawer, and Session details (`kind: "drawer"`) opens as a sheet inside it.
-Candidate: `packages/app/src/runtime/extension/mobile.tsx` (`MobileViewTabs`) renders the menu entries
-as tab triggers, with drawer-kind entries opening their sheet. The bar can scroll sideways on phones.
-
 ### Shorter composer model labels
 
 - [ ] If Jon still prefers the shorter label, remove a leading `Claude ` from the composer model trigger.
