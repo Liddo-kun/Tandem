@@ -7,7 +7,7 @@ import { Button } from "@opencode/ui/button"
 import { TimelineDetailControl } from "@/settings/timeline-detail"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
-import { ExtensionSettingSections } from "@/runtime/extension/setting-view"
+import { ExtensionSettingsSections } from "@/runtime/extension/settings-page-view"
 import {
   type FollowUpBehavior,
   type TerminalPlacement,
@@ -21,9 +21,11 @@ import { createShellOptions, type ShellSettingsController } from "./controllers"
 import "@/settings/settings.css"
 
 const tabLayoutOptions: ("horizontal" | "vertical")[] = ["horizontal", "vertical"]
+
 const AutoApprovePermissionsSetting: Component = () => {
   const language = useLanguage()
   const settings = useSettings()
+
   return (
     <SettingsRow
       title={language.t("command.permissions.autoaccept.enable")}
@@ -42,6 +44,7 @@ const AutoApprovePermissionsSetting: Component = () => {
 const WorkspaceDestinationSetting: Component = () => {
   const language = useLanguage()
   const settings = useSettings()
+
   const options = createMemo((): { value: WorkspaceDefaultDestination; label: string }[] => [
     { value: "last-used", label: language.t("settings.workspaces.default.lastUsed") },
     { value: "local", label: language.t("settings.workspaces.default.local") },
@@ -69,12 +72,14 @@ const WorkspaceDestinationSetting: Component = () => {
 
 export const ShellSetting: Component<{ controller: ShellSettingsController }> = (props) => {
   const language = useLanguage()
+
   const options = createMemo(() =>
     createShellOptions({
       shells: props.controller.shells(),
       current: props.controller.current(),
     }),
   )
+
   return (
     <SettingsRow
       title={language.t("settings.general.row.shell.title")}
@@ -89,7 +94,9 @@ export const ShellSetting: Component<{ controller: ShellSettingsController }> = 
         value={(option) => option.id}
         label={(option) => {
           if (option.id === "auto") return language.t("settings.general.row.shell.autoDefault")
+
           if (!option.terminalOnly) return option.name
+
           return `${option.name} (${language.t("settings.general.row.shell.terminalOnly")})`
         }}
         onSelect={(option) => option && props.controller.select(option.value)}
@@ -101,6 +108,7 @@ export const ShellSetting: Component<{ controller: ShellSettingsController }> = 
 const TerminalPlacementSetting: Component = () => {
   const language = useLanguage()
   const settings = useSettings()
+
   const options = createMemo((): { value: TerminalPlacement; label: string }[] => [
     { value: "side", label: language.t("settings.general.row.terminalPlacement.side") },
     { value: "bottom", label: language.t("settings.general.row.terminalPlacement.bottom") },
@@ -128,6 +136,7 @@ const TerminalPlacementSetting: Component = () => {
 const FollowUpBehaviorSetting: Component = () => {
   const language = useLanguage()
   const settings = useSettings()
+
   const options = createMemo((): { value: FollowUpBehavior; label: string }[] => [
     { value: "queue", label: language.t("settings.general.row.followUpBehavior.queue") },
     { value: "steer", label: language.t("settings.general.row.followUpBehavior.steer") },
@@ -156,12 +165,14 @@ const FollowUpBehaviorSetting: Component = () => {
 
 const LanguageSetting = () => {
   const language = useLanguage()
+
   const options = createMemo(() =>
     language.locales.map((locale) => ({
       value: locale,
       label: language.label(locale),
     })),
   )
+
   return (
     <SettingsRow
       title={language.t("settings.general.row.language.title")}
@@ -184,6 +195,7 @@ const LanguageSetting = () => {
 const TabLayoutSetting = () => {
   const language = useLanguage()
   const settings = useSettings()
+
   return (
     <SettingsRow
       title={language.t("settings.appearance.row.tabs.title")}
@@ -223,6 +235,7 @@ export const SettingsGeneral: Component = () => {
   const onPinchZoomChange = (checked: boolean) => {
     setPinchZoom(checked)
     const update = platform.setPinchZoomEnabled?.(checked)
+
     if (!update) return
     void update.catch(() => setPinchZoom(!checked))
   }
@@ -302,21 +315,7 @@ export const SettingsGeneral: Component = () => {
           </SettingsRow>
         </Show>
 
-        <SettingsRow
-          title={language.t("session.review.wrapLines")}
-          description={language.t("settings.general.row.mobileDiffWrap.description")}
-        >
-          <div data-action="settings-mobile-diff-wrap">
-            <Switch
-              aria-label={language.t("session.review.wrapLines")}
-              checked={settings.general.mobileDiffWrap()}
-              onChange={settings.general.setMobileDiffWrap}
-              hideLabel
-            >
-              {language.t("session.review.wrapLines")}
-            </Switch>
-          </div>
-        </SettingsRow>
+        <ExtensionSettingsSections page="general" section="general" />
 
         <Show when={mobile()}>
           <SettingsRow
@@ -362,7 +361,7 @@ export const SettingsGeneral: Component = () => {
           </SettingsList>
         </section>
 
-        <ExtensionSettingSections page="general" />
+        <ExtensionSettingsSections page="general" />
       </div>
     </>
   )
