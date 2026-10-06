@@ -50,15 +50,6 @@ Full-history forks (`fork_turns` omitted or `"all"`) inherit the parent model an
 <multi_agent_mode>Any earlier instruction enabling proactive multi-agent delegation no longer applies. Do not spawn sub-agents unless the user or applicable AGENTS.md/skill instructions explicitly ask for sub-agents, delegation, or parallel agent work.</multi_agent_mode>
   ```
 
-## File discovery
-
-- [ ] Check v2's project picker in home/root directories and investigate only if folders are missing. If a failure is reproduced, determine the appropriate fix; the old Tandem fff-to-ripgrep fallback in `packages/core/src/filesystem/search.ts` is a reference, not an assumed requirement.
-
-## Backend reliability investigations
-
-- [ ] Check truncated model output in real sessions: determine whether tool-JSON repair can execute an unintended incomplete tool call. Inspect `packages/ai/src/protocols/utils/tool-stream.ts` and `packages/ai/src/protocols/anthropic-messages.ts` (`onMessageStop`). Treat this as unconfirmed; fix only a demonstrated problem.
-- [ ] Check whether provider/publisher failures leave tools or assistant messages pending, including non-AI errors. Inspect `packages/core/src/session/runner/step.ts`; establish the actual failure before changing settlement behavior.
-
 ## iOS
 
 Jon has no iPhone and has never tested Tandem on iOS.
@@ -86,31 +77,6 @@ Try v2's Android UI with Jon before choosing which tweaks to recreate. The detai
 Tandem v1 at `e4cff28994`, compared with its upstream baseline `2fa3363c92`; they are a reconstruction
 reference, not fixed requirements for v2's different layout. Current inventory: `log.md`,
 **Shared Chat And Tool Display**.
-
-### Compact chat spacing
-
-- [ ] Compare v2's default chat density with the old compact layout and implement the changes Jon wants.
-
-The old shared CSS reduces whitespace around messages and their copy/metadata controls:
-
-| Element | Upstream baseline | Tandem v1 |
-| --- | --- | --- |
-| User bubble padding (vertical / horizontal) | 8px / 12px | 4px / 10px |
-| User copy-row minimum height | 24px | 18px |
-| User copy-row top margin | 4px | 0 |
-| Assistant text-block top margin | 24px | 4px |
-| Assistant copy-row minimum height | 24px | 18px |
-| Assistant copy-row top margin | 4px | 0 |
-| Assistant content-stack gap | 12px | 6px |
-| Turn-list gap | 24px | 4px |
-
-The assistant copy row also constrains normal-size icon buttons to 20×20px. These shared spacing
-changes affect all clients; only the side-gutter changes below are Android-specific. Retune for v2's
-timeline rows and check readability, touch controls and streaming/scroll stability rather than copying
-old selectors blindly.
-
-Old sources: `packages/session-ui/src/components/message-part.css` and `session-turn.css`.
-V2 candidates: the corresponding CSS and `packages/session-ui/src/timeline/session-timeline-row.tsx`.
 
 ### Narrow Android side margins
 
@@ -245,8 +211,3 @@ structurally and to filter removed or duplicate mentioned files, so re-check the
 - [ ] Retire Tandem v1 when Jon no longer needs it: `~/.local/bin/tandem-v1-server`,
   `/usr/local/bin/tandem-v1`, the Tandem v1 app (`ai.opencode.android.v1`) and `~/.local/share/tandem-v1/`
   (about 6 GB including the September database backup). Jon decides when.
-
-## Claude narration — lowest priority
-
-- [ ] Check a real v2 Claude session for visible user-facing narration and intact provider signatures; v2 may already handle this.
-- [ ] If still needed, port narration detection, metadata propagation and rendering through the smallest available integration points. Candidate locations: `packages/ai/src/protocols/anthropic-messages.ts`, `packages/core/src/session/runner/publish-llm-event.ts`, and session-ui's `timeline/projection.ts` / `message/message-content.tsx`. Current behavior is documented under Anthropic Narration Rendering in `log.md`.

@@ -9,6 +9,8 @@ import {
   ToolDisplay,
 } from "../tools/tool-renderer"
 import { currentToolError, currentToolInput, currentToolMetadata, currentToolOutput } from "./current-tool-state"
+// UPSTREAM-DIVERGENCE: Tandem's Claude narration display.
+import { isNarrationText } from "../timeline/tandem-narration"
 
 export type { SessionUserActions, SessionUserAttachmentReference, SessionUserComment } from "../actions"
 
@@ -55,15 +57,25 @@ export function SessionAssistantContent(props: {
   return (
     <Switch>
       <Match when={props.content.type === "text" ? props.content : undefined}>
-        {(content) => (
-          <AssistantTextContent
-            id={props.contentID}
-            text={content().text}
-            message={props.message}
-            showCopy={props.showAssistantCopyPartID === props.contentID}
-            turnDurationMs={props.turnDurationMs}
-          />
-        )}
+        {(content) => {
+          const text = (
+            <AssistantTextContent
+              id={props.contentID}
+              text={content().text}
+              message={props.message}
+              showCopy={props.showAssistantCopyPartID === props.contentID}
+              turnDurationMs={props.turnDurationMs}
+            />
+          )
+          // UPSTREAM-DIVERGENCE: mark Claude narration shown as text so it keeps Tandem's accent bar.
+          return isNarrationText(content()) ? (
+            <div style={{ display: "contents" }} data-tandem-narration="">
+              {text}
+            </div>
+          ) : (
+            text
+          )
+        }}
       </Match>
       <Match when={props.content.type === "reasoning" ? props.content : undefined}>
         {(content) => (

@@ -1,0 +1,43 @@
+/* Tandem-owned (not in upstream): compact chat spacing. Each value sits 20% of the way from
+   the tightest tried value (v1's, with an 8px turn gap) back to upstream's, rounded to whole pixels.
+   Imported unlayered from index.css so it wins over upstream's layered component and utility styles. */
+
+/* Between turns: upstream 24px (TurnGap h-6). */
+[data-timeline-row="TurnGap"] {
+  height: 11px;
+}
+
+/* Between assistant rows: upstream 16px before text, 8px between tools. */
+[data-timeline-row="AssistantPart"][data-timeline-spacing="content"] {
+  padding-top: 8px;
+}
+
+[data-timeline-row="AssistantPart"][data-timeline-spacing="tool"] {
+  padding-top: 5px;
+}
+
+/* First reply text in a turn: upstream 24px. Later text keeps the row padding above. */
+[data-component="text-part"] {
+  margin-top: 8px;
+}
+
+[data-timeline-row="AssistantPart"][data-timeline-spacing="content"] [data-component="text-part"] {
+  margin-top: 0;
+}
+
+/* User bubble: upstream 8px / 12px. */
+[data-component="user-message"] [data-slot="user-message-text"] {
+  padding: 5px 10px;
+}
+
+/* Copy and info rows under messages: upstream 24px tall with a 4px gap. */
+[data-component="user-message"] [data-slot="user-message-copy-wrapper"],
+[data-component="text-part"] [data-slot="text-part-copy-wrapper"] {
+  min-height: 19px;
+  margin-top: 1px;
+}
+
+[data-component="text-part"] [data-slot="text-part-copy-wrapper"] [data-component="icon-button-v2"][data-size="normal"] {
+  width: 21px;
+  height: 21px;
+}

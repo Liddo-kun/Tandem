@@ -287,6 +287,12 @@
   margin-top: 0;
 }
 
+/* UPSTREAM-DIVERGENCE: an accent bar marks Claude narration shown as text (see timeline/tandem-narration.ts). */
+[data-tandem-narration] > [data-component="text-part"] {
+  padding-inline-start: 10px;
+  border-inline-start: 2px solid var(--v2-text-text-accent);
+}
+
 [data-component="reasoning-part"] {
   width: 100%;
   color: var(--v2-text-text-muted);

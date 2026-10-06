@@ -16,6 +16,8 @@ import {
 } from "../message/current-tool-state"
 import { TimelineRow, type PartGroup, type PartRef, type TimelineRowMap } from "./timeline-row"
 import { timelineCategory, timelineNoticeRequired, type TimelineDetail } from "./detail"
+// UPSTREAM-DIVERGENCE: Tandem's Claude narration display.
+import { narrationAsText } from "./tandem-narration"
 
 export { TimelineRow, type PartGroup, type PartRef, type TimelineRowMap }
 
@@ -125,6 +127,10 @@ export function createReactiveTimelineProjection(input: {
   pendingInputIDs?: Accessor<ReadonlySet<string>>
   queuedCompactionIDs?: Accessor<readonly string[]>
 }) {
+  // UPSTREAM-DIVERGENCE: show Claude narration (signed as thinking) as assistant text in every timeline.
+  const source = input.sessionMessages
+  input = { ...input, sessionMessages: createMemo(() => narrationAsText(source())) }
+
   const sessionMessageByID = createMemo(
     () => new Map(input.sessionMessages().map((message) => [message.id, message] as const)),
   )
