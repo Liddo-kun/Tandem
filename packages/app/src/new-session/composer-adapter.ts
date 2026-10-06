@@ -52,11 +52,14 @@ export function createNewSessionComposerAdapter(props: {
       const branch = props.branch()
       const mcp = props.mcp.capture()
       const id = Session.ID.create()
+
       const pending =
         worktree === "create"
           ? tabs.prepareSession(draftID, { server: server.key, sessionId: id }, { message, selection })
           : undefined
+
       await pending?.ready
+
       const sessionDirectory = await resolveSessionDirectory({
         currentDirectory,
         projectDirectory,
@@ -66,8 +69,10 @@ export function createNewSessionComposerAdapter(props: {
         serverSDK,
         language,
       })
+
       if (!sessionDirectory) {
         await pending?.rollback()
+
         return
       }
 
@@ -77,9 +82,12 @@ export function createNewSessionComposerAdapter(props: {
         await data.project.sync().catch(() => undefined)
         await pending.rollback(sessionDirectory)
       }
+
       if (!(await props.mcp.prepare(sessionDirectory, mcp))) {
         await rollback()
+
         if (pending) props.mcp.remember(sessionDirectory, mcp)
+
         return
       }
 
@@ -93,6 +101,7 @@ export function createNewSessionComposerAdapter(props: {
         },
         location: { directory: sessionDirectory },
       })
+
       const creation = created.request.then(
         () => ({ ok: true as const }),
         (error) => {
@@ -100,22 +109,30 @@ export function createNewSessionComposerAdapter(props: {
             title: language.t("prompt.toast.sessionCreateFailed.title"),
             description: errorMessage(language, error),
           })
+
           return { ok: false as const, error }
         },
       )
+
       if (pending && !(await creation).ok) {
         await rollback()
+
         return
       }
+
       const afterCreation = async <T>(run: () => Promise<T>) => {
         const result = await creation
+
         if (!result.ok) throw result.error
+
         return run()
       }
+
       const sessionKey = SessionStateKey.from(
         serverSDK.scope,
         SessionRouteKey.fromRoute(base64Encode(sessionDirectory), created.id),
       )
+
       const cleanupReady = startTransition(() => {
         if (!pending) tabs.updateDraft(draftID, { worktree: undefined, branch: undefined })
         local.session.promote(sessionDirectory, created.id, {
@@ -124,6 +141,7 @@ export function createNewSessionComposerAdapter(props: {
           variant: selection.variant ?? null,
           choices: model.remembered(),
         })
+
         if (!pending) tabs.promoteDraft(draftID, { server: server.key, sessionId: created.id })
         submission.retarget(
           prompt.capture(
@@ -176,6 +194,7 @@ export function createNewSessionComposerAdapter(props: {
 
 function createMessageHandoff(key: string, sessionID: string, event: ServerSDK["event"]) {
   let unsubscribe: VoidFunction | undefined
+
   return {
     set(message: SessionMessageUser) {
       unsubscribe?.()
@@ -227,9 +246,12 @@ function errorMessage(language: ReturnType<typeof useLanguage>, error: unknown) 
   if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
     return error.message
   }
+
   if (error && typeof error === "object" && "data" in error) {
     const data = (error as { data?: { message?: string } }).data
+
     if (data?.message) return data.message
   }
+
   return language.t("common.requestFailed")
 }

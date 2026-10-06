@@ -36,6 +36,7 @@ export interface TextFieldProps
 
 export function TextField(props: TextFieldProps) {
   const i18n = useI18n()
+
   const [local, others] = splitProps(props, [
     "name",
     "defaultValue",
@@ -56,17 +57,22 @@ export function TextField(props: TextFieldProps) {
     "copyKind",
     "multiline",
   ])
+
   const [copied, setCopied] = createSignal(false)
 
   const label = () => {
     if (copied()) return i18n.t("ui.textField.copied")
+
     if (local.copyKind === "link") return i18n.t("ui.textField.copyLink")
+
     return i18n.t("ui.textField.copyToClipboard")
   }
 
   const icon = () => {
     if (copied()) return "check"
+
     if (local.copyKind === "link") return "link"
+
     return "copy"
   }
 

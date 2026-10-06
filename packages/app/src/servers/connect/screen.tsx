@@ -25,31 +25,42 @@ export function ConnectServerScreen(props: { url?: string } = {}) {
   const check = useCheckServerHealth()
   const camera = createCameraAvailability()
   const [state, setState] = createStore({ url: props.url ?? "", password: "", error: "", scanning: false })
+
   const connectionError = () =>
     language.t(
       platform.platform === "web" && isMixedContent(location.href, state.url)
         ? "server.connect.mixedContent"
         : "server.connect.failed",
     )
+
   const request = useMutation(() => ({
     mutationFn: async () => {
       const link = pairingLink(state.url)
+
       if (link) {
         const redeemed = await redeemPairingLink(link)
+
         if (!redeemed) {
           setState("error", language.t("server.connect.link.expired"))
+
           return
         }
+
         // Keep the token in the form so a failed connection check can retry without the spent code.
         setState({ url: link.url, password: redeemed.password })
       }
+
       const url = serverAddress(state.url)
+
       if (!url) {
         setState("error", language.t("server.connect.address.invalid"))
+
         return
       }
+
       const http = { url, password: state.password || undefined }
       const result = await check(http)
+
       if (!result.healthy) {
         // UPSTREAM-DIVERGENCE: Distinguish reachable credential-required servers from offline servers.
         setState("error", result.unauthorized ? language.t("server.connect.credentialsRequired") : connectionError())
@@ -102,6 +113,7 @@ export function ConnectServerScreen(props: { url?: string } = {}) {
           <form
             onSubmit={(event) => {
               event.preventDefault()
+
               if (request.isPending) return
               setState("error", "")
               request.mutate()
