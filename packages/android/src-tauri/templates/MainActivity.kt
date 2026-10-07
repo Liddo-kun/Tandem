@@ -2,8 +2,12 @@ package ai.opencode.android
 
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.View
 import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 // Generated Tauri activities are replaced by this reviewed edge-to-edge shell.
 class MainActivity : TauriActivity() {
@@ -12,6 +16,14 @@ class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+    // Edge-to-edge apps targeting Android 15+ no longer get adjustResize, so the keyboard covered the
+    // page and the visible area could be panned over the hidden strip. Shrink the WebView above the
+    // keyboard instead, and hide the keyboard inset from it so it doesn't shrink its viewport again.
+    ViewCompat.setOnApplyWindowInsetsListener(findViewById<View>(android.R.id.content)) { view, insets ->
+      val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+      view.setPadding(0, 0, 0, keyboard)
+      WindowInsetsCompat.Builder(insets).setInsets(WindowInsetsCompat.Type.ime(), Insets.NONE).build()
+    }
   }
 
   override fun onWebViewCreate(webView: WebView) {

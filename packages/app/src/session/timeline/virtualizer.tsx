@@ -36,6 +36,10 @@ const pendingMarkdown = '[data-component="markdown"]:not([data-markdown-ready])'
 // Distance from the bottom that counts as "at the end". Deliberately tight: a collapse clamps
 // exactly to the end, while a one-pixel nudge upward is a deliberate move away from it.
 const endEpsilon = 0.5
+// UPSTREAM-DIVERGENCE(temporary): at fractional pixel ratios (2.75 on the Y700) the scroller cannot land
+// within 0.5px of the end; a fling to the bottom stopped 0.636px short and never resumed following.
+// Re-pinning still requires a downward arrival, so an upward nudge keeps unpinning.
+const pinEpsilon = 2
 
 const upwardKeys = new Set(["up", "page-up", "home"])
 
@@ -733,7 +737,7 @@ export function createTimelineVirtualizer(input: Input) {
     const previousMaxScroll = maxScroll
     scrollTop = root.scrollTop
     maxScroll = root.scrollHeight - root.clientHeight
-    const atEnd = maxScroll - scrollTop <= endEpsilon
+    const atEnd = maxScroll - scrollTop <= pinEpsilon
     const arrived = scrollTop > previousTop + endEpsilon || maxScroll < previousMaxScroll
 
     if (maxScroll <= 1 || (atEnd && arrived)) input.onPin()
