@@ -339,9 +339,13 @@ export const dict = {
   "dialog.server.add.passwordPlaceholder": "password",
 
   "server.connect.title": "Connect to a server",
-  // UPSTREAM-DIVERGENCE: English fallback copy for Corrector, Android zoom and native server connection.
+  // UPSTREAM-DIVERGENCE: English fallback copy for Corrector, the composer context button, Android zoom and native server connection.
   "prompt.corrector.title": "Corrector",
   "prompt.corrector.description": "Correct spelling, punctuation and dictation errors before sending. Keeps your meaning and leaves attachments and context intact. Changes apply to new prompts; queued prompts keep their original setting.",
+  "prompt.context.view": "View context usage",
+  "prompt.context.tokens": "{{count}}t",
+  "prompt.context.ttl": "{{minutes}}m",
+  "prompt.context.cacheHit": "cache",
   "settings.android.zoom.title": "Page zoom",
   "settings.android.zoom.description": "Scale the app from 80% to 150% in 2% steps. Volume keys also adjust zoom. Default: 100%.",
   "settings.android.zoom.reset": "Reset",

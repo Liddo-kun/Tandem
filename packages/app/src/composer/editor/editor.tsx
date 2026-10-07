@@ -47,6 +47,8 @@ import type { ComposerEditorModel, ComposerSelectControl } from "./interaction"
 import { isAttachment } from "../prompt-parts"
 // UPSTREAM-DIVERGENCE: Android native range-editing helpers.
 import { getDeleteWordRange, getEditorText, getSelectionRange, setSelectionRange } from "./dom"
+// UPSTREAM-DIVERGENCE: Tandem's composer context button.
+import { TandemContextButton } from "../tandem-composer"
 import "../attachments/attachments.css"
 import "./editor.css"
 
@@ -458,7 +460,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
             inert={state.mode === "shell" ? true : undefined}
             style={buttons()}
           >
-            <div ref={controlsContent} class="flex h-full w-max min-w-full items-center gap-1">
+            {/* UPSTREAM-DIVERGENCE: 1px instead of 4px between controls, to make room for Tandem's context button. */}
+            <div ref={controlsContent} class="flex h-full w-max min-w-full items-center gap-px">
               {/* UPSTREAM-DIVERGENCE: Persisted Corrector toggle in shared composer controls. */}
               <Show when={view.corrector} keyed>
                 {(control) => (
@@ -502,6 +505,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
                   )}
                 </Show>
               </Show>
+              {/* UPSTREAM-DIVERGENCE: Tandem's context tokens, cache countdown and cache-hit pulse after the effort. */}
+              <TandemContextButton />
             </div>
           </div>
           <div data-slot="composer-actions" class="flex shrink-0 items-center">

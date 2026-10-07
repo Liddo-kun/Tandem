@@ -78,25 +78,6 @@ Tandem v1 at `e4cff28994`, compared with its upstream baseline `2fa3363c92`; the
 reference, not fixed requirements for v2's different layout. Current inventory: `log.md`,
 **Shared Chat And Tool Display**.
 
-### Context and cache indicator
-
-- [ ] Evaluate v2's usage/context display with Jon before deciding whether to recreate the composer-footer indicator or add only missing information.
-
-The old footer button shows `NN,NNNt   TTL: M:SS` without a “Context” label. It opens the same
-context panel as the header usage ring. The countdown starts at the last completed request; the old
-provider mapping uses a one-hour TTL for Anthropic/OpenRouter/Alibaba and hides the TTL for other
-providers. A v2 implementation must derive applicable TTLs from its current cache policy.
-
-After a response completes, the button briefly shows `cache hit: NN%` with a colored background pulse,
-then returns to the token/countdown display. Cache health is `cacheRead / previousCacheTotal`, with a
-per-request hit-ratio fallback on the first request. Bands are green at ≥90%, amber at ≥50%, otherwise
-red. Session switches do not pulse; the pulse uses completed-request statistics, not partial streaming
-values. Preserve those semantics if recreating the indicator, while checking what v2 already supplies.
-
-Old sources: `packages/app/src/components/session/context-token-button.tsx`, `session-context-metrics.ts`,
-`packages/app/src/components/prompt-input-v2.tsx`, `pages/session/helpers.ts` and `index.css`.
-V2 candidates: `packages/gui-extensions/src/usage` and a composer control slot if still wanted.
-
 ### Manual session refresh
 
 - [ ] Evaluate v2's recovery after background suspension, reconnect and server restart. If a manual recovery control is still useful, add a session refresh button using v2's synchronization APIs and header extension point.
@@ -128,15 +109,6 @@ Old sources: `packages/app/src/pages/session.tsx` (`mobileTabs`, `mobileActionsM
 `packages/app/src/pages/session/timeline/message-timeline.tsx` (title/actions portal and header visibility).
 V2 candidate: the app's session header/navigation and GUI-extension mobile views. Do not impose the
 old fixed two-tab split on v2 without checking its current navigation.
-
-### Shorter composer model labels
-
-- [ ] If Jon still prefers the shorter label, remove a leading `Claude ` from the composer model trigger.
-
-Old behavior uses `name.replace(/^Claude\s+/, "")`, so `Claude Opus 4.8` displays as `Opus 4.8`.
-Only the trigger's display text changes: model IDs, provider data and other model names remain intact.
-Old source: `packages/app/src/components/prompt-input-v2.tsx`.
-V2 candidate: `packages/app/src/composer/composer.tsx`.
 
 ## Queued prompt editing (upstream behavior)
 

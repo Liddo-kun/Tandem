@@ -1,0 +1,46 @@
+/* Tandem-owned (not in upstream): cache-hit tint and pulse for the composer context button (tandem-composer.tsx). */
+[data-component="tandem-context-button"] {
+  --tandem-cache-flash: var(--v2-state-bg-success);
+}
+
+[data-component="tandem-context-button"][data-cache-band="warn"] {
+  --tandem-cache-flash: var(--v2-state-bg-warning);
+}
+
+[data-component="tandem-context-button"][data-cache-band="bad"] {
+  --tandem-cache-flash: var(--v2-state-bg-danger);
+}
+
+[data-component="tandem-context-button"][data-cache-band="good"] [data-slot="tandem-cache-tint"] {
+  color: var(--v2-state-fg-success);
+}
+
+[data-component="tandem-context-button"][data-cache-band="warn"] [data-slot="tandem-cache-tint"] {
+  color: var(--v2-state-fg-warning);
+}
+
+[data-component="tandem-context-button"][data-cache-band="bad"] [data-slot="tandem-cache-tint"] {
+  color: var(--v2-state-fg-danger);
+}
+
+[data-component="tandem-context-button"][data-cache-pulse] {
+  animation: tandem-cache-pulse 1.6s ease-out;
+}
+
+@keyframes tandem-cache-pulse {
+  0% {
+    background-color: transparent;
+  }
+  10% {
+    background-color: var(--tandem-cache-flash);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-component="tandem-context-button"][data-cache-pulse] {
+    animation: none;
+  }
+}

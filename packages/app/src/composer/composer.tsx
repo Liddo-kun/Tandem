@@ -12,6 +12,8 @@ import { DialogSelectModelUnpaid } from "@/providers/models/unpaid"
 import { formatKeybind, useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
 import type { ComposerModel } from "./model"
+// UPSTREAM-DIVERGENCE: Tandem drops a leading "Claude " from the model button.
+import { tandemModelLabel } from "./tandem-composer"
 
 export function Composer(props: {
   class?: string
@@ -45,7 +47,9 @@ export function Composer(props: {
             keybind={command.keybindParts("model.choose")}
             model={props.model.model.selection}
             provider={props.model.model.selection.current()?.provider}
-            modelName={props.model.model.selection.current()?.name ?? language.t("dialog.model.select.title")}
+            modelName={tandemModelLabel(
+              props.model.model.selection.current()?.name ?? language.t("dialog.model.select.title"),
+            )}
             onClose={props.model.restoreFocus}
             onUnpaidClick={() => dialog.show(() => <DialogSelectModelUnpaid model={props.model.model.selection} />)}
           />
