@@ -24,8 +24,6 @@ import { tabKey, useTabs } from "@/shell/tabs/tabs"
 import type { ComposerState } from "@/composer/persistence"
 import "./titlebar.css"
 import { TitlebarRightMount } from "@/shell/titlebar/right-slot"
-import { MobileDrawer, MobileDrawerContent, MobileDrawerLabel, MobileDrawerTrigger } from "@/shell/mobile-drawer"
-import { useSettingsDialog } from "@/settings/command"
 import { rootSession } from "@/shell/routes/session"
 import { TitlebarItem } from "@opencode/gui-extensions/sdk"
 import { useExtensionHost } from "@/runtime/extension/host"
@@ -55,7 +53,6 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
   const command = useCommand()
   const language = useLanguage()
   const settings = useSettings()
-  const openSettings = useSettingsDialog()
   const navigate = useNavigate()
   const location = useLocation()
   const mobile = createMediaQuery("(max-width: 767px)")
@@ -486,14 +483,6 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
               ].filter((v) => v !== undefined)
             })
 
-            const [mobileTabs, setMobileTabs] = createStore({ open: false, settings: false })
-
-            createEffect(() => {
-              path()
-              mobile()
-              setMobileTabs("open", false)
-            })
-
             return (
               <div
                 class="h-full flex-1 overflow-hidden flex flex-row items-center gap-1.5 px-2 md:pe-3"
@@ -518,98 +507,21 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                 <Show
                   when={!mobile()}
                   fallback={
-                    <MobileDrawer
-                      open={mobileTabs.open}
-                      onOpenChange={(open) => setMobileTabs("open", open)}
-                      onContentPresentChange={(present) => {
-                        if (present || !mobileTabs.settings) return
-                        setMobileTabs("settings", false)
-                        openSettings()
-                      }}
-                    >
-                      {/* UPSTREAM-DIVERGENCE: Tandem shows every tab in a swipeable strip on mobile, so the
-                          drawer trigger shrinks to a menu button instead of a current-tab title button. */}
-                      <MobileDrawerTrigger
-                        data-slot="mobile-tabs-trigger"
-                        class="flex size-7 shrink-0 items-center justify-center rounded-[6px] text-v2-icon-icon-muted focus-visible:outline-none [app-region:no-drag]"
-                        aria-label={language.t("titlebar.tabs")}
-                      >
-                        <Icon name="menu" />
-                      </MobileDrawerTrigger>
-                      <MobileDrawerContent>
-                        <MobileDrawerLabel class="sr-only">{language.t("titlebar.tabs")}</MobileDrawerLabel>
-                        <div data-slot="mobile-tabs-drawer" data-corvu-no-drag>
-                          <div data-slot="mobile-tabs-drawer-list">
-                            <TitlebarTabStrip
-                              orientation="vertical"
-                              tabs={tabsStore}
-                              currentTab={currentTab()}
-                              onNavigate={(tab) => {
-                                tabs.select(tab)
-                                setMobileTabs("open", false)
-                              }}
-                              onClose={(tab) => {
-                                const index = tabsStore.findIndex((item) => tabKey(item) === tabKey(tab))
-
-                                if (index !== -1) tabsStoreActions.closeTab(index)
-                              }}
-                              onReorder={(keys) => tabsStoreActions.reorder(keys)}
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            data-action="mobile-tabs-new-session"
-                            class="flex h-7 w-full shrink-0 items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-base hover:bg-v2-background-bg-layer-02 focus-visible:outline-none focus-visible:bg-v2-background-bg-layer-02"
-                            onClick={() => {
-                              openNewTab()
-                              setMobileTabs("open", false)
-                            }}
-                          >
-                            <Icon name="plus" />
-                            {language.t("command.session.new")}
-                          </button>
-                          <div class="flex shrink-0 flex-col gap-1 border-t border-v2-border-border-muted pt-2">
-                            <button
-                              type="button"
-                              data-action="mobile-tabs-home"
-                              data-state={layout.route().type === "home" ? "pressed" : undefined}
-                              aria-current={layout.route().type === "home" ? "page" : undefined}
-                              class="flex h-7 w-full items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-faint data-[state=pressed]:text-v2-text-text-base focus-visible:outline-none"
-                              onClick={() => {
-                                if (layout.route().type !== "home") toggleHome()
-                                setMobileTabs("open", false)
-                              }}
-                            >
-                              <Icon name="grid-plus" />
-                              {language.t("home.title")}
-                            </button>
-                            <div class="flex items-center gap-1">
-                              <button
-                                type="button"
-                                data-action="mobile-tabs-settings"
-                                class="flex h-7 min-w-0 flex-1 items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-faint hover:bg-v2-background-bg-layer-02 focus-visible:outline-none focus-visible:bg-v2-background-bg-layer-02"
-                                onClick={() => setMobileTabs({ open: false, settings: true })}
-                              >
-                                <Icon name="settings-gear" size="small" />
-                                {language.t("sidebar.settings")}
-                              </button>
-                              <button
-                                type="button"
-                                data-action="mobile-tabs-help"
-                                class="flex h-7 shrink-0 items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-faint hover:bg-v2-background-bg-layer-02 focus-visible:outline-none focus-visible:bg-v2-background-bg-layer-02"
-                                onClick={() => {
-                                  setMobileTabs("open", false)
-                                  // UPSTREAM-DIVERGENCE: Tandem product support link.
-                                  platform.openExternal("https://github.com/Liddo-kun/Tandem/issues")
-                                }}
-                              >
-                                <Icon name="help" size="small" />
-                                {language.t("sidebar.help")}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </MobileDrawerContent>
+                    <>
+                      {/* UPSTREAM-DIVERGENCE: Tandem shows every tab in a swipeable strip on mobile, and the
+                          button before it opens Home directly instead of a tabs drawer; Home carries
+                          Settings and Help. Tapping it on Home returns to the current tab, as on desktop. */}
+                      <IconButton
+                        type="button"
+                        variant="ghost-muted"
+                        size="large"
+                        class="shrink-0 [app-region:no-drag]"
+                        icon={<Icon name="grid-plus" />}
+                        state={layout.route().type === "home" ? "pressed" : undefined}
+                        onClick={toggleHome}
+                        aria-label={language.t("home.title")}
+                        aria-pressed={layout.route().type === "home"}
+                      />
                       <TitlebarTabStrip
                         tabs={tabsStore}
                         currentTab={currentTab()}
@@ -632,7 +544,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                         onClick={openNewTab}
                         aria-label={language.t("command.session.new")}
                       />
-                    </MobileDrawer>
+                    </>
                   }
                 >
                   <Show

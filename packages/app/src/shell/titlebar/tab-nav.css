@@ -196,14 +196,18 @@
 }
 
 @media (hover: none) {
-  [data-titlebar-tab] [data-slot="tab-close"] {
-    background: linear-gradient(var(--tab-overlay), var(--tab-overlay)), var(--tab-base);
+  /* UPSTREAM-DIVERGENCE: The title's mask below already hides it before the X's strokes, so touch drops the close
+     button's opaque backdrop and the title stays visible up to the button. A tapped tab keeps :hover on touch. */
+  [data-titlebar-tab] [data-slot="tab-close"],
+  [data-titlebar-tab]:is(:hover, [data-state="pressed"]) [data-slot="tab-close"] {
+    background: none;
   }
 
   [data-titlebar-tab]:not([data-editing="true"]) [data-slot="tab-link"],
   [data-titlebar-tab][data-title-overflow="true"]:not([data-editing="true"]) [data-slot="tab-link"] {
-    /* UPSTREAM-DIVERGENCE: Touch shows the close button's opaque backdrop, so end a short title fade at its edge. */
-    --tab-title-fade-offset: 18px;
+    /* UPSTREAM-DIVERGENCE: Touch always shows the X, so keep the title opaque up to the close button's edge and fade
+       it over the button's padding, ending where the X's strokes begin. */
+    --tab-title-fade-offset: 12px;
     /* UPSTREAM-DIVERGENCE: Android WebView leaves a masked title stale (blank or a stray fragment) when its tab
        resizes inside the overflowing, scrolling strip; its own layer repaints the mask with the tab. */
     will-change: transform;

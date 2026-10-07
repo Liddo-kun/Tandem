@@ -55,7 +55,7 @@ function SessionTabSlot(props: {
       class="relative flex"
       classList={{
         // UPSTREAM-DIVERGENCE: Keep mobile tab titles legible; the strip scrolls instead of shrinking tabs to icons.
-        "w-56 min-w-7 max-md:min-w-[150px] max-w-56 flex-shrink": props.orientation === "horizontal",
+        "w-56 min-w-7 max-md:min-w-[140px] max-w-56 flex-shrink": props.orientation === "horizontal",
         "w-full shrink-0": props.orientation === "vertical",
       }}
     >
@@ -239,7 +239,7 @@ function DraftTabSlot(props: {
       class="relative flex"
       classList={{
         // UPSTREAM-DIVERGENCE: Keep mobile tab titles legible; the strip scrolls instead of shrinking tabs to icons.
-        "w-56 min-w-7 max-md:min-w-[150px] max-w-56 flex-shrink": props.orientation === "horizontal",
+        "w-56 min-w-7 max-md:min-w-[140px] max-w-56 flex-shrink": props.orientation === "horizontal",
         "w-full shrink-0": props.orientation === "vertical",
       }}
     >

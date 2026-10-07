@@ -51,7 +51,8 @@ export function Home() {
           <HomeSessions sessions={sessions} search={search} scroll={scroll} />
         </div>
       </ScrollView>
-      <div class="hidden shrink-0 px-3 py-2 md:block lg:hidden">
+      {/* UPSTREAM-DIVERGENCE: Tandem's mobile titlebar has no tabs drawer, so Settings and Help live here below md too. */}
+      <div class="shrink-0 px-3 py-2 lg:hidden">
         <HomeUtilityNav
           class="flex"
           onOpenSettings={projects.utility.settings}
