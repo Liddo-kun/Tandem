@@ -16,7 +16,9 @@ export function WebFetchRenderer(props: ToolProps) {
     return value
   })
   const answer = createMemo(() => typeof props.metadata.answer === "string" ? props.metadata.answer : props.output ?? "")
-  const preview = createMemo(() => firstLine(answer()))
+  // One plain line: drop Markdown heading marks, bold and code ticks.
+  const preview = createMemo(() => firstLine(answer())?.replace(/^#+\s*/, "").replace(/\*\*|`/g, ""))
+  const shotError = createMemo(() => typeof props.metadata.screenshotError === "string" ? props.metadata.screenshotError : undefined)
   const paths = createMemo(() => Array.isArray(props.metadata.paths) ? props.metadata.paths.filter((value): value is string => typeof value === "string") : [])
   return (
     <BasicTool
@@ -49,6 +51,7 @@ export function WebFetchRenderer(props: ToolProps) {
       }
     >
       <Show when={answer()}><Markdown text={answer()} /></Show>
+      <Show when={shotError()}>{(error) => <div>{i18n.t("ui.tool.webfetch.screenshotFailed", { error: error() })}</div>}</Show>
       <For each={paths()}>{(file) => <div><bdi dir="ltr"><code style={{ "overflow-wrap": "anywhere" }}>{file}</code></bdi></div>}</For>
     </BasicTool>
   )

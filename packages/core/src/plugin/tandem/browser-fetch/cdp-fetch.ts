@@ -51,6 +51,8 @@ export interface Page {
   mime?: string
   screenshots: string[]
   screenshotCut?: number
+  /** Why capture stopped early; the slices taken before the failure are kept. */
+  screenshotError?: string
   textCut?: boolean
 }
 
@@ -190,7 +192,7 @@ class Cdp {
   async evaluate<A>(expression: string, schema: Schema.Codec<A>, signal: AbortSignal) {
     for (let attempt = 0; ; attempt++) {
       try {
-        const value = await this.send("Runtime.evaluate", Schema.Struct({ result: Schema.Struct({ value: Schema.optionalKey(Schema.Unknown) }), exceptionDetails: Schema.optionalKey(Schema.Unknown) }), { expression, returnByValue: true }, signal)
+        const value = await this.send("Runtime.evaluate", Schema.Struct({ result: Schema.Struct({ value: Schema.optionalKey(Schema.Unknown) }), exceptionDetails: Schema.optionalKey(Schema.Unknown) }), { expression, returnByValue: true, awaitPromise: true }, signal)
         if (value.exceptionDetails) throw new FetchError("Page evaluation failed")
         return Schema.decodeUnknownSync(schema)(value.result.value)
       } catch (error) {
@@ -267,6 +269,41 @@ async function download(cdp: Cdp, response: ResponseInfo, base: string, signal: 
     return { file, text: text.trim() || "PDF has no extractable text layer; read the saved PDF explicitly.", textCut, url }
   }
   throw new FetchError("Document redirect budget exceeded")
+}
+
+// One viewport per slice, scrolled into view. Capturing beyond the viewport makes Chromium lay out and paint the
+// whole page height, which takes over 20s for a long article on the tablet. A failed capture keeps the slices taken
+// so far and reports why; only cancellation and the deadline still fail the fetch.
+async function screenshots(page: Cdp, base: string, signal: AbortSignal, artifacts: ArtifactBudget) {
+  const files: string[] = []
+  let covered = 0
+  let height = 0
+  try {
+    const metrics = await page.send("Page.getLayoutMetrics", Schema.Struct({ cssContentSize: Schema.Struct({ width: Schema.Number, height: Schema.Number }), cssLayoutViewport: Schema.Struct({ clientWidth: Schema.Number, clientHeight: Schema.Number }) }), {}, signal)
+    height = Math.max(1, Math.ceil(metrics.cssContentSize.height))
+    const width = Math.max(1, Math.min(2560, Math.ceil(metrics.cssLayoutViewport.clientWidth)))
+    const slice = Math.max(1, Math.min(1600, Math.floor(metrics.cssLayoutViewport.clientHeight)))
+    const count = Math.min(4, Math.ceil(height / slice))
+    const dpr = Math.max(1, await page.evaluate("window.devicePixelRatio", Schema.Number, signal))
+    for (let i = 0; i < count; i++) {
+      const y = i * slice
+      // Near the bottom the browser stops scrolling early; the clip still lies inside the viewport then.
+      await page.evaluate(`(window.scrollTo(0, ${y}), new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(window.scrollY)))))`, Schema.Number, signal)
+      const shot = await page.send("Page.captureScreenshot", Schema.Struct({ data: Schema.String }), { format: "png", clip: { x: 0, y, width, height: Math.min(slice, height - y), scale: 1 / dpr } }, signal)
+      if (shot.data.length > MAX_SHOT * 4 / 3 + 4) throw new FetchError("Screenshot exceeds 12 MiB slice budget")
+      const file = `${base}-${i + 1}.png`
+      signal.throwIfAborted()
+      await save(file, Buffer.from(shot.data, "base64"), artifacts)
+      files.push(file)
+      covered = y + Math.min(slice, height - y)
+    }
+    return { screenshots: files, screenshotCut: Math.max(0, height - covered) }
+  } catch (error) {
+    signal.throwIfAborted()
+    const message = error instanceof Error ? error.message : "unknown error"
+    console.warn("webfetch screenshot capture failed", message)
+    return { screenshots: files, screenshotCut: height ? Math.max(0, height - covered) : undefined, screenshotError: message }
+  }
 }
 
 async function attempt(input: { url: string; html: boolean; timeout: number; base: string; android: boolean; signal: AbortSignal; artifacts: ArtifactBudget }): Promise<Page> {
@@ -346,22 +383,9 @@ async function attempt(input: { url: string; html: boolean; timeout: number; bas
       await setTimeout(1000, undefined, { signal })
     }
     const extracted = await page.evaluate(`({title:document.title,url:location.href,text:(${input.html ? "document.documentElement.outerHTML" : '(document.body?.innerText ?? "")'}).slice(0,${MAX_TEXT}),textCut:(${input.html ? "document.documentElement.outerHTML" : '(document.body?.innerText ?? "")'}).length>${MAX_TEXT}})`, Schema.Struct({ ...Probe.fields, textCut: Schema.Boolean }), signal)
-    const metrics = await page.send("Page.getLayoutMetrics", Schema.Struct({ cssContentSize: Schema.Struct({ width: Schema.Number, height: Schema.Number }), cssLayoutViewport: Schema.Struct({ clientWidth: Schema.Number }) }), {}, signal)
-    const height = Math.max(1, Math.ceil(metrics.cssContentSize.height))
-    const width = Math.max(1, Math.min(2560, Math.ceil(metrics.cssLayoutViewport.clientWidth)))
-    const count = Math.min(4, Math.ceil(height / 1600))
-    const dpr = Math.max(1, await page.evaluate("window.devicePixelRatio", Schema.Number, signal))
-    const screenshots: string[] = []
-    for (let i = 0; i < count; i++) {
-      const shot = await page.send("Page.captureScreenshot", Schema.Struct({ data: Schema.String }), { format: "png", captureBeyondViewport: true, clip: { x: 0, y: i * 1600, width, height: Math.min(1600, height - i * 1600), scale: 1 / dpr } }, signal)
-      if (shot.data.length > MAX_SHOT * 4 / 3 + 4) throw new FetchError("Screenshot exceeds 12 MiB slice budget")
-      const file = `${input.base}-${i + 1}.png`
-      signal.throwIfAborted()
-      await save(file, Buffer.from(shot.data, "base64"), input.artifacts)
-      screenshots.push(file)
-    }
+    const shots = await screenshots(page, input.base, signal, input.artifacts)
     const downloaded = document ? await download(page, document, input.base, signal, input.artifacts) : undefined
-    return { ...extracted, ...downloaded, title: document ? "Document download" : extracted.title, mime: document?.mimeType, status: document?.status ?? response?.status, pageState: state, via: input.android ? "Android Chrome" : "regular Chromium", screenshots, screenshotCut: Math.max(0, height - count * 1600) }
+    return { ...extracted, ...downloaded, title: document ? "Document download" : extracted.title, mime: document?.mimeType, status: document?.status ?? response?.status, pageState: state, via: input.android ? "Android Chrome" : "regular Chromium", ...shots }
   } catch (error) {
     input.signal.throwIfAborted()
     if (deadline.aborted) throw new FetchError(`Browser capture timed out after ${input.timeout}s`, "timeout")

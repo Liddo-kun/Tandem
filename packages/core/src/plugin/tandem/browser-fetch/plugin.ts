@@ -17,11 +17,10 @@ import SYSTEM from "./web-fetcher.md" with { type: "text" }
 const Input = Schema.Struct({
   url: Schema.String.annotate({ description: "HTTP or HTTPS URL to retrieve through the user's real browser session" }),
   format: Schema.optionalKey(Schema.Literals(["markdown", "text", "html"])).annotate({ description: "Return format; defaults to markdown" }),
-  timeout: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(120))),
   prompt: Schema.optionalKey(Schema.String).annotate({ description: "Specific information to extract; omit for the full main content" }),
   screenshot: Schema.optionalKey(Schema.Boolean).annotate({ description: "Give captured PNG slices directly to the reader for visual extraction" }),
 })
-const RawInput = Schema.Struct({ url: Input.fields.url, format: Schema.optionalKey(Schema.Literals(["text", "html"])), timeout: Input.fields.timeout })
+const RawInput = Schema.Struct({ url: Input.fields.url, format: Schema.optionalKey(Schema.Literals(["text", "html"])) })
 const Output = Schema.Struct({ url: Schema.String, answer: Schema.String, paths: Schema.Array(Schema.String) })
 const Search = /^(?:www\.)?(?:google\.[a-z.]+|bing\.com|duckduckgo\.com|search\.yahoo\.com|yandex\.[a-z.]+|baidu\.com)$/i
 type Budget = { owner: string; prefix: string; total: number; searches: number; paths: Set<string>; blocked: Set<string>; artifacts: ArtifactBudget }
@@ -38,16 +37,17 @@ function render(page: Page) {
     `Browser: ${page.via}; page state: ${page.pageState}; HTTP: ${page.status ?? "not reported"}`,
     page.status && page.status >= 400 ? "This is the server's error page, not the requested content." : "",
     page.file ? `Document (${page.mime}) saved to ${page.file}. Text below is extracted from it. Screenshots show the download notice, not document pages.` : "",
-    `Screenshots (top to bottom): ${page.screenshots.join(", ")}${page.screenshotCut ? `; ${page.screenshotCut}px below the final slice was not captured` : ""}`,
+    `Screenshots (top to bottom): ${page.screenshots.join(", ") || "none"}${page.screenshotCut ? `; ${page.screenshotCut}px below the final slice was not captured` : ""}`,
+    page.screenshotError ? `Screenshot capture failed: ${page.screenshotError}` : "",
     page.textCut ? "Page capture reached its 2 MiB-character limit (PDF text: 2 MiB UTF-8 bytes); further content is not available in this text capture." : "",
     "", page.text,
   ].filter((line) => line !== "").join("\n")
 }
 
-async function captured(input: { url: string; format?: string; timeout?: number }, base: string, signal: AbortSignal, budget: Budget) {
+async function captured(input: { url: string; format?: string }, base: string, signal: AbortSignal, budget: Budget) {
   const host = new URL(input.url).hostname.toLowerCase()
   if (budget.blocked.has(host)) throw new FetchError("This site already refused this call; do not retry it", "blocked")
-  const page = await fetchPage({ url: input.url, html: input.format === "html", timeout: input.timeout ?? 60, base, signal, artifacts: budget.artifacts }).catch((error) => {
+  const page = await fetchPage({ url: input.url, html: input.format === "html", timeout: 60, base, signal, artifacts: budget.artifacts }).catch((error) => {
     if (error instanceof FetchError && error.code === "blocked") {
       budget.blocked.add(host)
       if (error.site) budget.blocked.add(error.site.toLowerCase())
@@ -67,7 +67,7 @@ async function captured(input: { url: string; format?: string; timeout?: number 
 }
 
 // Await the native CDP finalizer on Effect interruption, including cancellation during tab acquisition.
-function capture(input: { url: string; format?: string; timeout?: number }, base: string, budget: Budget) {
+function capture(input: { url: string; format?: string }, base: string, budget: Budget) {
   return Effect.scoped(Effect.gen(function* () {
     const operation = yield* Effect.acquireRelease(
       Effect.sync(() => {
@@ -138,7 +138,7 @@ export const Plugin = define({
         options: { codemode: false },
         input: Input,
         output: Output,
-        description: "Fetch a URL through the user's regular Chrome session for logged-in and JavaScript-rendered content. Returns a reader's answer (full main content by default, or prompt-targeted extraction), source URL and saved paths. Captures up to four full-page PNG slices on every fetch; screenshot=true gives them directly to the reader. Downloads documents with browser cookies and extracts PDF text. Does not interact with the page beyond loading it.",
+        description: "Fetch a webpage URL using a real \"logged in\" Chromium instance, which handles complex pages and Cloudflare-protected pages fairly reliably. The prompt is optional; omitting it returns the full page content. Use prompt to get a focused answer from the page. The tool captures page images as well. Use `screenshot=true` to force the webfetch model to read the webpage image directly for complex pages. File downloads and PDFs work as well.",
         execute: (input, context) => Effect.scoped(Effect.gen(function* () {
           yield* Effect.try({ try: () => {
             if (!["http:", "https:"].includes(new URL(input.url).protocol)) throw new Error("URL must use HTTP or HTTPS")
@@ -192,8 +192,9 @@ export const Plugin = define({
           const answer = last?.type === "assistant" ? last.content.filter((part) => part.type === "text").map((part) => part.text).join("\n").trim() : ""
           if (!answer) return yield* new Tool.Error({ message: "Browser reader returned no answer" })
           const paths = [...budget.paths]
-          const content = `${answer}\n\n[Source: ${fetched.page.url}]${paths.length ? `\n[Saved paths:\n${paths.join("\n")}\n]` : ""}`
-          return { output: { url: fetched.page.url, answer, paths }, content, metadata: { url: fetched.page.url, answer, paths, pageState: fetched.page.pageState, status: fetched.page.status ?? null } }
+          const shotError = fetched.page.screenshotError
+          const content = `${answer}\n\n[Source: ${fetched.page.url}]${shotError ? `\n[Screenshot capture failed: ${shotError}]` : ""}${paths.length ? `\n[Saved paths:\n${paths.join("\n")}\n]` : ""}`
+          return { output: { url: fetched.page.url, answer, paths }, content, metadata: { url: fetched.page.url, answer, paths, pageState: fetched.page.pageState, status: fetched.page.status ?? null, screenshotError: shotError ?? null } }
         })).pipe(Effect.mapError(failure)),
       })
     }).pipe(Effect.orDie)

@@ -71,22 +71,9 @@ and extension points before porting the integration. Browser-backed webfetch rem
 - [ ] Port browser-grant settings and the bounded browser-tool summary renderer.
 - [ ] Regenerate shared contracts only where needed and verify real browser workflows and cleanup.
 
-## Queued prompt editing (upstream behavior)
+## Queued prompt editing
 
-These were fixed during the port, then reverted to upstream on 2026-10-05: they are OpenCode
-behavior, not caused by Tandem. Reproduce in real use before deciding anything; if confirmed, report
-them with the pristine-upstream code path first. Code: `packages/app/src/session/composer/queue.ts`.
-
-- [ ] Editing a queued prompt: a removed attached file can still be sent, or a kept one can appear twice
-  (attachment/context prefix and separator handling).
-- [ ] Editing a queued prompt that mentions the same @file more than once can bind a mention to the
-  wrong occurrence.
-- [ ] A queued prompt with empty display text can show hidden model-only text instead.
-- [ ] Undoing a queued message back into the composer and resending it may duplicate an attached file
-  reference (reviewer suspicion, not reproduced; upstream already had a version of it).
-
-Upstream `2db9c2e1b3` (merged in the 2026-10-06 sync) rewrote queue undo/edit to restore comments and files
-structurally and to filter removed or duplicate mentioned files, so re-check these against the new code first.
+- [ ] Look for bugs in queued prompt editing and resending.
 
 ## Webfetch concurrency
 

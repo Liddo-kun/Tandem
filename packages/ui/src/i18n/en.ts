@@ -271,7 +271,7 @@ const source = {
   "ui.patch.action.moved": "Moved",
   "ui.patch.action.patched": "Patched",
 
-  // UPSTREAM-DIVERGENCE: Tandem's compact patch summary lines.
+  // UPSTREAM-DIVERGENCE: Tandem's compact patch summary lines and webfetch screenshot failure note.
   "ui.tool.summary.created.one": "Created {{file}} with {{count}} line",
   "ui.tool.summary.created.other": "Created {{file}} with {{count}} lines",
   "ui.tool.summary.deleted": "Deleted {{file}}",
@@ -282,6 +282,7 @@ const source = {
   "ui.tool.summary.removals.other": "{{count}} removals",
   "ui.tool.summary.both": "{{first}} and {{second}}",
   "ui.tool.summary.noChanges": "no line changes",
+  "ui.tool.webfetch.screenshotFailed": "Screenshot capture failed: {{error}}",
 
   "ui.question.subtitle.answered": "{{count}} answered",
   "ui.question.answer.none": "(no answer)",
