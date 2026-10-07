@@ -71,45 +71,6 @@ and extension points before porting the integration. Browser-backed webfetch rem
 - [ ] Port browser-grant settings and the bounded browser-tool summary renderer.
 - [ ] Regenerate shared contracts only where needed and verify real browser workflows and cleanup.
 
-## Chat appearance
-
-Try v2's Android UI with Jon before choosing which tweaks to recreate. The details below describe
-Tandem v1 at `e4cff28994`, compared with its upstream baseline `2fa3363c92`; they are a reconstruction
-reference, not fixed requirements for v2's different layout. Current inventory: `log.md`,
-**Shared Chat And Tool Display**.
-
-### Manual session refresh
-
-- [ ] Evaluate v2's recovery after background suspension, reconnect and server restart. If a manual recovery control is still useful, add a session refresh button using v2's synchronization APIs and header extension point.
-
-The old button sits beside the session overflow actions (inside the Session tab on mobile). It forces
-the active conversation's messages and session state to resynchronize without reloading the whole
-app. It was added for stale client state after missed events, including rewind/send and server-restart
-cases. Reuse upstream recovery where it works and evaluate the need for the button with Jon.
-
-Old sources: `packages/app/src/pages/session/timeline/message-timeline.tsx` (`refreshSession`) and
-`packages/app/src/pages/session.tsx` (forced active-session refresh). V2 candidate: the `session.header`
-GUI extension slot and current client synchronization methods.
-
-### Mobile session title and actions in the tab bar
-
-- [ ] Try v2's mobile navigation with Jon and decide whether moving the session title/actions into the tab bar still improves usable space. Adapt to v2's extension-defined tabs if wanted.
-
-The old phone layout divides the bottom tabs 75/25 between Session and Changes. The Session tab shows
-the live conversation title (falling back to the normal Session label), with the overflow actions
-(rename/share/archive/delete) portaled into its `closeButton` slot. The manual-refresh button shares
-that actions area. Hiding the separate sticky title bar reclaims about 48px; inline rename and
-child-session breadcrumbs retain their header. Desktop and the old-layout variant are unchanged.
-
-The old mobile header context ring was also hidden because the composer-footer context button opened
-the same panel. Both that footer and the refresh button are separate deferred decisions above; do not
-remove access to usage information or require those controls merely to change the tab layout.
-
-Old sources: `packages/app/src/pages/session.tsx` (`mobileTabs`, `mobileActionsMount`) and
-`packages/app/src/pages/session/timeline/message-timeline.tsx` (title/actions portal and header visibility).
-V2 candidate: the app's session header/navigation and GUI-extension mobile views. Do not impose the
-old fixed two-tab split on v2 without checking its current navigation.
-
 ## Queued prompt editing (upstream behavior)
 
 These were fixed during the port, then reverted to upstream on 2026-10-05: they are OpenCode
