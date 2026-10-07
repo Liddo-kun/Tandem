@@ -14,6 +14,8 @@ import type { BackgroundTask, MountedSession, SessionScreen } from "@opencode/gu
 import { ExtensionSlot } from "@/runtime/extension/render"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useServer } from "@/runtime/server/current"
+// UPSTREAM-DIVERGENCE: Android chat gutters.
+import { usePlatform } from "@/runtime/platform/platform"
 import { useWorkspaceLocation } from "@/workspaces/location"
 import { Timeline } from "@opencode/session-ui/timeline/projection"
 import { createSessionTimelineRowRenderer } from "@opencode/session-ui/timeline/row"
@@ -160,7 +162,9 @@ function MessageTimelineView(
     if (!directory) return
     void data.location.vcs.sync({ directory }).catch(() => undefined)
   })
-  const turnPadding = () => "px-4 md:px-5"
+  const platform = usePlatform()
+  // UPSTREAM-DIVERGENCE: narrower chat gutters in the Android app; other clients keep upstream's.
+  const turnPadding = () => (platform.platform === "android" ? "px-2" : "px-4 md:px-5")
   const showHeader = createMemo(() => !props.hideHeader && (props.data.showHeader() || workspaceSession()))
   const pinned = createMemo(() => props.pinned)
   const messageByID = projection.messageByID

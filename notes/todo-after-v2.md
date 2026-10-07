@@ -78,20 +78,6 @@ Tandem v1 at `e4cff28994`, compared with its upstream baseline `2fa3363c92`; the
 reference, not fixed requirements for v2's different layout. Current inventory: `log.md`,
 **Shared Chat And Tool Display**.
 
-### Narrow Android side margins
-
-- [ ] Evaluate and, if wanted, restore narrower Android chat gutters without changing web/desktop margins.
-
-- In the Android APK, the new-layout outer session-card inset is 3px (`p-[3px]`) instead of 8px (`p-2`).
-- All timeline row containers use 8px horizontal padding (`px-2`) rather than 16px, or 20px at the
-  medium breakpoint (`px-4 md:px-5`). A shared `rowPadX` keeps message/auxiliary rows aligned.
-- Both changes are gated on `platform.platform === "android"`; browser, desktop and iOS retain
-  upstream margins. Check narrow and wide tablet layouts and avoid confusing these gutters with
-  native safe-area/keyboard insets.
-
-Old sources: `packages/app/src/pages/session.tsx` and `pages/session/timeline/message-timeline.tsx`.
-V2 candidate: the timeline row's `padding` input and its app-side container.
-
 ### Compact shell and patch summaries
 
 - [ ] Compare v2's tool cards with Tandem's compact summaries and recreate only the useful differences.
