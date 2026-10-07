@@ -12,5 +12,6 @@
 @import "../components/tool-count-summary.css" layer(components);
 @import "../components/tool-error-card.css" layer(components);
 @import "../components/tool-status-title.css" layer(components);
-/* UPSTREAM-DIVERGENCE: Tandem's compact chat spacing, unlayered so it overrides the layers above. */
+/* UPSTREAM-DIVERGENCE: Tandem's compact chat spacing and tool summaries, unlayered so they override the layers above. */
 @import "./tandem-compact.css";
+@import "./tandem-tool-summary.css";

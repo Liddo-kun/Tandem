@@ -78,36 +78,6 @@ Tandem v1 at `e4cff28994`, compared with its upstream baseline `2fa3363c92`; the
 reference, not fixed requirements for v2's different layout. Current inventory: `log.md`,
 **Shared Chat And Tool Display**.
 
-### Compact shell and patch summaries
-
-- [ ] Compare v2's tool cards with Tandem's compact summaries and recreate only the useful differences.
-
-The old collapsed/trigger presentation uses two lines while preserving expanded output and diffs:
-
-- Main line: a small status dot, tool name and parenthesized command/file subject, e.g.
-  `Bash(git status)` or `apply_patch(src/app.ts)`. Long subjects ellipsize instead of widening the card.
-- Status: neutral, warning-colored pending/running, success-colored completed, or error-colored failure.
-  The tool name shimmers while pending/running. A nonzero shell `exit`/`exitCode` also indicates failure.
-- Preview line: an indented branch marker followed by one ellipsized line, shown only after pending/running
-  ends. Shell uses the first nonempty output line after stripping ANSI escapes and trimming whitespace.
-- Single-file patch previews distinguish create, delete, move and update. Creation includes the line
-  count; updates show additions/removals (or “no line changes”). Multi-file patches summarize the file
-  count; missing file metadata falls back to the first output line.
-- Typography: 14px monospace main line, 13px preview, an 8px status dot, no vertical gap between lines.
-  Multiline collapsible triggers use automatic height, a 36px minimum and 2px vertical padding.
-- Running shell commands can still expand. Expanded shell output retains the command, full output and
-  copy button; patch cards retain single-file and multi-file diff/accordion views. Error-card labels
-  match the visible tool names.
-
-Old sources: `ToolSummaryTrigger` in `packages/session-ui/src/components/basic-tool.tsx` / `.css`;
-`firstOutputLine`, `toolFailed`, `applyPatchSummary` and the shell/patch renderers in
-`packages/session-ui/src/components/message-part.tsx`; `tool-error-card.tsx`; and
-`packages/ui/src/components/collapsible.css`. These helpers were also reused by webfetch: the retained
-webfetch answer renderer must not depend on completing this deferred shell/patch styling task.
-
-V2 candidate: `packages/session-ui/src/tools/tool-renderer.tsx`. Its tools are named `shell` and
-`patch`; also inspect how Code Mode `execute` groups calls before deciding where summaries belong.
-
 ### Context and cache indicator
 
 - [ ] Evaluate v2's usage/context display with Jon before deciding whether to recreate the composer-footer indicator or add only missing information.

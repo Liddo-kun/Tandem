@@ -59,6 +59,8 @@ import { AssistantReasoningContent, writeClipboard } from "../message/message-co
 import { followShellOutput } from "./shell-output"
 // UPSTREAM-DIVERGENCE: Load Tandem's cards for every consumer of the shared registry.
 import { registerTandemTools } from "./tandem-tools"
+// UPSTREAM-DIVERGENCE: Tandem v1-style tool summaries (status dot, preview line, patch headers).
+import { firstLine, PatchSummary, toolDotState, toolPartsDotState, ToolPreview } from "./tandem-tool-summary"
 
 function ShellSubmessage(props: { text: string; animate?: boolean }) {
   let widthRef: HTMLSpanElement | undefined
@@ -791,7 +793,11 @@ export function CurrentContextToolGroup(props: {
                     )
 
                     return (
-                      <div data-slot="context-tool-group-item">
+                      // UPSTREAM-DIVERGENCE: tool state for Tandem's status dot on grouped rows.
+                      <div
+                        data-slot="context-tool-group-item"
+                        data-tandem-tool-state={toolPartsDotState(group())}
+                      >
                         <Show
                           when={!currentToolGroupedRead(tool())}
                           fallback={
@@ -1465,7 +1471,12 @@ export function ToolDisplay(
 
   return (
     <Show when={!hideQuestion()}>
-      <div data-component="tool-part-wrapper" data-timeline-part-id={props.id}>
+      {/* UPSTREAM-DIVERGENCE: tool state for Tandem's status dot. */}
+      <div
+        data-component="tool-part-wrapper"
+        data-timeline-part-id={props.id}
+        data-tandem-tool-state={toolDotState([{ name: props.tool, status: props.status, metadata: props.metadata }])}
+      >
         <Switch>
           <Match when={error()}>
             {(error) => {
@@ -2148,6 +2159,10 @@ ToolRegistry.register({
                 </Show>
               </Show>
             </div>
+            {/* UPSTREAM-DIVERGENCE: Tandem's first-output-line preview under a collapsed command. */}
+            <Show when={!open() && !pending()}>
+              <ToolPreview text={firstLine(props.output)} />
+            </Show>
           </div>
         )}
       >
@@ -2408,38 +2423,13 @@ ToolRegistry.register({
                     }
                     type={file().type}
                     header={
-                      <div data-slot="apply-patch-trigger-content">
-                        <div data-slot="apply-patch-file-info">
-                          <FileIcon node={{ path: file().path, type: "file" }} />
-                          <div data-slot="apply-patch-file-name-container">
-                            <Show when={file().path.includes("/")}>
-                              <span data-slot="apply-patch-directory">{`\u202A${displayDirectory(file().path)}\u202C`}</span>
-                            </Show>
-                            <span data-slot="apply-patch-filename">{getFilename(file().path)}</span>
-                          </div>
-                        </div>
-                        <div data-slot="apply-patch-trigger-actions">
-                          <Switch>
-                            <Match when={file().type === "add"}>
-                              <span data-slot="apply-patch-change" data-type="added">
-                                {i18n.t("ui.patch.action.created")}
-                              </span>
-                            </Match>
-                            <Match when={file().type === "delete"}>
-                              <span data-slot="apply-patch-change" data-type="removed">
-                                {i18n.t("ui.patch.action.deleted")}
-                              </span>
-                            </Match>
-                            <Match when={true}>
-                              <DiffChanges
-                                appearance="standard"
-                                changes={{ additions: file().additions, deletions: file().deletions }}
-                              />
-                            </Match>
-                          </Switch>
-                          <Icon name="chevron-grabber-vertical" size="small" />
-                        </div>
-                      </div>
+                      // UPSTREAM-DIVERGENCE: Tandem's compact `Patch(path)` summary with a change preview.
+                      <PatchSummary
+                        title={title()}
+                        path={`${displayDirectory(file().path)}${getFilename(file().path)}`}
+                        file={file()}
+                        pending={props.status === "streaming" || props.status === "running"}
+                      />
                     }
                   >
                     <Show when={props.deferContent === false || visible()}>

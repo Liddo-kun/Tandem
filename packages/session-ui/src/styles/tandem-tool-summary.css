@@ -1,0 +1,125 @@
+/* Tandem-owned (not in upstream): Tandem v1's tool summaries in v2's font and size:
+   `● Name(subject)` with an optional `└ preview` line (tools/tandem-tool-summary.tsx).
+   Imported unlayered from index.css so it wins over upstream's layered component styles. */
+
+/* Status dot. Wrappers carry the state (tools/tandem-tool-summary.tsx); the nearest wrapper wins. */
+[data-tandem-tool-state] {
+  --tandem-tool-dot: var(--icon-weak-base);
+}
+
+[data-tandem-tool-state="running"] {
+  --tandem-tool-dot: var(--icon-warning-base);
+}
+
+[data-tandem-tool-state="success"] {
+  --tandem-tool-dot: var(--icon-success-base);
+}
+
+[data-tandem-tool-state="error"] {
+  --tandem-tool-dot: var(--icon-critical-base);
+}
+
+[data-tandem-tool-state] [data-component="tool-trigger"] [data-slot="basic-tool-tool-info-main"]::before {
+  content: "";
+  flex: none;
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  margin-inline-end: 8px;
+  border-radius: 999px;
+  background: var(--tandem-tool-dot);
+}
+
+/* Name(subject): parentheses replace upstream's gap; the closing one stays visible when the subject ellipsizes. */
+[data-component="tool-trigger"] [data-slot="basic-tool-tool-info-main"] {
+  gap: 0;
+}
+
+[data-component="tool-trigger"] [data-slot="basic-tool-tool-title"]:not(:last-child)::after {
+  content: "(";
+  font-weight: var(--font-weight-regular);
+  color: var(--text-base);
+}
+
+[data-component="tool-trigger"] [data-slot="basic-tool-tool-info-main"]:has(> [data-slot="basic-tool-tool-title"]:not(:last-child))::after {
+  content: ")";
+  flex: none;
+  color: var(--text-base);
+}
+
+[data-component="tool-trigger"] [data-slot="basic-tool-tool-info-main"] > [data-slot="basic-tool-tool-arg"] {
+  margin-inline-start: 0.5ch;
+}
+
+/* └ preview line under the call. */
+[data-slot="basic-tool-tool-info-structured"]:has(> [data-slot="tandem-tool-preview"]) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+[data-slot="tandem-tool-preview"] {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 4px;
+  align-items: start;
+  min-width: 0;
+  font-size: 13px;
+  line-height: var(--line-height-compact);
+  text-align: start;
+  color: var(--text-base);
+}
+
+[data-slot="tandem-tool-branch"] {
+  width: 9px;
+  height: 9px;
+  margin-inline-start: 3px;
+  border-inline-start: 1px solid var(--border-weak-hover);
+  border-bottom: 1px solid var(--border-weak-hover);
+}
+
+[data-slot="tandem-tool-preview-text"] {
+  justify-self: start;
+  min-width: 0;
+  max-width: 100%;
+  text-align: start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-slot="collapsible-trigger"]:has([data-slot="tandem-tool-preview"]) {
+  height: auto;
+  min-height: 28px;
+  padding-block: 2px;
+}
+
+/* Command, path and argument text: v1's gray (upstream uses the slightly brighter muted text color). */
+[data-component="tool-trigger"] [data-slot="basic-tool-tool-subtitle"]:not(.subagent-link, .webfetch-link),
+[data-component="tool-trigger"] [data-slot="basic-tool-tool-arg"] {
+  color: var(--text-base);
+}
+
+/* Patch, edit and write files: plain summary rows instead of a bordered card; an opened diff keeps its box. */
+[data-component="accordion"][data-scope="apply-patch"] [data-slot="accordion-item"]:has([data-tandem-patch-summary]) {
+  margin-top: 0;
+
+  & + [data-slot="accordion-item"]:has([data-tandem-patch-summary]) {
+    margin-top: 6px;
+  }
+
+  & [data-slot="accordion-header"] [data-slot="accordion-trigger"] {
+    height: auto;
+    min-height: 28px;
+    padding: 2px 0;
+    border: none;
+    border-radius: 0;
+    background-color: transparent !important;
+    text-align: start;
+  }
+
+  &[data-expanded] [data-slot="accordion-content"] {
+    border-top: 1px solid var(--v2-border-border-base);
+    border-radius: var(--radius-lg);
+  }
+}
