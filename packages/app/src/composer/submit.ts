@@ -318,7 +318,7 @@ function readSubmission(
     delivery: input.delivery?.(alternate) ?? "steer",
     // UPSTREAM-DIVERGENCE: Restored/retried prompts retain their original Corrector setting.
     correctorDisabled: input.adapter.state.correctorDisabled.current() ??
-      (retryID ? retry?.correctorDisabled : undefined) ?? !(input.correctorEnabled?.() ?? true),
+      (retryID ? retry?.correctorDisabled : undefined) ?? !(input.correctorEnabled?.() ?? false),
   }
 }
 

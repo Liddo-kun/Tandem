@@ -265,8 +265,8 @@ export const settingsPersistence = Persistence.migrate(
           ...value,
           general: {
             ...general,
-            // UPSTREAM-DIVERGENCE: Retain the v1 disabled preference without restoring RePrompt.
-            corrector: general.corrector ?? general.promptEnhance !== "off",
+            // UPSTREAM-DIVERGENCE: Retain the v1 preference without restoring RePrompt.
+            corrector: general.corrector ?? (general.promptEnhance === undefined ? undefined : general.promptEnhance !== "off"),
             timelineDetail: general.timelineDetail !== undefined ? general.timelineDetail : {
               shell: legacyTimelineActivity(general.shellToolPartsExpanded),
               edit: legacyTimelineActivity(general.editToolPartsExpanded),
@@ -290,8 +290,8 @@ export const defaultSettings: Settings = {
     mobileTitlebarPosition: "top",
     terminalPlacement: "side",
     followUpBehavior: "steer",
-    // UPSTREAM-DIVERGENCE: Corrector defaults on for new prompts.
-    corrector: true,
+    // UPSTREAM-DIVERGENCE: Corrector defaults off for new prompts.
+    corrector: false,
   },
   // UPSTREAM-DIVERGENCE: Android page zoom defaults to 100%.
   appearance: { displayScale: 1, fontSize: 14, mono: "", sans: "", terminal: "", tabLayout: "horizontal" },
@@ -361,7 +361,7 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
       },
       general: {
         // UPSTREAM-DIVERGENCE: Expose the persisted Corrector preference and toggle action.
-        corrector: withFallback(() => store.general?.corrector, defaultSettings.general.corrector ?? true),
+        corrector: withFallback(() => store.general?.corrector, defaultSettings.general.corrector ?? false),
         setCorrector(value: boolean) {
           setStore("general", "corrector", value)
         },

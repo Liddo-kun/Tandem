@@ -16,7 +16,8 @@ const keys: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   write: { path: "file_path", filePath: "file_path" },
   edit: { path: "file_path", filePath: "file_path", oldString: "old_string", newString: "new_string", replaceAll: "replace_all" },
   grep: { include: "glob" }, skill: { id: "skill", name: "skill" },
-  subagent: { background: "run_in_background" }, task: { background: "run_in_background" },
+  shell: { background: "run_in_background" }, bash: { background: "run_in_background" },
+  subagent: { agent: "subagent_type", background: "run_in_background" }, task: { agent: "subagent_type", background: "run_in_background" },
 }
 const nameFor = (name: string) => names[name] ?? name.charAt(0).toUpperCase() + name.slice(1)
 const record = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)
@@ -57,8 +58,9 @@ export function request(input: LLMRequest, selectedClaude = isClaude(input.model
     outbound.set(role, { name, keys: mapping })
     reverse.set(name, { name: role, keys: Object.fromEntries(Object.entries(mapping).map(([a, b]) => [b, a])) })
     const properties = tool.inputSchema.properties
+    // Plain-word keys ("agent", "background") also occur in prose; only their `key=` form is renamed.
     const description = (text: string) => Object.entries(mapping).reduce((text, [from, to]) =>
-      ["filePath", "oldString", "newString", "replaceAll"].includes(from) ? text.replaceAll(from, to) : text, references(text))
+      ["filePath", "oldString", "newString", "replaceAll"].includes(from) ? text.replaceAll(from, to) : text.replaceAll(`(${from}=`, `(${to}=`), references(text))
     return new ToolDefinition({
       ...tool, name,
       description: description(tool.description),
