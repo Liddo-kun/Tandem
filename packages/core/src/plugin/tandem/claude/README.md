@@ -33,7 +33,7 @@ the shims.
 - `plugin.ts` selects the base prompt, relocates the instruction baseline, and adjusts Skill guidance.
 - `instructions.ts` changes only Claude-facing rendering of skills, environment text, Code Mode references, and search guidance.
 - `presentation.ts` maps native tool schemas, request history, streamed tool events, billing metadata, and clear-thinking request options.
-- `anthropic.txt` is the bundled Claude base prompt.
+- `anthropic.txt` is the bundled Claude base prompt for every Claude model. It follows Claude Code 2.1.291's Opus 5.5 prompt, without Claude Code-only sections, plus Tandem's communication and turn-ending rules.
 - `../bash-search/{plugin,shims}.ts` probes dependencies, filters tool snapshots, and supplies subprocess-local shims.
 - `packages/core/src/session/{context,model-request}.ts` applies presentation after model and plugin hooks and before transport.
 - `packages/ai/src/{cache-policy.ts,protocols/anthropic-messages.ts}` owns cache and context-management lowering.
