@@ -55,7 +55,8 @@ Everything lives in `~/.local/share/tandem-v2/development/`: `bin/tandem`, expli
 `environment.json`, a JSON object of `TANDEM_*` string values that override the inherited environment
 (merge edits rather than replacing the file). The launcher clears inherited `OPENCODE_CONFIG*`, sets
 `TMPDIR=/tmp/tandem/v2`, and keeps the server's loaded settings until it restarts. Its config folder
-links to the daily `AGENTS.md`, selected skills and every other `~/.config` entry. App: **Tandem Dev**
+links to the daily `AGENTS.md`, `opencode.jsonc` and `skills`, so it has the daily subagents, skills
+and settings; replace a link with a copy to try a setting on development only. App: **Tandem Dev**
 (`app.liddokun.tandem.v2`); enter `http://192.168.1.85:4098` manually or pair with
 `bun script/tandem-v2.ts cli pair --server http://127.0.0.1:4098`.
 
@@ -71,7 +72,7 @@ development server run `bun script/tandem-v2.ts cli auth login ... --server http
 | Claude | `anthropic --method claude-pro-max` | Needs the plugin below. Paste the full callback URL, `code#state` or `code=...&state=...` within ten minutes; a bare code is rejected. |
 
 The Claude plugin is registered in the global config (daily `~/.config/tandem/opencode.jsonc`,
-development `config/tandem/opencode.json`) as
+which development links to) as
 `"plugins": ["file:///home/jon/code/opencode-anthropic-auth-v2"]` (v2 uses `plugins`, plural). Never
 register the v1 copy, `~/code/opencode-anthropic-auth`. Its dependency setup and the optional
 `ANTHROPIC_BASE_URL`/`ANTHROPIC_INSECURE` transport settings are in that repo's `V2-TRANSPORT.md`.
