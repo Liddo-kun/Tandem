@@ -1,9 +1,10 @@
-// Tandem-owned (not in upstream): model-facing Read, shell, and patch usage guidance.
+// Tandem-owned (not in upstream): model-facing Read, shell, patch, and subagent usage guidance.
 export * as ToolGuidancePlugin from "./plugin.js"
 
 import { define } from "@opencode/plugin/effect/plugin"
 import type { SessionHooks } from "@opencode/plugin/effect/session"
-import { Effect } from "effect"
+import { Effect, Schema, Struct } from "effect"
+import { SubagentTool } from "../../../tool/plugin/subagent.js"
 
 export const Plugin = define({
   id: "tandem.tool-guidance",
@@ -21,6 +22,15 @@ export const Plugin = define({
           "Use the `patch` tool to edit files.",
           "The `patch` tool combines file creation, editing, deletion, and rename/move operations. Supply the patch in `patchText`.",
         )
+      })
+      // Each subagent's configured model is chosen through its agent, so the model override is not offered.
+      editor.update("subagent", (tool) => {
+        tool.input = SubagentTool.Input.mapFields((fields) => ({
+          ...Struct.omit(fields, ["model"]),
+          agent: Schema.String.annotate({
+            description: 'The subagent to run: one of the IDs under "Available subagents" in this tool\'s description.',
+          }),
+        }))
       })
     }).pipe(Effect.orDie)
 
