@@ -5,7 +5,7 @@
 
 ## Debugging
 
-- Debug against the development server (4098) and the Tandem V2 app. Leave the daily server (4097), its app and the Tandem v1 fallback (4095) alone unless Jon asks.
+- Debug against the development server (4098) and the Tandem Dev app. Leave the daily server (4097), its app and the Tandem v1 fallback (4095) alone unless Jon asks.
 
 ## Local Dev
 

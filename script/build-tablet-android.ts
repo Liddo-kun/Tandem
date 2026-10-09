@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 // Tandem-owned (not in upstream): build (and optionally install) the Tandem Android app natively
-// on the tablet. Builds the daily app by default, or the side-by-side Tandem V2 test app with --dev.
+// on the tablet. Builds the daily app by default, the side-by-side Tandem Dev test app with --dev,
+// or the side-by-side Tandem Desktop app (production key) with --desktop.
 // See notes/tandem-setup.md for signing and the toolchain.
 
 import { createWriteStream } from "fs"
@@ -29,6 +30,7 @@ let doInstall = false
 let overwrite = false
 let release = true
 let dev = false
+let desktop = false
 let device = process.env["ANDROID_SERIAL"] ?? ""
 
 for (let i = 0; i < args.length; i++) {
@@ -54,6 +56,9 @@ for (let i = 0; i < args.length; i++) {
     case "--dev":
       dev = true
       break
+    case "--desktop":
+      desktop = true
+      break
     case "--device":
       device = requireValue(arg, args[++i])
       break
@@ -66,7 +71,12 @@ if (process.platform !== "linux" || process.arch !== "arm64") {
   throw new Error("This tablet build requires aarch64 Linux.")
 }
 
-const config = dev ? path.join(root, "packages/android/src-tauri/tauri.v2.conf.json") : undefined
+if (dev && desktop) throw new Error("Pass either --dev or --desktop, not both.")
+const config = dev
+  ? path.join(root, "packages/android/src-tauri/tauri.v2.conf.json")
+  : desktop
+    ? path.join(root, "packages/android/src-tauri/tauri.desktop.conf.json")
+    : undefined
 const logDir = "/tmp/tandem/v2"
 await fs.mkdir(logDir, { recursive: true })
 process.env["TMPDIR"] = path.join(logDir, "tmp")
@@ -74,9 +84,9 @@ await fs.mkdir(process.env["TMPDIR"], { recursive: true })
 process.env["GRADLE_USER_HOME"] = path.join(logDir, "gradle")
 process.env["XDG_CACHE_HOME"] = path.join(logDir, "cache")
 process.env["BUN_INSTALL_CACHE_DIR"] = path.join(logDir, "bun-install-cache")
-process.env["OPENCODE_ANDROID_VARIANT"] = dev ? "v2" : "production"
+process.env["OPENCODE_ANDROID_VARIANT"] = dev ? "v2" : desktop ? "desktop" : "production"
 process.env["PATH"] = [path.dirname(bun), process.env["PATH"]].filter(Boolean).join(path.delimiter)
-const expectedId = dev ? "app.liddokun.tandem.v2" : "app.liddokun.tandem"
+const expectedId = dev ? "app.liddokun.tandem.v2" : desktop ? "app.liddokun.tandem.desktop" : "app.liddokun.tandem"
 const applicationId = await resolveApplicationId()
 if (applicationId !== expectedId) {
   throw new Error(`Expected ${expectedId}; build config resolves to ${applicationId}.`)
@@ -147,7 +157,7 @@ async function resolveApplicationId() {
   return identifier
 }
 
-// Both apps share Tauri's single generated project, so regenerate it when it belongs to the other app.
+// All apps share Tauri's single generated project, so regenerate it when it belongs to another app.
 async function ensureAndroidProject() {
   const project = path.join(root, "packages/android/src-tauri/gen/android")
   const gradle = Bun.file(path.join(project, "app/build.gradle.kts"))
@@ -218,7 +228,7 @@ async function install(apk: string) {
   console.log(`\nInstalling to ${serial}...`)
   let res = await capture([adb, "-s", serial, "install", "-r", apk])
   if (res.code !== 0 && /signatures do not match|INSTALL_FAILED_UPDATE_INCOMPATIBLE/i.test(res.stdout + res.stderr)) {
-    if (!dev) throw new Error(`Signature mismatch with the installed daily ${applicationId}; it is never uninstalled.`)
+    if (!dev) throw new Error(`Signature mismatch with the installed ${applicationId}; it is never uninstalled.`)
     if (!overwrite) {
       throw new Error(
         `Signature mismatch with installed ${applicationId}. ` +
@@ -327,12 +337,14 @@ function printHelp() {
   console.log(`Usage: bun run tandem:tablet -- [options]
 
 Builds the Tandem release APK (app.liddokun.tandem, production key) natively on aarch64 Linux,
-or the side-by-side Tandem V2 test app (app.liddokun.tandem.v2) with --dev. Reruns itself under
-the pinned Bun 1.4.2 and regenerates the shared Android project when it belongs to the other app.
+the side-by-side Tandem Dev test app (app.liddokun.tandem.v2) with --dev, or the side-by-side
+Tandem Desktop app (app.liddokun.tandem.desktop, production key) with --desktop. Reruns itself under
+the pinned Bun 1.4.2 and regenerates the shared Android project when it belongs to another app.
 
 Options:
   --install      adb install -r the APK after building
-  --dev          Build the Tandem V2 test app instead of the daily app
+  --dev          Build the Tandem Dev test app instead of the daily app
+  --desktop      Build the Tandem Desktop app (for a remote desktop server) instead of the daily app
   --overwrite    With --dev: like --install, but uninstall a signature-mismatched test app first
                  (erases its data). The daily app is never uninstalled.
   --debug        Build a debug APK instead of release
@@ -342,5 +354,6 @@ Options:
 
 Examples:
   bun run tandem:tablet -- --install
-  bun run tandem:tablet -- --dev --install`)
+  bun run tandem:tablet -- --dev --install
+  bun run tandem:tablet -- --desktop --install`)
 }

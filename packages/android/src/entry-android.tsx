@@ -69,7 +69,7 @@ function App() {
     ...createServerDiscovery(),
     onResume: (callback) => bridge.on("resume", callback),
     serverSetup: {
-      serve: `tandem serve --hostname 0.0.0.0 --port ${import.meta.env.TANDEM_ANDROID_NAME === "Tandem V2" ? "4098" : "4097"}`,
+      serve: `tandem serve --hostname 0.0.0.0 --port ${import.meta.env.TANDEM_ANDROID_NAME === "Tandem Dev" ? "4098" : "4097"}`,
     },
   }
 

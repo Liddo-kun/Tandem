@@ -29,7 +29,7 @@ class MainActivity : TauriActivity() {
   override fun onWebViewCreate(webView: WebView) {
     this.webView = webView
     super.onWebViewCreate(webView)
-    if (applicationContext.packageName == "app.liddokun.tandem.v2") {
+    if (applicationContext.packageName in setOf("app.liddokun.tandem", "app.liddokun.tandem.v2")) {
       WebView.setWebContentsDebuggingEnabled(true)
     }
     webView.settings.setSupportZoom(false)

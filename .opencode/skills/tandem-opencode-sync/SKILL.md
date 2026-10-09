@@ -22,7 +22,7 @@ the practical code rules it keeps.
   uncommitted work; do not auto-stash, reset, restore or clean. A dirty worktree blocks
   a merge until its owners and Jon settle the integration plan.
 - Verify on the development server first: port 4098, the isolated launcher and
-  `app.liddokun.tandem.v2` (**Tandem V2**) with separate data/signing. The daily install
+  `app.liddokun.tandem.v2` (**Tandem Dev**) with separate data/signing. The daily install
   (`/usr/local/bin/tandem`, port 4097, `app.liddokun.tandem`) changes only when Jon asks
   to install. Never copy daily credentials or run another server against the same database.
 - Run builds and browser/device workflows one at a time. Installation,

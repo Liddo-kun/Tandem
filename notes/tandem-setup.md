@@ -55,7 +55,7 @@ Everything lives in `~/.local/share/tandem-v2/development/`: `bin/tandem`, expli
 `environment.json`, a JSON object of `TANDEM_*` string values that override the inherited environment
 (merge edits rather than replacing the file). The launcher clears inherited `OPENCODE_CONFIG*`, sets
 `TMPDIR=/tmp/tandem/v2`, and keeps the server's loaded settings until it restarts. Its config folder
-links to the daily `AGENTS.md`, selected skills and every other `~/.config` entry. App: **Tandem V2**
+links to the daily `AGENTS.md`, selected skills and every other `~/.config` entry. App: **Tandem Dev**
 (`app.liddokun.tandem.v2`); enter `http://192.168.1.85:4098` manually or pair with
 `bun script/tandem-v2.ts cli pair --server http://127.0.0.1:4098`.
 
@@ -94,11 +94,11 @@ Server-environment settings. Corrector's are in [tandem-corrector.md](tandem-cor
 
 ## Building the Android app
 
-`bun run tandem:tablet -- --install` builds and installs the daily app; `--dev` selects the Tandem V2
-test app, `--debug` a debug APK, `--help` the rest. The script reruns itself under the pinned Bun,
+`bun run tandem:tablet -- --install` builds and installs the daily app; `--dev` selects the Tandem Dev
+test app, `--desktop` the Tandem Desktop app (production key, for the Windows desktop's server), `--debug` a debug APK, `--help` the rest. The script reruns itself under the pinned Bun,
 loads the Android toolchain, and regenerates the shared generated project
-(`packages/android/src-tauri/gen/android`, ignored by Git) when it was set up for the other app, so
-build the two apps one at a time. It installs to `127.0.0.1:5555` unless `--device` is given, after
+(`packages/android/src-tauri/gen/android`, ignored by Git) when it was set up for another app, so
+build the apps one at a time. It installs to `127.0.0.1:5555` unless `--device` is given, after
 checking the APK's application ID. `--overwrite` (test app only) uninstalls a test app with a
 mismatched signature; the daily app is never uninstalled. Logs: `/tmp/tandem/v2/android-build.log` and
 `android-init.log`; Gradle and other caches are under `/tmp/tandem/v2`.

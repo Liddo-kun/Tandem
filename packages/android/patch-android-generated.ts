@@ -20,8 +20,10 @@ const buildGradlePath = path.join(import.meta.dir, "src-tauri", "gen", "android"
 const stringsPath = generated("res", "values", "strings.xml")
 const mainActivityTemplatePath = path.join(import.meta.dir, "src-tauri", "templates", "MainActivity.kt")
 const baseConfig = (await Bun.file(path.join(import.meta.dir, "src-tauri", "tauri.conf.json")).json()) as TauriConfig
-const config: TauriConfig = process.env.OPENCODE_ANDROID_VARIANT === "v2"
-  ? { ...baseConfig, ...await Bun.file(path.join(import.meta.dir, "src-tauri", "tauri.v2.conf.json")).json() }
+const variantConfigs: Record<string, string> = { v2: "tauri.v2.conf.json", desktop: "tauri.desktop.conf.json" }
+const variantConfig = variantConfigs[process.env.OPENCODE_ANDROID_VARIANT ?? ""]
+const config: TauriConfig = variantConfig
+  ? { ...baseConfig, ...await Bun.file(path.join(import.meta.dir, "src-tauri", variantConfig)).json() }
   : baseConfig
 const manifest = Bun.file(manifestPath)
 const mainActivity = await findMainActivity()
