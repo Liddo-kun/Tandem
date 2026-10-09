@@ -172,14 +172,8 @@ export const layer = (options?: Options) =>
           notificationID: background.notificationID,
           recovery,
           run: execution.resume(recovery.childSessionID).pipe(
-            Effect.andThen(store.context(recovery.childSessionID)),
-            Effect.map((messages) => {
-              const assistant = messages.findLast(
-                (message) =>
-                  message.type === "assistant" && message.time.completed !== undefined && message.error === undefined,
-              )
-              return SubagentCompletion.text(assistant)
-            }),
+            // UPSTREAM-DIVERGENCE: recover Tandem's finals from the persisted job boundary, including compacted history.
+            Effect.andThen(SubagentCompletion.collect(sessions, recovery)),
           ),
         })
         yield* jobs.background(background.id)

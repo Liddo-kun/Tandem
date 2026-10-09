@@ -43,12 +43,8 @@ export const make: Effect.Effect<Runner, never, Session.Service | Job.Service | 
         recovery,
         run: Effect.gen(function* () {
           yield* sessions.resume(recovery.childSessionID)
-          const messages = yield* sessions.messages({ sessionID: recovery.childSessionID, order: "desc", limit: 20 })
-          const assistant = messages.find(
-            (message) =>
-              message.type === "assistant" && message.time.completed !== undefined && message.error === undefined,
-          )
-          return SubagentCompletion.text(assistant)
+          // UPSTREAM-DIVERGENCE: Tandem preserves earlier final answers across in-flight follow-ups.
+          return yield* SubagentCompletion.collect(sessions, recovery)
         }),
       }),
     background: Effect.fn("SubagentJob.background")(function* (recovery: Recovery) {

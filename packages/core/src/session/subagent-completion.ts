@@ -7,6 +7,47 @@ import type { SessionMessage } from "./message.js"
 
 export const NO_TEXT = "Subagent completed without a text response."
 
+// UPSTREAM-DIVERGENCE: Tandem collects every final answer in this job, not just the newest assistant step.
+export const collect = Effect.fnUntraced(function* (
+  sessions: Pick<Session.Interface, "messages">,
+  recovery: Extract<Job.Recovery, { kind: "subagent" }>,
+) {
+  const messages = yield* sessions.messages({
+    sessionID: recovery.childSessionID,
+    order: "asc",
+    type: "assistant",
+    ...(recovery.promptID ? { cursor: { id: recovery.promptID, direction: "next" as const } } : {}),
+  })
+  // Pre-upgrade durable jobs have no boundary; preserve their latest-message behavior rather than replay old turns.
+  if (!recovery.promptID)
+    return text(
+      messages.findLast(
+        (message) => message.type === "assistant" && message.time.completed !== undefined && !message.error,
+      ),
+    )
+  const answers = messages.flatMap((message) => {
+    if (
+      message.type !== "assistant" ||
+      message.time.completed === undefined ||
+      message.error !== undefined ||
+      message.finish !== "stop" ||
+      message.content.some((part) => part.type === "tool" && !part.executed)
+    )
+      return []
+    const parts = message.content.filter((part) => part.type === "text")
+    const final = parts.some((part) => part.state?.phase === "final_answer")
+    const answer = parts
+      .filter((part) => (final ? part.state?.phase === "final_answer" : part.state?.phase !== "commentary"))
+      .map((part) => part.text)
+      .filter((value) => value.length > 0)
+      .join("\n\n")
+    return answer ? [answer] : []
+  })
+  if (answers.length === 0) return NO_TEXT
+  if (answers.length === 1) return answers[0]
+  return answers.map((answer, index) => `### Subagent final answer ${index + 1}\n\n${answer}`).join("\n\n")
+})
+
 export function text(message: SessionMessage.Info | undefined) {
   if (message?.type !== "assistant") return NO_TEXT
   return (

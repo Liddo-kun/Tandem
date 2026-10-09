@@ -202,12 +202,17 @@ export const Plugin = {
 
               // Standard prompt admission outside the job: Job.start joining a running child skips
               // its run effect, and the default wake starts an idle child or steers a running one.
-              yield* sessions
+              // UPSTREAM-DIVERGENCE: anchor Tandem's output collection to this admitted prompt before execution can finish.
+              const prompted = yield* sessions
                 .prompt({
                   sessionID: child.id,
                   text:
                     existing === undefined
-                      ? ["You are a subagent spawned by another session.", input.prompt].join("\n")
+                      ? [
+                          // UPSTREAM-DIVERGENCE: expand upstream's first-prompt intro into Tandem's delivery reminder.
+                          "<system-reminder>\nYou are a subagent spawned by another session. At idle, the main agent receives your completed final answers in order, but not commentary or tool output. Include all needed findings in your final answer.\n</system-reminder>",
+                          input.prompt,
+                        ].join("\n")
                       : input.prompt,
                   ...(background && existing === undefined ? { resume: false } : {}),
                 })
@@ -223,6 +228,8 @@ export const Plugin = {
                 childSessionID: child.id,
                 agent: agent.name,
                 description: input.description,
+                // UPSTREAM-DIVERGENCE: a running Tandem job keeps its original prompt boundary.
+                promptID: prompted.id,
               }
               yield* subagents.start(recovery)
 

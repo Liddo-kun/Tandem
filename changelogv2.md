@@ -8,6 +8,7 @@ Baseline: OpenCode `upstream/v2` at `80c4a6b7c8` (2026-10-06, `@opencode/cli` 2.
 
 ### 2026-10-09
 
+- **Added — Tandem subagent answer-delivery enhancement:** steering a running child preserves all completed final answers in order, instead of returning only its last answer. The first delegated prompt explains that final answers reach the main agent while commentary and intermediate tool steps do not.
 - **Changed — Subagent tool has no model option:** the subagent tool no longer offers a `model` field, for GPT and Claude alike; a subagent runs on its agent's configured model (for example `general-sol` on GPT-6.1 Sol), or the parent session's model if it has none. This shortens the tool's description in every system prompt. [Tool descriptions](logv2.md#instructions-and-tool-guidance).
 
 ### 2026-10-07
