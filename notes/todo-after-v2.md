@@ -75,6 +75,12 @@ and extension points before porting the integration. Browser-backed webfetch rem
 
 - [ ] Look for bugs in queued prompt editing and resending.
 
+## Android swipe lock
+
+- [ ] Reproduce Jon's original horizontal tab-strip swipe failure using only native touch input, then verify a fix in Tandem Dev. It happened before WebView debugging was enabled and may relate to the composer's cursor magnifier; its cause remains unconfirmed.
+- The later chat-wide lock had a real Chromium `TouchActionFilter` counter imbalance: a finger swipe started with one touch already counted, incremented to two, and ended at one. The page supplied `AUTO`, but the filter retained `NONE`, blocking scrolling while taps worked. An Android touch-cancel did not recover it.
+- **Diagnostic contamination found 2026-10-09:** on a freshly restarted development app (WebView 153.0.8010.36), native swipes had balanced counts and reset touch action. A CDP `Input.synthesizeScrollGesture` timed out, and the next native swipe produced two increments and one decrement; subsequent native swipes retained the extra touch. Earlier debugger-generated swipes therefore could have caused the chat-wide lock. Do not treat that trace as proof of the original user-triggered bug or add a scrolling workaround based on it. After restarting development again, native composer cursor swipes and subsequent chat swipes had balanced counts. Scratch evidence: `/tmp/tandem/v2/{dev-baseline,dev-after-cdp,dev-after-cdp-second,native-cursor,native-post-cursor}-trace.json`.
+
 ## Webfetch concurrency
 
 - [ ] Jon will compare v1 and v2 browser-fetch concurrency. v2 serializes each whole fetch process-wide

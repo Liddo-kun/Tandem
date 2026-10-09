@@ -34,4 +34,5 @@
   `sudo install -m 755 packages/cli/dist/cli-linux-arm64/bin/opencode /usr/local/bin/tandem.new && sudo mv /usr/local/bin/tandem.new /usr/local/bin/tandem`. It takes effect when the daily server restarts.
 - Daily server restart: `setsid nohup tandem-restart-daily >/dev/null 2>&1 </dev/null &`. It waits until the server is idle, restarts it through its widget and logs to `~/.local/share/tandem-v2/restart-daily.log`; it works from a session on the daily server.
 - Native Android insets have one owner, `packages/android/src/viewport.ts`; check keyboard/titlebar/composer changes at different zooms and orientations.
+- Android touch checks must use real fingers or `adb -s <serial> shell input touchscreen ...`. Do not use CDP `Input.synthesizeScrollGesture` in the WebView: it can leave Chromium's active-touch counter stuck and contaminate later scrolling checks. CDP remains useful for inspection and tracing. Reproduce on a freshly started development app after any synthetic-input experiment.
 - GitHub operations target `Liddo-kun/Tandem` explicitly, because this checkout also has the OpenCode remote.
