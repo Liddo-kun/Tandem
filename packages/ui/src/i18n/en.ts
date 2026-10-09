@@ -206,6 +206,8 @@ const source = {
   "ui.tool.agent": "{{type}} Agent",
   "ui.tool.agent.default": "Agent",
   "ui.tool.agent.delegating": "Delegating agent…",
+  // UPSTREAM-DIVERGENCE: distinguish follow-up calls to the same child session.
+  "ui.tool.agent.followUp": "Follow-up",
   "ui.tool.skill": "Skill",
 
   "ui.basicTool.called": "Called `{{tool}}`",

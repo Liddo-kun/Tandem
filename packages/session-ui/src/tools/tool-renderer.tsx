@@ -1868,6 +1868,10 @@ ToolRegistry.register({
 
       if (typeof value === "string" && value) return value
 
+      // UPSTREAM-DIVERGENCE: a follow-up identifies its child directly, even before progress metadata arrives.
+      const existing = props.input.sessionID
+      if (typeof existing === "string" && existing) return existing
+
       return taskSession(props.input, data.sessionID, data.store.session)
     })
 
@@ -1880,11 +1884,13 @@ ToolRegistry.register({
       return props.metadata.background === true || (props.status === "completed" && props.metadata.status === "running")
     })
 
+    // UPSTREAM-DIVERGENCE: use the child's identity for every call and distinguish follow-ups.
+    const followUp = () => typeof props.input.sessionID === "string" && !!props.input.sessionID
     const subtitle = createMemo(() => {
       const value =
-        typeof props.input.description === "string" && props.input.description
-          ? props.input.description
-          : childSessionId()
+        data.store.session.find((session) => session.id === childSessionId())?.title ||
+        childSessionId() ||
+        (typeof props.input.description === "string" ? props.input.description : undefined)
 
       if (!value) return value
 
@@ -1955,7 +1961,15 @@ ToolRegistry.register({
               </Show>
               <span data-component="task-tool-title">{title()}</span>
               <Show when={subtitle()}>
-                <span data-slot="basic-tool-tool-subtitle">{subtitle()}</span>
+                {/* UPSTREAM-DIVERGENCE: isolate mixed-direction session titles and identify follow-up calls. */}
+                <span data-slot="basic-tool-tool-subtitle">
+                  <bdi>{subtitle()}</bdi>
+                </span>
+              </Show>
+              <Show when={followUp()}>
+                <span class="ms-2 shrink-0 text-12-regular text-v2-text-text-muted">
+                  {i18n.t("ui.tool.agent.followUp")}
+                </span>
               </Show>
             </div>
             <Show when={clickable()}>

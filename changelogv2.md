@@ -8,6 +8,7 @@ Baseline: OpenCode `upstream/v2` at `80c4a6b7c8` (2026-10-06, `@opencode/cli` 2.
 
 ### 2026-10-10
 
+- **Changed — Subagent call labels:** initial and follow-up cards show the same child-session title. Later calls are marked Follow-up.
 - **Added — Direct subagent chat:** open a child session to steer it or continue chatting, with its normal composer and context-token display. During an active delegated task, direct user prompts are quoted separately before the answers returned to the main agent. After that task ends, replies stay in the child session, as explained beside the composer.
 
 ### 2026-10-09

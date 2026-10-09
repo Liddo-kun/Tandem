@@ -51,6 +51,12 @@
   margin-inline-start: 0.5ch;
 }
 
+/* Stable subagent titles may be long; reserve space for the follow-up label and navigation arrow. */
+[data-component="task-tool-card"] [data-slot="basic-tool-tool-subtitle"] {
+  flex: 1 1 auto;
+  margin-inline-start: 8px;
+}
+
 /* └ preview line under the call. */
 [data-slot="basic-tool-tool-info-structured"]:has(> [data-slot="tandem-tool-preview"]) {
   flex-direction: column;
