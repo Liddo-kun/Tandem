@@ -108,6 +108,8 @@ export const Plugin = define({
                   const prompted = yield* sessions.prompt({
                     ...input.prompt,
                     sessionID: child.id,
+                    // UPSTREAM-DIVERGENCE: mark command-spawned prompts as parent delegation.
+                    metadata: { tandemSubagentPrompt: true },
                     text: [
                       // UPSTREAM-DIVERGENCE: expand upstream's first-prompt intro into Tandem's delivery reminder.
                       "<system-reminder>\nYou are a subagent spawned by another session. At idle, the main agent receives your completed final answers in order, but not commentary or tool output. Include all needed findings in your final answer.\n</system-reminder>",

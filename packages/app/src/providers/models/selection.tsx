@@ -92,11 +92,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
     const id = createMemo(() => params.id || undefined)
 
-    const list = createMemo(() =>
-      normalizeAgentList(data.location.agent.list({ directory: sdk().directory }) ?? []).filter(
-        (item) => item.mode !== "subagent" && !item.hidden,
-      ),
-    )
+    // UPSTREAM-DIVERGENCE: a directly prompted child must retain its current subagent instead of falling back to Build.
+    const list = createMemo(() => {
+      const sessionID = id()
+      const session = sessionID ? data.session.get(sessionID) : undefined
+      return normalizeAgentList(data.location.agent.list({ directory: sdk().directory }) ?? []).filter(
+        (item) => (session?.parentID && item.name === session.agent) || (item.mode !== "subagent" && !item.hidden),
+      )
+    })
 
     const agentsVisible = createMemo(() => settings.visibility.customAgents() || hasCustomAgent(list()))
     const connected = createMemo(() => new Set(providers.connected().map((item) => item.id)))

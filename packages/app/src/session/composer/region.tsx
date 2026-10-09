@@ -108,7 +108,8 @@ export function createActiveSessionRegion(input: {
   }
 
   const focus = () => {
-    if (!input.session.data.isChild()) promptRef?.focus()
+    // UPSTREAM-DIVERGENCE: direct child chat supports the normal composer focus command.
+    promptRef?.focus()
   }
 
   const openParent = () => {
@@ -176,7 +177,8 @@ export function createActiveSessionRegion(input: {
 
     if (event.key.length !== 1 || event.key === "Unidentified" || event.ctrlKey || event.metaKey) return
 
-    if (state.blocked() || input.session.data.isChild() || !promptRef) return
+    // UPSTREAM-DIVERGENCE: typing can focus a child's enabled composer too.
+    if (state.blocked() || !promptRef) return
     promptRef.focus()
     setCursorPosition(promptRef, prompt.cursor() ?? promptLength(prompt.current()))
   }

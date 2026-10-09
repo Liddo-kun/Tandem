@@ -4,10 +4,12 @@ import { Effect } from "effect"
 import type { Job } from "../job.js"
 import type { Session } from "../session.js"
 import type { SessionMessage } from "./message.js"
+// UPSTREAM-DIVERGENCE: keep Tandem's steering presentation in an owned module.
+import { withUserSteering } from "./tandem-subagent-steering.js"
 
 export const NO_TEXT = "Subagent completed without a text response."
 
-// UPSTREAM-DIVERGENCE: Tandem collects every final answer in this job, not just the newest assistant step.
+// UPSTREAM-DIVERGENCE: Tandem collects this job's final answers and separately reports direct user steering.
 export const collect = Effect.fnUntraced(function* (
   sessions: Pick<Session.Interface, "messages">,
   recovery: Extract<Job.Recovery, { kind: "subagent" }>,
@@ -15,7 +17,7 @@ export const collect = Effect.fnUntraced(function* (
   const messages = yield* sessions.messages({
     sessionID: recovery.childSessionID,
     order: "asc",
-    type: "assistant",
+    ...(recovery.promptID ? {} : { type: "assistant" as const }),
     ...(recovery.promptID ? { cursor: { id: recovery.promptID, direction: "next" as const } } : {}),
   })
   // Pre-upgrade durable jobs have no boundary; preserve their latest-message behavior rather than replay old turns.
@@ -43,9 +45,14 @@ export const collect = Effect.fnUntraced(function* (
       .join("\n\n")
     return answer ? [answer] : []
   })
-  if (answers.length === 0) return NO_TEXT
-  if (answers.length === 1) return answers[0]
-  return answers.map((answer, index) => `### Subagent final answer ${index + 1}\n\n${answer}`).join("\n\n")
+  const output =
+    answers.length === 0
+      ? NO_TEXT
+      : answers.length === 1
+        ? answers[0]
+        : answers.map((answer, index) => `### Subagent final answer ${index + 1}\n\n${answer}`).join("\n\n")
+  // UPSTREAM-DIVERGENCE: report direct user steering separately from the collected finals.
+  return withUserSteering(messages, output)
 })
 
 export function text(message: SessionMessage.Info | undefined) {

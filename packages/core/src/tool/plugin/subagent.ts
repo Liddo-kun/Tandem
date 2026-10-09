@@ -206,6 +206,8 @@ export const Plugin = {
               const prompted = yield* sessions
                 .prompt({
                   sessionID: child.id,
+                  // UPSTREAM-DIVERGENCE: distinguish parent delegation from direct user steering in child output.
+                  metadata: { tandemSubagentPrompt: true },
                   text:
                     existing === undefined
                       ? [

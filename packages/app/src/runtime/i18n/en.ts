@@ -292,6 +292,8 @@ export const dict = {
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
   "session.child.promptDisabled": "Subagent sessions cannot be prompted.",
+  // UPSTREAM-DIVERGENCE: explain local-only chat after a delegated job ends.
+  "session.child.chatNotice": "Replies after the delegated task ends are not sent to the main session.",
   "session.child.backToParent": "Back to main session.",
 
   "prompt.action.attachFile": "Add files",

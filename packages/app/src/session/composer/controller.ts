@@ -43,7 +43,8 @@ export function createSessionComposerController(input: {
   })
 
   const composer = createComposerModel(adapter, { queue })
-  const editable = createMemo(() => region.showComposer() && !region.child())
+  // UPSTREAM-DIVERGENCE: child sessions use the same composer and drag/drop behavior as primary sessions.
+  const editable = createMemo(() => !region.state.blocked())
   // Requests hide the view without disposing its draft or queue edit.
   createEffect(on(editable, () => composer.onDragLeave()))
 

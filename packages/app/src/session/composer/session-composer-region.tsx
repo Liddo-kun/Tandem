@@ -66,12 +66,10 @@ export function SessionComposerRegion(props: {
               "relative z-[70]": true,
             }}
           >
-            <Show when={controller.child()} fallback={<Show when={!controller.state.blocked()}>{props.composer}</Show>}>
-              <div
-                ref={controller.setPromptRef}
-                class="w-full rounded-[12px] border border-border-weak-base bg-background-base p-3 text-16-regular text-text-weak"
-              >
-                <span>{language.t("session.child.promptDisabled")} </span>
+            {/* UPSTREAM-DIVERGENCE: Tandem permits direct child chat and explains the parent-delivery boundary. */}
+            <Show when={controller.child()}>
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 pb-2 text-12-regular text-text-weak">
+                <span>{language.t("session.child.chatNotice")}</span>
                 <Show when={controller.parentID()}>
                   <button
                     type="button"
@@ -83,6 +81,7 @@ export function SessionComposerRegion(props: {
                 </Show>
               </div>
             </Show>
+            <Show when={!controller.state.blocked()}>{props.composer}</Show>
           </div>
         </Show>
       </div>
