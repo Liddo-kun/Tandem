@@ -4,7 +4,6 @@ import { addPluginListener, invoke } from "@tauri-apps/api/core"
 const commands = {
   scanNetwork: "scan_network",
   cancelScan: "cancel_scan",
-  share: "share",
 } as const
 
 const resolve = (method: string) => {

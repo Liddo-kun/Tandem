@@ -3,7 +3,6 @@ const COMMANDS: &[&str] = &[
     "remove_listener",
     "scan_network",
     "cancel_scan",
-    "share",
 ];
 
 fn main() {

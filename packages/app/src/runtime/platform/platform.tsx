@@ -89,22 +89,16 @@ type PlatformBase = {
   /** Set the default server URL to use on app startup (platform-specific) */
   setDefaultServer?(url: ServerConnection.Key | null): Promise<void> | void
 
-  // UPSTREAM-DIVERGENCE: Optional native Android zoom, haptics, sharing, discovery and resume capabilities.
+  // UPSTREAM-DIVERGENCE: Optional native Android zoom, discovery and setup help.
   /** Native webview zoom level. */
   webviewZoom?: Accessor<number>
 
   /** Native page zoom; browsers can omit this capability. */
   setWebviewZoom?(scale: number): void
 
-  haptic?(style: "light" | "medium" | "heavy" | "success" | "warning" | "error"): void
-  share?(data: { text?: string; url?: string }): Promise<boolean>
-
   /** Native LAN discovery. A credential-required server is still reachable. */
   discoverServers?(onServer: (server: { url: string; authenticationRequired: boolean }) => void): Promise<void>
   cancelServerDiscovery?(): Promise<void>
-
-  /** Native foreground transition; returns an unsubscribe function. */
-  onResume?(callback: () => void): () => void
 
   /** Platform-specific connection help, kept out of shared product branding. */
   serverSetup?: { serve: string; pair?: string }

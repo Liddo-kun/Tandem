@@ -8,6 +8,7 @@ Baseline: OpenCode `upstream/v2` at `80c4a6b7c8` (2026-10-06, `@opencode/cli` 2.
 
 ### 2026-10-10
 
+- **Removed — Unused Android capabilities:** removed uncalled haptics and sharing methods, dependencies, native registrations and bridge commands. Resume recovery now listens directly inside the Android wrapper instead of extending the shared app interface.
 - **Removed — Obsolete Corrector model migration:** legacy `small_model` no longer sets the Corrector model. Restored `packages/core/src/config/normalize.ts` to upstream; explicit Corrector agent configuration remains supported.
 - **Removed — Obsolete Corrector preference migration:** removed conversion of v1's RePrompt settings. The current Corrector toggle keeps its saved on/off preference and default-off behavior.
 - **Guidance — Scope and upstream divergence:** explicitly require alternative approaches before changing upstream-shared code and prohibit unrequested features, especially those adding divergence. Recorded in `AGENTS.md`.

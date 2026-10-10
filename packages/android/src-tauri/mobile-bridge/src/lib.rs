@@ -34,8 +34,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("mobile-bridge")
         .invoke_handler(tauri::generate_handler![
             commands::scan_network,
-            commands::cancel_scan,
-            commands::share
+            commands::cancel_scan
         ])
         .setup(|app, api| {
             #[cfg(mobile)]

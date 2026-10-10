@@ -7,5 +7,4 @@ permissions = [
   "allow-remove-listener",
   "allow-scan-network",
   "allow-cancel-scan",
-  "allow-share",
 ]

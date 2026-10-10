@@ -3,7 +3,6 @@
 import { render } from "solid-js/web"
 import { createStore } from "solid-js/store"
 import { onCleanup, onMount } from "solid-js"
-import { impactFeedback, notificationFeedback } from "@tauri-apps/plugin-haptics"
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification"
 import { openUrl } from "@tauri-apps/plugin-opener"
 import { Store } from "@tauri-apps/plugin-store"
@@ -39,14 +38,6 @@ function App() {
       if (!granted && await requestPermission() !== "granted") return
       sendNotification({ title, body: description ?? "" })
     },
-    haptic: (style) => {
-      if (style === "success" || style === "warning" || style === "error") {
-        void notificationFeedback(style).catch(console.error)
-        return
-      }
-      void impactFeedback(style).catch(console.error)
-    },
-    share: async (data) => await bridge.sendAsync<boolean>("share", data) ?? false,
     storage: createTauriStorage,
     draftStore: createBrowserDraftStore(),
     getDefaultServer: async () => {
@@ -67,7 +58,6 @@ function App() {
       viewport.sync()
     },
     ...createServerDiscovery(),
-    onResume: (callback) => bridge.on("resume", callback),
     serverSetup: {
       serve: `tandem serve --hostname 0.0.0.0 --port ${import.meta.env.TANDEM_ANDROID_NAME === "Tandem Dev" ? "4098" : "4097"}`,
     },
@@ -85,14 +75,14 @@ function App() {
       platform.openExternal(link.href)
     }
     document.addEventListener("click", openLink)
-    const stopResume = platform.onResume?.(() => {
+    const stopResume = bridge.on("resume", () => {
       viewport.sync()
       // Feed the lifecycle signals the v2 stream client already understands.
       window.dispatchEvent(new Event("pageshow"))
       document.dispatchEvent(new Event("visibilitychange"))
     })
     onCleanup(stop)
-    onCleanup(() => stopResume?.())
+    onCleanup(stopResume)
     onCleanup(() => document.removeEventListener("click", openLink))
   })
 

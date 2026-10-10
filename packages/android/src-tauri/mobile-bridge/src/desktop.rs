@@ -24,10 +24,4 @@ impl<R: Runtime> MobileBridge<R> {
             "Mobile bridge is unavailable on this platform".to_string(),
         ))
     }
-
-    pub fn share(&self, _text: Option<String>, _url: Option<String>) -> crate::Result<bool> {
-        Err(Error::Message(
-            "Mobile bridge is unavailable on this platform".to_string(),
-        ))
-    }
 }

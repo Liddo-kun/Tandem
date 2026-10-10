@@ -1,15 +1,13 @@
-// Tandem-owned (not in upstream): Android LAN discovery, share and lifecycle bridge.
+// Tandem-owned (not in upstream): Android LAN discovery and lifecycle bridge.
 package ai.opencode.mobilebridge
 
 import android.app.Activity
 import android.content.Context
-import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Handler
 import android.os.Looper
 import app.tauri.annotation.Command
-import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSArray
@@ -25,12 +23,6 @@ import org.json.JSONObject
 import java.util.Collections
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
-
-@InvokeArg
-class ShareArgs {
-    var text: String? = null
-    var url: String? = null
-}
 
 private data class ScanEntry(val host: String, val port: Int, val url: String, val authenticationRequired: Boolean)
 private data class WifiAddressInfo(val address: String, val prefixLength: Int)
@@ -91,30 +83,6 @@ class MobileBridgePlugin(private val activity: Activity) : Plugin(activity) {
         // Let even a queued task run its stale check and resolve the scan invoke.
         // Future.cancel would skip the task entirely and leave JS awaiting forever.
         invoke.resolve()
-    }
-
-    @Command
-    fun share(invoke: Invoke) {
-        val args = invoke.parseArgs(ShareArgs::class.java)
-        val parts = listOfNotNull(args.text?.trim()?.takeIf { it.isNotEmpty() }, args.url?.trim()?.takeIf { it.isNotEmpty() })
-        if (parts.isEmpty()) {
-            invoke.resolve(JSObject().put("success", false))
-            return
-        }
-
-        val text = parts.joinToString("\n")
-        val sendIntent = Intent().apply {
-            action = Intent.ACTION_SEND
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, text)
-        }
-
-        try {
-            activity.startActivity(Intent.createChooser(sendIntent, null))
-            invoke.resolve(JSObject().put("success", true))
-        } catch (_: Throwable) {
-            invoke.resolve(JSObject().put("success", false))
-        }
     }
 
     private fun runScan(gen: Int): ArrayList<JSObject> {

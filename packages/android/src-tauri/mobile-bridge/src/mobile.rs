@@ -1,4 +1,4 @@
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize};
 use tauri::{
     plugin::{PluginApi, PluginHandle},
     AppHandle, Runtime,
@@ -29,26 +29,9 @@ impl<R: Runtime> MobileBridge<R> {
             .run_mobile_plugin("cancelScan", ())
             .map_err(Into::into)
     }
-
-    pub fn share(&self, text: Option<String>, url: Option<String>) -> crate::Result<bool> {
-        let response: ShareResponse = self.0.run_mobile_plugin("share", SharePayload { text, url })?;
-        Ok(response.success)
-    }
 }
 
 #[derive(Deserialize)]
 struct ScanResponse {
     results: Vec<ScanResult>,
-}
-
-#[derive(Deserialize)]
-struct ShareResponse {
-    success: bool,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SharePayload {
-    text: Option<String>,
-    url: Option<String>,
 }

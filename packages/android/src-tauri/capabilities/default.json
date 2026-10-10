@@ -5,7 +5,6 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "haptics:default",
     "notification:default",
     "opener:default",
     {
