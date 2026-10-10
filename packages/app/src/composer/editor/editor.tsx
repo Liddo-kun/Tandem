@@ -47,6 +47,8 @@ import type { ComposerEditorModel, ComposerSelectControl } from "./interaction"
 import { isAttachment } from "../prompt-parts"
 // UPSTREAM-DIVERGENCE: Android native range-editing helpers.
 import { getDeleteWordRange, getEditorText, getSelectionRange, setSelectionRange } from "./dom"
+// UPSTREAM-DIVERGENCE(temporary): Android Backspace over read-only mentions.
+import { ensureMentionGaps, installNativeMentions } from "./tandem-native-mentions"
 // UPSTREAM-DIVERGENCE: Tandem's composer context button.
 import { TandemContextButton } from "../tandem-composer"
 import "../attachments/attachments.css"
@@ -212,10 +214,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const deleteWord = () => mobileEdit("delete-word")
     window.addEventListener("opencode:keyboard-delete-word", deleteWord)
     onCleanup(() => window.removeEventListener("opencode:keyboard-delete-word", deleteWord))
+    // UPSTREAM-DIVERGENCE(temporary): Android Backspace over read-only mentions.
+    if (editor) onCleanup(installNativeMentions(editor))
   })
   const updateCursor = () => {
     if (!editor || !window.getSelection()?.isCollapsed) return
-    props.controller.onCursor(composerCursor(editor))
+    // UPSTREAM-DIVERGENCE(temporary): Android mention gaps are not text.
+    props.controller.onCursor(composerCursor(editor, view.nativeEditing))
   }
 
   const mode = createMemo(() => state.mode)
@@ -349,7 +354,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
               "text-align": "start",
             }}
             onInput={(event) => {
-              const cursor = composerCursor(event.currentTarget)
+              // UPSTREAM-DIVERGENCE(temporary): Restore Android mention gaps; they are not text.
+              if (view.nativeEditing && !event.isComposing) ensureMentionGaps(event.currentTarget)
+              const cursor = composerCursor(event.currentTarget, view.nativeEditing)
               // UPSTREAM-DIVERGENCE: Keep Android authored newlines separate from its caret BR.
               const prompt = parseComposerEditor(event.currentTarget, view.nativeEditing)
               const attachments = props.controller.parts().filter(isAttachment)
@@ -588,6 +595,8 @@ function renderComposerEditor(editor: HTMLDivElement, prompt: ComposerPrompt, na
     }),
   )
 
+  // UPSTREAM-DIVERGENCE(temporary): Android Backspace needs an editable gap after each mention.
+  if (nativeEditing) ensureMentionGaps(editor)
   // UPSTREAM-DIVERGENCE: Keep the native caret visible after a trailing newline.
   if (nativeEditing && editor.textContent?.endsWith("\n")) {
     const tail = document.createElement("br")
@@ -676,7 +685,8 @@ function parseComposerEditor(editor: HTMLDivElement, preserveNewlines = false) {
 
   const visit = (node: Node) => {
     if (node.nodeType === Node.TEXT_NODE) {
-      buffer += node.textContent ?? ""
+      // UPSTREAM-DIVERGENCE(temporary): Android mention gaps are not text.
+      buffer += preserveNewlines ? (node.textContent ?? "").replaceAll("\u200B", "") : (node.textContent ?? "")
 
       return
     }
@@ -720,7 +730,8 @@ function parseComposerEditor(editor: HTMLDivElement, preserveNewlines = false) {
   return [{ type: "text" as const, content: "", start: 0, end: 0 }]
 }
 
-function composerCursor(editor: HTMLDivElement) {
+// UPSTREAM-DIVERGENCE(temporary): Android mention gaps are not text.
+function composerCursor(editor: HTMLDivElement, nativeEditing = false) {
   const selection = window.getSelection()
 
   if (!selection?.rangeCount || !editor.contains(selection.anchorNode)) return editor.textContent?.length ?? 0
@@ -728,7 +739,7 @@ function composerCursor(editor: HTMLDivElement) {
   range.selectNodeContents(editor)
   range.setEnd(selection.anchorNode!, selection.anchorOffset)
 
-  return range.toString().length
+  return (nativeEditing ? range.toString().replaceAll("\u200B", "") : range.toString()).length
 }
 
 export function ComposerAttachments(props: {

@@ -6,6 +6,10 @@ Dated user-visible changes and published releases of Tandem v2, and the source f
 
 Baseline: OpenCode `upstream/v2` at `80c4a6b7c8` (2026-10-06, `@opencode/cli` 2.0.24), synced on 2026-10-06 from `40679546d4` (2026-10-03, 2.0.22). Version `2.0.24-tandem-v2.2`, installed as the daily Tandem on Jon's tablet on 2026-10-07 (`2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
 
+### 2026-10-11
+
+- **Fixed — Deleting mentions on Android:** Backspace right after an `@` mention now removes the whole mention, and the keyboard keeps working. Previously the Android keyboard could not delete it and editing stopped. Android app only.
+
 ### 2026-10-10
 
 - **Simplified — Mobile view navigation:** sort upstream's complete view list once instead of combining and re-sorting the tab and menu lists.
