@@ -8,6 +8,7 @@ Baseline: OpenCode `upstream/v2` at `80c4a6b7c8` (2026-10-06, `@opencode/cli` 2.
 
 ### 2026-10-10
 
+- **Removed — Obsolete Android build switch:** removed v1's `OPENCODE_ANDROID_VARIANT=1` metadata-preservation branch. The generated-project patcher always applies the selected Tauri configuration's application ID and labels.
 - **Removed — Unused Android capabilities:** removed uncalled haptics and sharing methods, dependencies, native registrations and bridge commands. Resume recovery now listens directly inside the Android wrapper instead of extending the shared app interface.
 - **Removed — Obsolete Corrector model migration:** legacy `small_model` no longer sets the Corrector model. Restored `packages/core/src/config/normalize.ts` to upstream; explicit Corrector agent configuration remains supported.
 - **Removed — Obsolete Corrector preference migration:** removed conversion of v1's RePrompt settings. The current Corrector toggle keeps its saved on/off preference and default-off behavior.

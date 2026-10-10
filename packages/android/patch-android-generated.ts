@@ -29,10 +29,8 @@ const manifest = Bun.file(manifestPath)
 const mainActivity = await findMainActivity()
 
 await patchGradleProperties()
-
-const preserveVariantMetadata = process.env.OPENCODE_ANDROID_VARIANT === "1"
-await patchBuildGradle(preserveVariantMetadata)
-if (!preserveVariantMetadata) await patchStrings()
+await patchBuildGradle()
+await patchStrings()
 
 if (await manifest.exists()) {
   const text = await manifest.text()
@@ -60,17 +58,14 @@ if (mainActivity && (await Bun.file(mainActivity).exists())) {
   )
 }
 
-async function patchBuildGradle(preserveIdentifier: boolean) {
+async function patchBuildGradle() {
   const buildGradle = Bun.file(buildGradlePath)
   if (!(await buildGradle.exists())) return
 
-  let text = patchReleaseSigning(await buildGradle.text())
-  if (!preserveIdentifier) {
-    text = text.replace(
-      /applicationId\s*=\s*"[^"]+"/,
-      `applicationId = "${config.identifier ?? "app.liddokun.tandem"}"`,
-    )
-  }
+  const text = patchReleaseSigning(await buildGradle.text()).replace(
+    /applicationId\s*=\s*"[^"]+"/,
+    `applicationId = "${config.identifier ?? "app.liddokun.tandem"}"`,
+  )
 
   await Bun.write(
     buildGradlePath,
