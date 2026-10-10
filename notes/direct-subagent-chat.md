@@ -12,7 +12,7 @@ Tandem enhancement requested by Jon on 2026-10-10.
 
 ## Ownership
 
-Steering presentation is owned by `packages/core/src/session/tandem-subagent-steering.ts`: origin filtering, headings, quoting and attachment summaries. The shared collector reads messages within the existing job boundary, collects final answers, and calls `withUserSteering(messages, output)`. The two prompt-origin markers stay at the tool/command admission sites. Composer editability depends only on whether a request is blocking it; the redundant `showComposer()` check is removed.
+Steering presentation is owned by `packages/core/src/session/tandem-subagent-steering.ts`: origin filtering, headings, quoting and attachment summaries. The owned collector in `tandem-subagent-completion.ts` reads messages within the existing job boundary, collects final answers, and calls `withUserSteering(messages, output)`. Shared job/recovery code calls that collector; `subagent-completion.ts` matches the pinned upstream. The two prompt-origin markers stay at the tool/command admission sites. Composer editability depends only on whether a request is blocking it; the redundant `showComposer()` check is removed.
 
 ## Verification
 

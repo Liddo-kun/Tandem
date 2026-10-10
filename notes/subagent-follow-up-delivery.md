@@ -83,6 +83,7 @@ Jon approved preserving all completed final answers and adding deterministic del
 - Collects error-free, completed `stop` responses without local tool calls. Explicit `final_answer` text parts take precedence; otherwise text is included except parts tagged `commentary`. This supports providers without phase metadata using their normalized turn-ending signal.
 - Returns one combined result, numbering answers when there is more than one. Existing notification deduplication remains in place.
 - Uses the same collector after background server recovery. Old durable jobs without a prompt boundary retain latest-message behavior to avoid replaying their old turns.
+- Collection lives in the Tandem-owned `packages/core/src/session/tandem-subagent-completion.ts`, called by the existing job and recovery paths. Shared `subagent-completion.ts` is restored to the pinned upstream implementation; the owned collector reuses its existing text fallback.
 - Replaces upstream's existing first-prompt introductory string with the concise reminder below, at the tool- and command-spawning sites. The existing conditional handles first-prompt-only delivery; follow-up prompts pass through unchanged. No append logic, prompt hook, tracking state, or reminder constant in the result collector is needed:
 
   ```text
@@ -114,3 +115,9 @@ The first smoke attempt was stopped because its observer looked for text deltas 
 
 Scratch evidence: `/tmp/tandem/v2/subagent-delivery/` contains the database snapshot,
 extracted session records, and both original final texts.
+
+### Owned-collector extraction verification
+
+After moving the collector into `tandem-subagent-completion.ts`, rebuilt the development CLI and exercised real agent sessions and tools on port 4098. Parent `ses_edac59e70ffeHZ2zRbDPGdjXDr` received a plain foreground result without steering headings. Background child `ses_edac536c8ffeTKB755OV5BO6yd` waited in shell while the parent sent a delegated follow-up and two direct user prompts were submitted. The parent's stored completion contained both direct prompts in order, followed by the final answer, with no delegated-prompt text, commentary or shell output. Exactly one notification arrived and the parent replied to it.
+
+Evidence: `/tmp/tandem/v2/collector-refactor/{live.py,result.json,parent-messages.json,child-messages.json,returned-steering.md}`. Core `bun typecheck`, formatting and `git diff --check` passed. `subagent-completion.ts` matches pinned upstream exactly. This extraction did not separately repeat crash-recovery or command-spawned-child checks.

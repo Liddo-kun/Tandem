@@ -11,6 +11,8 @@ import { SessionSchema } from "../schema.js"
 import { SessionStore } from "../store.js"
 import { ShellResult } from "../../shell/result.js"
 import { SubagentCompletion } from "../subagent-completion.js"
+// UPSTREAM-DIVERGENCE: recover answers through Tandem's owned module.
+import { collectSubagentCompletion } from "../tandem-subagent-completion.js"
 
 const CONTINUE_AFTER_SERVER_RESTART =
   "The server restarted while you were working. Continue from where you left off without repeating completed work."
@@ -173,7 +175,7 @@ export const layer = (options?: Options) =>
           recovery,
           run: execution.resume(recovery.childSessionID).pipe(
             // UPSTREAM-DIVERGENCE: recover Tandem's finals from the persisted job boundary, including compacted history.
-            Effect.andThen(SubagentCompletion.collect(sessions, recovery)),
+            Effect.andThen(collectSubagentCompletion(sessions, recovery)),
           ),
         })
         yield* jobs.background(background.id)

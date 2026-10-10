@@ -4,6 +4,8 @@ import { Effect, Scope } from "effect"
 import { Job } from "../job.js"
 import { Session } from "../session.js"
 import { SubagentCompletion } from "./subagent-completion.js"
+// UPSTREAM-DIVERGENCE: collect answers through Tandem's owned module.
+import { collectSubagentCompletion } from "./tandem-subagent-completion.js"
 
 type Recovery = Extract<Job.Recovery, { kind: "subagent" }>
 
@@ -44,7 +46,7 @@ export const make: Effect.Effect<Runner, never, Session.Service | Job.Service | 
         run: Effect.gen(function* () {
           yield* sessions.resume(recovery.childSessionID)
           // UPSTREAM-DIVERGENCE: Tandem preserves earlier final answers across in-flight follow-ups.
-          return yield* SubagentCompletion.collect(sessions, recovery)
+          return yield* collectSubagentCompletion(sessions, recovery)
         }),
       }),
     background: Effect.fn("SubagentJob.background")(function* (recovery: Recovery) {
