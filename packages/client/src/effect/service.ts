@@ -13,8 +13,7 @@ export { headers }
 /** Contents of the local service registration file. */
 export type Info = import("../service.js").Info
 
-// UPSTREAM-DIVERGENCE: describe Tandem's local-service discovery contract.
-// Find, start, and stop the local Tandem background service.
+// Find, start, and stop the local opencode background service.
 //
 // The service daemon advertises itself through a registration file in the
 // user's state directory: url, pid, version, and the private password, with

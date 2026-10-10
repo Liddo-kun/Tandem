@@ -1,5 +1,4 @@
-// UPSTREAM-DIVERGENCE: document the Tandem local service without renaming wire fields.
-/** Connection details for a local Tandem service. */
+/** Connection details for a local OpenCode service. */
 export type Endpoint = {
   /** Base URL of the service. */
   readonly url: string
@@ -14,8 +13,7 @@ export type Endpoint = {
   }
 }
 
-// UPSTREAM-DIVERGENCE: identify Tandem's service discovery options.
-/** Options used to discover the local Tandem service. */
+/** Options used to discover the local OpenCode service. */
 export type DiscoverOptions = {
   /** Absolute registration file path. Defaults to the XDG state directory. */
   readonly file?: string
@@ -26,9 +24,9 @@ export type DiscoverOptions = {
 /** Reason ensuring the service requires a new process. */
 export type EnsureReason = "missing" | "version-mismatch"
 
-// UPSTREAM-DIVERGENCE: document Tandem's managed-service command default.
-/** Options used to ensure the local Tandem service is running. */
+/** Options used to ensure the local OpenCode service is running. */
 export type EnsureOptions = DiscoverOptions & {
+  // UPSTREAM-DIVERGENCE: document Tandem's managed-service command default.
   /** Service command and arguments. Defaults to `tandem serve --service`. */
   readonly command?: ReadonlyArray<string>
   /** Environment variables added to the inherited service process environment. */
@@ -37,8 +35,7 @@ export type EnsureOptions = DiscoverOptions & {
   readonly onStart?: (reason: EnsureReason, previousVersion?: string) => void
 }
 
-// UPSTREAM-DIVERGENCE: identify Tandem's local-service stop options.
-/** Options used to stop the local Tandem service. */
+/** Options used to stop the local OpenCode service. */
 export type StopOptions = {
   /** Absolute registration file path. Defaults to the XDG state directory. */
   readonly file?: string
@@ -50,8 +47,7 @@ export type StopOptions = {
 export type Info = {
   /** Unique service instance identifier. */
   readonly id?: string
-  // UPSTREAM-DIVERGENCE: describe the served application version without upstream product branding.
-  /** Application version served by the process. */
+  /** OpenCode version served by the process. */
   readonly version?: string
   /** Base URL advertised by the service. */
   readonly url: string

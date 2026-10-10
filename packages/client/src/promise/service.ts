@@ -11,8 +11,7 @@ import { decide, fallback, headers, probeResult, same } from "../service-probe.j
 export * from "../service.js"
 export { headers }
 
-// UPSTREAM-DIVERGENCE: describe Tandem's local-service discovery contract.
-// Find, start, and stop the local Tandem background service.
+// Find, start, and stop the local opencode background service.
 //
 // The registration file is the complete discovery contract. This module is
 // intentionally implemented with Node APIs so Promise clients do not need
