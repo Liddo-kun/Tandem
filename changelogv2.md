@@ -8,6 +8,7 @@ Baseline: OpenCode `upstream/v2` at `80c4a6b7c8` (2026-10-06, `@opencode/cli` 2.
 
 ### 2026-10-10
 
+- **Simplified — Mobile view navigation:** sort upstream's complete view list once instead of combining and re-sorting the tab and menu lists.
 - **Removed — Cosmetic source rebranding:** restored upstream service comments except the actual `tandem serve --service` default, and restored the upstream update dialog's unreachable automatic-update strings. Runtime command/path changes and manual-update guidance remain.
 - **Removed — Obsolete Android build switch:** removed v1's `OPENCODE_ANDROID_VARIANT=1` metadata-preservation branch. The generated-project patcher always applies the selected Tauri configuration's application ID and labels.
 - **Removed — Unused Android capabilities:** removed uncalled haptics and sharing methods, dependencies, native registrations and bridge commands. Resume recovery now listens directly inside the Android wrapper instead of extending the shared app interface.

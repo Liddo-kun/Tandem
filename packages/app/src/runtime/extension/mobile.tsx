@@ -81,9 +81,7 @@ export function MobileViewTabs(props: {
 
   // UPSTREAM-DIVERGENCE: Every view is its own tab instead of hiding menu and drawer views behind More.
   // Menu views replace the conversation like tabs; drawer views open their sheet directly.
-  const views = createMemo(() =>
-    [...props.views.tabs(), ...props.views.menu()].toSorted((a, b) => a.mobile.order - b.mobile.order),
-  )
+  const views = createMemo(() => props.views.entries().toSorted((a, b) => a.mobile.order - b.mobile.order))
 
   const tab = () => props.current
 
