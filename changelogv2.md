@@ -8,6 +8,7 @@ Baseline: OpenCode `upstream/v2` at `80c4a6b7c8` (2026-10-06, `@opencode/cli` 2.
 
 ### 2026-10-11
 
+- **Changed — Composer plus button:** opens the image and file picker directly instead of a menu. Commands, context and shell commands are still available by typing `/`, `@` and `!`.
 - **Fixed — Deleting mentions on Android:** Backspace right after an `@` mention now removes the whole mention, and the keyboard keeps working. Previously the Android keyboard could not delete it and editing stopped. Android app only.
 
 ### 2026-10-10

@@ -942,38 +942,17 @@ export function ComposerEditorAddMenu(props: {
         </>
       }
     >
-      <Menu gutter={6} modal={false} placement="top-start">
-        <Menu.Trigger
-          as={IconButton}
-          data-action="composer-attach"
-          type="button"
-          icon={<Icon name="plus" />}
-          variant="ghost-muted"
-          size="large"
-          disabled={props.disabled}
-          aria-label={props.title}
-        />
-        <Menu.Portal>
-          <Menu.Content
-            class="[&_[data-slot=menu-v2-item-shortcut]]:w-5 [&_[data-slot=menu-v2-item-shortcut]]:justify-center"
-            style={{ "min-width": "180px" }}
-          >
-            <Menu.Item onSelect={props.onAttach} shortcut={props.attachShortcut}>
-              {props.attachLabel}
-            </Menu.Item>
-            <Menu.Separator />
-            <Menu.Item onSelect={props.onCommands} shortcut="/">
-              {props.commandsLabel}
-            </Menu.Item>
-            <Menu.Item onSelect={props.onContext} shortcut="@">
-              {props.contextLabel}
-            </Menu.Item>
-            <Menu.Item onSelect={props.onShell} shortcut="!">
-              {props.shellLabel}
-            </Menu.Item>
-          </Menu.Content>
-        </Menu.Portal>
-      </Menu>
+      {/* UPSTREAM-DIVERGENCE: The plus button opens the image and file picker directly instead of the add menu. */}
+      <IconButton
+        data-action="composer-attach"
+        type="button"
+        icon={<Icon name="plus" />}
+        variant="ghost-muted"
+        size="large"
+        disabled={props.disabled}
+        aria-label={props.title}
+        onClick={props.onAttach}
+      />
     </Tooltip>
   )
 }
