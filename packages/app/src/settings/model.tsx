@@ -228,10 +228,6 @@ export const settingsPersistence = Persistence.migrate(
   Schema.Struct({
     general: Persistence.optional(
       Schema.Struct({
-        // UPSTREAM-DIVERGENCE: Read retained v1 enhancement preferences when migrating Corrector settings.
-        corrector: Persistence.optional(Schema.Boolean),
-        promptEnhance: Persistence.optional(Schema.Literals(["on", "no-reprompt", "off"])),
-        reprompt: Persistence.optional(Schema.Boolean),
         // Keep invalid explicit values distinct from absent values so legacy preferences cannot replace them.
         timelineDetail: Schema.optional(
           Schema.NullOr(
@@ -258,16 +254,13 @@ export const settingsPersistence = Persistence.migrate(
       decode: SchemaGetter.transform((value) => {
         const general = value.general
 
-        // UPSTREAM-DIVERGENCE: Migrate Corrector even when upstream timelineDetail is already present.
-        if (!general) return value
+        if (!general || general.timelineDetail !== undefined) return value
 
         return {
           ...value,
           general: {
             ...general,
-            // UPSTREAM-DIVERGENCE: Retain the v1 preference without restoring RePrompt.
-            corrector: general.corrector ?? (general.promptEnhance === undefined ? undefined : general.promptEnhance !== "off"),
-            timelineDetail: general.timelineDetail !== undefined ? general.timelineDetail : {
+            timelineDetail: {
               shell: legacyTimelineActivity(general.shellToolPartsExpanded),
               edit: legacyTimelineActivity(general.editToolPartsExpanded),
               thinking: legacyTimelineActivity(

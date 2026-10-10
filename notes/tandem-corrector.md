@@ -2,9 +2,9 @@
 
 Corrector copy-edits a prompt before it is admitted to the session: spelling, punctuation,
 capitalization, wrong-word autocorrect and dictation artifacts, including clear technical symbols,
-paths and names. It returns only the corrected message; ambiguous wording stays unchanged. It is on by
-default. The composer **Corrector** button and General settings share one per-client setting,
-`settings.v3.general.corrector` (legacy `promptEnhance` on/no-reprompt migrates to on, off to off).
+paths and names. It returns only the corrected message; ambiguous wording stays unchanged. The composer
+**Corrector** button and General settings share one per-client setting, `settings.v3.general.corrector`,
+which defaults to off.
 
 Code: `packages/core/src/plugin/tandem/prompt-corrector.ts` (registered in `plugin/internal.ts`),
 shared metadata in `packages/util/src/tandem-auxiliary.ts`, client in `packages/app/src/settings/model.tsx`
@@ -24,7 +24,7 @@ Set in the server environment (or the development launcher's `environment.json`)
 | `TANDEM_PROMPT_CORRECTOR_DEBUG_KEEP` | `2` | Newest inactive debug roots kept; `0` is unlimited. |
 
 Model selection, reevaluated per prompt: environment override → configured `tandem-corrector` agent
-model (including a migrated `small_model`) → a cheap available model for the session's provider
+model → a cheap available model for the session's provider
 (Copilot `gpt-5-mini`, OpenCode `gpt-5-nano`, otherwise a Haiku/Flash/nano priority list) → the
 session model. An invalid explicit model or variant keeps the original text rather than switching
 provider. Only the default model and the 600 limit have been tested live.

@@ -8,6 +8,8 @@ Baseline: OpenCode `upstream/v2` at `80c4a6b7c8` (2026-10-06, `@opencode/cli` 2.
 
 ### 2026-10-10
 
+- **Removed — Obsolete Corrector model migration:** legacy `small_model` no longer sets the Corrector model. Restored `packages/core/src/config/normalize.ts` to upstream; explicit Corrector agent configuration remains supported.
+- **Removed — Obsolete Corrector preference migration:** removed conversion of v1's RePrompt settings. The current Corrector toggle keeps its saved on/off preference and default-off behavior.
 - **Guidance — Scope and upstream divergence:** explicitly require alternative approaches before changing upstream-shared code and prohibit unrequested features, especially those adding divergence. Recorded in `AGENTS.md`.
 - **Changed — Subagent call labels:** initial and follow-up cards show the same child-session title. Later calls are marked Follow-up.
 - **Added — Direct subagent chat:** open a child session to steer it or continue chatting, with its normal composer and context-token display. During an active delegated task, direct user prompts are quoted separately before the answers returned to the main agent. After that task ends, replies stay in the child session, as explained beside the composer.
