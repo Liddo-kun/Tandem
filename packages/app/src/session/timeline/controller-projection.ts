@@ -1,4 +1,6 @@
 import type { SessionInboxInfo, SessionMessageInfo, SessionMessageUser } from "@opencode/client/promise"
+// UPSTREAM-DIVERGENCE(temporary): position-based revert boundary.
+import { beforeRevert } from "../session-domain"
 
 export function applyTimelineMessageHandoff(messages: SessionMessageInfo[], handoff?: SessionMessageUser) {
   if (!handoff) return messages
@@ -29,9 +31,8 @@ export function visibleTimelineMessages(
 
   if (queued.size === 0 && inputs.size === 0 && !revertMessageID) return messages
 
-  const visible = messages.filter(
-    (message) => !queued.has(message.id) && (!revertMessageID || message.id < revertMessageID),
-  )
+  // UPSTREAM-DIVERGENCE(temporary): cut at the revert message's position instead of comparing IDs as text.
+  const visible = beforeRevert(messages, revertMessageID).filter((message) => !queued.has(message.id))
 
   if (inputs.size === 0) return visible
 

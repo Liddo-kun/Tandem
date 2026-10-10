@@ -62,8 +62,12 @@ export function createSessionRows(sessionID: Accessor<string>, onSynced?: (sessi
     )
     const visible = queued.size === 0 ? messages : messages.filter((message) => !queued.has(message.id))
     const boundary = revertBoundary()
+    // UPSTREAM-DIVERGENCE(temporary): cut at the revert message's position instead of comparing IDs as text.
+    // Fork-copied IDs end in an unpadded sequence number, so `_745` sorts after `_1070`. A revert message
+    // outside the loaded window is older than all of it, because history loads from the newest backwards.
+    const end = boundary ? visible.findIndex((message) => message.id === boundary) : visible.length
     const rows = reduceSessionRows(
-      boundary ? visible.filter((message) => message.id < boundary) : visible,
+      visible.slice(0, Math.max(end, 0)),
       inputs,
       turnTokens(),
       verbosity(),

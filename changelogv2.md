@@ -10,6 +10,7 @@ Baseline: OpenCode `upstream/v2` at `80c4a6b7c8` (2026-10-06, `@opencode/cli` 2.
 
 - **Changed — Composer plus button:** opens the image and file picker directly instead of a menu. Commands, context and shell commands are still available by typing `/`, `@` and `!`.
 - **Fixed — Deleting mentions on Android:** Backspace right after an `@` mention now removes the whole mention, and the keyboard keeps working. Previously the Android keyboard could not delete it and editing stopped. Android app only.
+- **Fixed — Missing history after an undo in a forked session:** after undoing back to a message in a fork, the chat (app and TUI) now shows every earlier message. Previously it hid most of them until the undo was redone or a new prompt was sent.
 
 ### 2026-10-10
 
