@@ -82,6 +82,8 @@ export const create = (
         const callIndex = yield* Ref.make(0)
         const files = yield* Ref.make<Array<CollectedFiles>>([])
         const calls = yield* Ref.make<Array<ExecuteCall>>([])
+        // UPSTREAM-DIVERGENCE: keep sessions started by Tandem's session_start so the Execute row can link them.
+        const startedSessions = yield* Ref.make<Array<string>>([])
         const lock = Semaphore.makeUnsafe(1)
         const record = (update: (items: Array<ExecuteCall>) => Array<ExecuteCall>) =>
           lock.withPermit(
@@ -93,6 +95,9 @@ export const create = (
             Effect.gen(function* () {
               const index = yield* Ref.getAndUpdate(callIndex, (index) => index + 1)
               const executed = yield* executeTool(name, tool, input, context)
+              // UPSTREAM-DIVERGENCE: see startedSessions.
+              const started = executed.metadata?.tandemStartedSession
+              if (typeof started === "string") yield* Ref.update(startedSessions, (items) => [...items, started])
               const content =
                 typeof executed.content === "string"
                   ? [{ type: "text" as const, text: executed.content }]
@@ -126,9 +131,12 @@ export const create = (
             ...(file.name === undefined ? {} : { name: file.name }),
           })),
         ]
+        // UPSTREAM-DIVERGENCE: see startedSessions.
+        const tandemStartedSessions = yield* Ref.get(startedSessions)
         const metadata: Metadata = {
           toolCalls: value.toolCalls,
           ...(value.error ? { error: true } : {}),
+          ...(tandemStartedSessions.length > 0 ? { tandemStartedSessions } : {}),
         }
         return {
           output: value,

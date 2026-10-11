@@ -129,3 +129,22 @@
     border-radius: var(--radius-lg);
   }
 }
+
+/* `└ Session started (title)` under an Execute row (tools/tandem-session-start.tsx). */
+button[data-tandem-session-start] {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+button[data-tandem-session-start] [data-slot="tandem-tool-preview-text"] {
+  color: var(--text-interactive-base);
+}
+
+button[data-tandem-session-start]:hover [data-slot="tandem-tool-preview-text"] {
+  text-decoration: underline;
+}

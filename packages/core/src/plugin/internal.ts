@@ -112,6 +112,7 @@ import { OpenAICompactionPlugin } from "./tandem/openai-compaction.js"
 import { BashSearch } from "./tandem/bash-search/plugin.js"
 import { ClaudePlugin } from "./tandem/claude/plugin.js"
 import { ToolGuidancePlugin } from "./tandem/tool-guidance/plugin.js" // UPSTREAM-DIVERGENCE: keep tool wording in a Tandem-owned transform.
+import { SessionStartPlugin } from "./tandem/session-start.js" // UPSTREAM-DIVERGENCE: Tandem-owned opencode.session_start tool.
 
 const services = [
   Agent.Service,
@@ -248,6 +249,7 @@ const pre = [
   GlobTool.Plugin,
   GrepTool.Plugin,
   OpenCodeTools.Plugin,
+  SessionStartPlugin.Plugin, // UPSTREAM-DIVERGENCE: after OpenCodeTools declares the opencode namespace.
   McpResourceTools.Plugin,
   QuestionTool.Plugin,
   ReadTool.Plugin,
