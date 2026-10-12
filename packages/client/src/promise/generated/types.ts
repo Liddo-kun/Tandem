@@ -2200,7 +2200,11 @@ export type ConfigEntry =
         experimental?: {
           portable_shell_scanner?: boolean
           subagent_depth?: number
-          policies?: Array<{ action: "provider.use" | "permission"; resource: string; effect: "allow" | "deny" }>
+          policies?: Array<{
+            action: "provider.use" | "tool.use" | "integration.use"
+            resource: string
+            effect: "allow" | "deny"
+          }>
         }
       }
     }
@@ -2314,6 +2318,8 @@ export type IntegrationOAuthMethod = { id: string; type: "oauth"; label: string;
 
 export type IntegrationKeyMethod = { type: "key"; label?: string; form?: FormFields }
 
+export type IntegrationExternalMethod = { id: string; type: "external"; label: string; form?: FormFields }
+
 export type CredentialEntry = {
   id: string
   integrationID: string
@@ -2351,6 +2357,7 @@ export type IntegrationMethod =
   | IntegrationOAuthMethod
   | IntegrationCommandMethod
   | IntegrationKeyMethod
+  | IntegrationExternalMethod
   | IntegrationEnvMethod
 
 export type FormCreated = {
@@ -5687,6 +5694,28 @@ export type IntegrationConnectKeyInput = {
 }
 
 export type IntegrationConnectKeyOutput = void
+
+export type IntegrationConnectExternalInput = {
+  readonly integrationID: { readonly integrationID: string }["integrationID"]
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly methodID: {
+    readonly methodID: string
+    readonly answer?: { readonly [x: string]: string | number | boolean | ReadonlyArray<string> } | undefined
+    readonly label?: string | undefined
+  }["methodID"]
+  readonly answer?: {
+    readonly methodID: string
+    readonly answer?: { readonly [x: string]: string | number | boolean | ReadonlyArray<string> } | undefined
+    readonly label?: string | undefined
+  }["answer"]
+  readonly label?: {
+    readonly methodID: string
+    readonly answer?: { readonly [x: string]: string | number | boolean | ReadonlyArray<string> } | undefined
+    readonly label?: string | undefined
+  }["label"]
+}
+
+export type IntegrationConnectExternalOutput = void
 
 export type IntegrationOauthConnectInput = {
   readonly integrationID: { readonly integrationID: string }["integrationID"]

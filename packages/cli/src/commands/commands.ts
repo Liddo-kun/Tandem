@@ -78,18 +78,8 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
     }),
     Spec.make("uninstall", {
       // UPSTREAM-DIVERGENCE: Tandem branding.
-      description: `Uninstall ${Brand.product} and remove all related files`,
+      description: `Uninstall ${Brand.product}, keeping session data, configuration, and state`,
       params: {
-        keepConfig: Flag.boolean("keep-config").pipe(
-          Flag.withAlias("c"),
-          Flag.withDescription("Keep configuration files"),
-          Flag.withDefault(false),
-        ),
-        keepData: Flag.boolean("keep-data").pipe(
-          Flag.withAlias("d"),
-          Flag.withDescription("Keep session data and snapshots"),
-          Flag.withDefault(false),
-        ),
         dryRun: Flag.boolean("dry-run").pipe(
           Flag.withDescription("Show what would be removed without removing"),
           Flag.withDefault(false),
