@@ -6,19 +6,23 @@ import { Message, SystemPart } from "@opencode/ai"
 import { Effect } from "effect"
 import { TandemAuxiliary } from "@opencode/util/tandem-auxiliary"
 import { ClaudePresentation } from "./presentation.js"
+import { ClaudeWorkdir } from "./workdir.js"
 import PROMPT from "./anthropic.txt" with { type: "text" }
 
 /** Register after configured hooks and the auxiliary policies. Transport auth is external. */
 export const Plugin = define({
   id: "tandem.claude",
   effect: Effect.fn("ClaudePlugin.Plugin")(function* (ctx) {
-    const hook = (event: SessionHooks["context"]) => Effect.gen(function* () {
+    const workdir = yield* ClaudeWorkdir.make(ctx)
+    const hook = (primary: boolean) => (event: SessionHooks["context"]) => Effect.gen(function* () {
+      if (primary) workdir.inactive(event.sessionID)
       if (!ClaudePresentation.isClaude(event.model.id)) {
         const model = (yield* ctx.model.list().pipe(Effect.orDie)).data.find((model) => model.providerID === event.model.providerID && model.id === event.model.id)
         if (!ClaudePresentation.isClaude(model?.modelID ?? "")) return
       }
       const session = yield* ctx.session.get({ sessionID: event.sessionID }).pipe(Effect.orDie)
       if (TandemAuxiliary.isBareContext(session.metadata)) return
+      workdir.present(event, primary)
       const agent = (yield* ctx.agent.get({ agentID: event.agent }).pipe(Effect.orDie)).data
       if (!agent.system && event.system[0]) event.system[0] = SystemPart.make(PROMPT)
       // Identity and configured hooks insert/reorder blocks, so use the assembly marker,
@@ -44,8 +48,8 @@ export const Plugin = define({
         }
       }
     })
-    yield* ctx.session.hook("context", hook)
-    yield* ctx.session.hook("compaction", hook)
-    yield* ctx.session.hook("generate", hook)
+    yield* ctx.session.hook("context", hook(true))
+    yield* ctx.session.hook("compaction", hook(false))
+    yield* ctx.session.hook("generate", hook(false))
   }),
 })

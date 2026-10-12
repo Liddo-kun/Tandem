@@ -31,6 +31,7 @@ the shims.
 ## Implementation
 
 - `plugin.ts` selects the base prompt, relocates the instruction baseline, and adjusts Skill guidance.
+- `workdir.ts` presents the shell as Claude Code's Bash tool without `workdir` when the shell is bash, and carries the working folder between foreground commands: a `BASH_ENV` exit trap records the final folder, and the next call's `workdir` is set to it.
 - `instructions.ts` changes only Claude-facing rendering of skills, environment text, Code Mode references, and search guidance.
 - `presentation.ts` maps native tool schemas, request history, streamed tool events, billing metadata, and clear-thinking request options.
 - `anthropic.txt` is the bundled Claude base prompt for every Claude model. It follows Claude Code 2.1.291's Opus 5.5 prompt, without Claude Code-only sections.
