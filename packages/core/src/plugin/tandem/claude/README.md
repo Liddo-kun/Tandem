@@ -31,9 +31,9 @@ the shims.
 ## Implementation
 
 - `plugin.ts` selects the base prompt, relocates the instruction baseline, and adjusts Skill guidance.
-- `workdir.ts` presents the shell as Claude Code's Bash tool without `workdir` when the shell is bash, and carries the working folder between foreground commands: a `BASH_ENV` exit trap records the final folder, and the next call's `workdir` is set to it.
+- `workdir.ts` presents the shell as Claude Code's Bash tool without `workdir` when the shell is local bash (not remote workspaces or Windows), and carries the working folder between foreground commands: the shell tool is wrapped so each foreground call gets its own capture file, a `BASH_ENV` exit trap writes the final folder there, and the next call's `workdir` is set to it. The folder does not move when a command `exec`s, replaces the EXIT trap, or a user `BASH_ENV` is set.
 - `instructions.ts` changes only Claude-facing rendering of skills, environment text, Code Mode references, and search guidance.
-- `presentation.ts` maps native tool schemas, request history, streamed tool events, billing metadata, and clear-thinking request options.
+- `presentation.ts` maps native tool schemas, request history (including Claude Code-style Bash results), streamed tool events, billing metadata, and clear-thinking request options. Its `toolResultBody`, applied to outgoing Anthropic request bodies, gives `tool_result` blocks Claude Code's key order.
 - `anthropic.txt` is the bundled Claude base prompt for every Claude model. It follows Claude Code 2.1.291's Opus 5.5 prompt, without Claude Code-only sections.
 - `../bash-search/{plugin,shims}.ts` probes dependencies, filters tool snapshots, and supplies subprocess-local shims.
 - `packages/core/src/session/{context,model-request}.ts` applies presentation after model and plugin hooks and before transport.
@@ -42,8 +42,9 @@ the shims.
 Only native local tools are renamed. Provider-hosted tools and namespaces pass
 through. Code Mode's internal tool paths and JavaScript stay canonical. Mappings are
 derived from the actual request snapshot; presentation-name collisions fail instead
-of dispatching to the wrong tool. Thinking data, signatures, IDs, results, provider
-metadata, and raw delta text pass through unchanged.
+of dispatching to the wrong tool. Thinking data, signatures, IDs, provider metadata,
+and raw delta text pass through unchanged; other tools' results do too, while Bash
+results are reworded like Claude Code's.
 
 Clear-thinking is emitted only for final `enabled` or `adaptive` thinking. Bedrock's
 cache behavior is unchanged. Supported inline-cache routes cap combined manual and

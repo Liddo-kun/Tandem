@@ -14,14 +14,18 @@ export const Plugin = define({
   id: "tandem.claude",
   effect: Effect.fn("ClaudePlugin.Plugin")(function* (ctx) {
     const workdir = yield* ClaudeWorkdir.make(ctx)
-    const hook = (primary: boolean) => (event: SessionHooks["context"]) => Effect.gen(function* () {
-      if (primary) workdir.inactive(event.sessionID)
+    // Selected or resolved Claude models, except bare auxiliary sessions.
+    const presented = (event: Pick<SessionHooks["context"], "sessionID" | "model">) => Effect.gen(function* () {
       if (!ClaudePresentation.isClaude(event.model.id)) {
         const model = (yield* ctx.model.list().pipe(Effect.orDie)).data.find((model) => model.providerID === event.model.providerID && model.id === event.model.id)
-        if (!ClaudePresentation.isClaude(model?.modelID ?? "")) return
+        if (!ClaudePresentation.isClaude(model?.modelID ?? "")) return false
       }
       const session = yield* ctx.session.get({ sessionID: event.sessionID }).pipe(Effect.orDie)
-      if (TandemAuxiliary.isBareContext(session.metadata)) return
+      return !TandemAuxiliary.isBareContext(session.metadata)
+    })
+    const hook = (primary: boolean) => (event: SessionHooks["context"]) => Effect.gen(function* () {
+      if (primary) workdir.inactive(event.sessionID)
+      if (!(yield* presented(event))) return
       workdir.present(event, primary)
       const agent = (yield* ctx.agent.get({ agentID: event.agent }).pipe(Effect.orDie)).data
       if (!agent.system && event.system[0]) event.system[0] = SystemPart.make(PROMPT)
@@ -48,6 +52,14 @@ export const Plugin = define({
         }
       }
     })
+    // Key order is chosen during lowering, so Claude Code's tool_result shape is applied to the outgoing body.
+    yield* ctx.session.hook("http.request", (event) => Effect.gen(function* () {
+      if (event.request.method !== "POST" || !event.request.headers.get("content-type")?.includes("json")) return
+      if (!(yield* presented(event))) return
+      const body = yield* Effect.promise(() => event.request.clone().text())
+      const rewritten = ClaudePresentation.toolResultBody(body)
+      if (rewritten !== body) event.request = new Request(event.request, { body: rewritten })
+    }), { providerID: "anthropic" })
     yield* ctx.session.hook("context", hook(true))
     yield* ctx.session.hook("compaction", hook(false))
     yield* ctx.session.hook("generate", hook(false))

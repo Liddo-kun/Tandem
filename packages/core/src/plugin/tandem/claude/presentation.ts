@@ -1,7 +1,7 @@
 export * as ClaudePresentation from "./presentation.js"
 
 import { createHash } from "node:crypto"
-import { LanguageModel, LLMRequest, Message, SystemPart, ToolChoice, ToolDefinition, type LLMEvent, type ToolEntry } from "@opencode/ai"
+import { LanguageModel, LLMRequest, Message, SystemPart, ToolChoice, ToolDefinition, type LLMEvent, type ToolEntry, type ToolResultPart } from "@opencode/ai"
 import { Stream } from "effect"
 
 export const isClaude = (id: string) => id.toLowerCase().includes("claude")
@@ -38,6 +38,59 @@ export function executeReferences(text: string) {
     .replaceAll("Inside `execute`", "Inside `Execute`")
     .replaceAll("call `execute`", "call `Execute`")
     .replaceAll("consider using `execute` to call `tools.opencode.session_move`", "consider using `Execute` to call `tools.opencode.session_move`")
+}
+
+/** Added to a Claude Bash result when its saved working directory had disappeared. */
+export const workdirReset = (folder: string) =>
+  `The working directory ${folder} no longer exists, so this command ran in the session's starting directory.`
+const RESET = /^The working directory .* no longer exists, so this command ran in the session's starting directory\.$/s
+
+/**
+ * Claude Code's Bash results: trimmed output, its empty-output text, and a failed exit reported as an error that leads
+ * with the exit code. Timeouts, kills and background notices keep Tandem's wording.
+ */
+function bashResult(part: ToolResultPart): ToolResultPart {
+  const texts = part.result.type === "text" && typeof part.result.value === "string"
+    ? [part.result.value]
+    : part.result.type === "content" && part.result.value.every((item) => item.type === "text")
+      ? part.result.value.map((item) => item.text)
+      : []
+  const note = texts.length > 1 && RESET.test(texts.at(-1)!) ? texts.pop() : undefined
+  const [output, notice] = texts
+  const exit = notice === undefined ? undefined : /^Exited with code (\d+)$/.exec(notice)?.[1]
+  if (output === undefined || texts.length > 2 || (notice !== undefined && exit === undefined)) return part
+  const text = output === "(no output)" ? "" : output.trimEnd()
+  const value = (exit !== undefined ? [`Exit code ${exit}`, text].filter(Boolean).join("\n") : text || "(Bash completed with no output)")
+  return { ...part, result: { type: exit !== undefined ? "error" : "text", value: note ? `${value}\n\n${note}` : value } }
+}
+
+/** Claude Code's tool_result key order: errors lead with type, Bash results with tool_use_id, and Bash always sends is_error. */
+export function toolResultBody(body: string) {
+  if (!body.includes('"tool_result"')) return body
+  const parsed = (() => {
+    try {
+      return JSON.parse(body) as unknown
+    } catch {
+      return undefined
+    }
+  })()
+  if (!record(parsed) || !Array.isArray(parsed.messages)) return body
+  const bash = new Set<unknown>()
+  for (const message of parsed.messages)
+    if (record(message) && Array.isArray(message.content))
+      for (const block of message.content)
+        if (record(block) && block.type === "tool_use" && block.name === "Bash") bash.add(block.id)
+  for (const message of parsed.messages) {
+    if (!record(message) || !Array.isArray(message.content)) continue
+    message.content = message.content.map((block: unknown) => {
+      if (!record(block) || block.type !== "tool_result") return block
+      const { type, tool_use_id, content, is_error, ...rest } = block
+      if (is_error === true) return { type, content, is_error, tool_use_id, ...rest }
+      if (bash.has(tool_use_id)) return { tool_use_id, type, content, is_error: false, ...rest }
+      return block
+    })
+  }
+  return JSON.stringify(parsed)
 }
 
 /** Request-local native presentation. The canonical execution snapshot is never mutated. */
@@ -79,7 +132,7 @@ export function request(input: LLMRequest, selectedClaude = isClaude(input.model
     const name = mapping?.name ?? nameFor(part.name)
     return part.type === "tool-call"
       ? { ...part, name, input: rename(part.input, mapping?.keys ?? keys[part.name] ?? {}) }
-      : { ...part, name }
+      : name === "Bash" ? bashResult({ ...part, name }) : { ...part, name }
   }) }))
   const inbound = (event: LLMEvent): LLMEvent => {
     if (!event.type.startsWith("tool-") || !("name" in event) || ("providerExecuted" in event && event.providerExecuted) || ("namespace" in event && event.namespace)) return event
