@@ -1,148 +1,196 @@
 ---
 name: tandem-opencode-sync
-description: Use ONLY when reviewing or syncing official OpenCode upstream/v2 into Tandem-v2, or adapting its pinned upstream baseline; obtain Jon's approval before advancing the baseline.
+description: Use when syncing official OpenCode upstream/v2 into Tandem-v2, especially when the user says get us up to date from opencode upstream, upstream sync, opencode update, fresh pull, batch merge, or remaining commits.
 ---
 
-# Tandem v2 upstream sync
+# Tandem OpenCode Sync
 
-This project-owned skill applies to `/home/jon/code/Tandem-v2`, branch `tandem-v2`.
-Read root `AGENTS.md`, the current platform's `contextL.md` or `contextW.md`,
-`logv2.md` (every Tandem customization of OpenCode) and `notes/todo-after-v2.md` before planning.
-The port baseline is **`80c4a6b7c873050f66457a95a71f90a4df5d4fa0`**, official
-**`upstream/v2`**. Read the nearest package instructions before editing.
-Root `AGENTS.md` is Tandem's own: keep it when upstream changes theirs, and carry over only changes to
-the practical code rules it keeps.
+Use this skill to update the Tandem repo (`~/code/Tandem-v2` on Ubuntu) from official OpenCode v2 while preserving Tandem's documented customizations. Run the git commands below in the current environment's native shell; `<sync-target>`, `<target>`, and `<base>` are SHAs you carry between commands.
 
-## Approval and isolation
+## Fresh Session Contract
 
-- Documenting this workflow does not advance the baseline. Retain the pin until Jon
-  authorizes a baseline change. A request to discover upstream changes
-  permits fetching; a fresh coding session alone does not authorize following its tip.
-- Keep `/home/jon/code/Tandem` and the daily/global sync skill read-only. Preserve all
-  uncommitted work; do not auto-stash, reset, restore or clean. A dirty worktree blocks
-  a merge until its owners and Jon settle the integration plan.
-- Verify on the development server first: port 4098, the isolated launcher and
-  `app.liddokun.tandem.v2` (**Tandem Dev**) with separate data/signing. The daily install
-  (`/usr/local/bin/tandem`, port 4097, `app.liddokun.tandem`) changes only when Jon asks
-  to install. Never copy daily credentials or run another server against the same database.
-- Run builds and browser/device workflows one at a time. Installation,
-  service restart, publication, commits and pushes each require applicable explicit
-  authorization. A source sync is not production cut-over permission.
+When the user says "get us up to date from opencode upstream", do not rely on previous chat history or remembered SHAs. Recompute the sync state from Git.
 
-## Review before changing anything
+- Resume point: `git merge-base tandem-v2 upstream/v2` (the pinned baseline recorded in `AGENTS.md`; if they differ, stop and inspect)
+- End target: current `upstream/v2` after `git fetch --no-tags upstream v2`
+- Pending commits: `git rev-list --topo-order --reverse tandem-v2..upstream/v2`
+- If the user asks to get up to date, process all pending commits, broken into logical batches and worked batch by batch, unless review or dry-run finds risk.
+- Only use an older pinned target if the user explicitly asks to continue that older target.
 
-Inspect Git from the v2 root:
+Read `contextL.md` (or `contextW.md` on Windows), `logv2.md` and `notes/todo-after-v2.md` in full before syncing. Use `logv2.md` as the authoritative inventory of intentional Tandem differences from official OpenCode.
+
+## Hard Rules
+
+- Read `logv2.md` in full before any merge or conflict resolution.
+- Use `tandem-v2` as the Tandem branch unless the user says otherwise.
+- Use `upstream/v2` as official OpenCode. Never use `dev`, `upstream/dev` or the v1 checkout (`~/code/Tandem`).
+- Use merge, not rebase, for normal sync work.
+- Do not use `origin/tandem-v2` to choose the next upstream batch; it may be stale.
+- Do not run tests or typechecks from the repo root.
+- Do not install to the daily setup, restart the daily server, or push without the user's explicit instruction.
+
+## Preflight
+
+Start in the Tandem repo root:
 
 ```sh
 git status --short --branch
 git remote -v
 git branch -vv
-git log --oneline -10
-git diff --stat
-git diff --check
-git rev-parse upstream/v2
 ```
 
-Do not modify remotes/config to make assumptions true. Verify branch/worktree identity
-and the baseline in the scope/context notes. If authorized to discover newer upstream:
+If the worktree is dirty, stop and ask before syncing.
+
+If `upstream` is missing, configure it as:
+
+```sh
+git remote add upstream https://github.com/sst/opencode.git
+```
+
+Fetch and pin the sync target for this session:
 
 ```sh
 git fetch --no-tags upstream v2
-git rev-parse upstream/v2
-git log --topo-order --reverse --oneline 80c4a6b7c873050f66457a95a71f90a4df5d4fa0..upstream/v2
+git rev-parse upstream/v2   # pin this SHA as <sync-target>
 ```
 
-Fetching only discovers a candidate. Present its full SHA, changes affecting retained
-features and a batch plan. Confirm that Jon's request authorizes advancing the port pin;
-ask only if that scope is unclear. For an already approved later baseline, use its
-recorded SHA instead of the original pin.
-Never use daily `dev`, `upstream/dev`, or `origin` tracking state as the v2 sync target.
+The pin is session-local. A future fresh session should fetch again and recompute from `tandem-v2..upstream/v2` unless the user asks for a specific older target.
 
-## Narrow divergence inventory
+## Plan Logical Batches
 
-Use the divergence inventory in `logv2.md` plus current source and its
-`UPSTREAM-DIVERGENCE` comments. Drop `UPSTREAM-DIVERGENCE(temporary)` fixes that the new
-baseline fixes itself. V1 `log.md` is historical reference, not scope.
-For each affected retained feature identify:
+Before merging anything, FIRST, break the full pending range into logical batches and work them batch by batch.
 
-1. Required observable behavior and its current evidence/unverified cases.
-2. Tandem-owned module and exact shared integration seam.
-3. Equivalent upstream behavior or configuration/public extension replacing that seam.
-4. Proposed retained, reshaped or removed delta and the real workflow to check it.
-
-Prefer upstream architecture, then configuration, then public **Effect v4** plugins
-(`@opencode/plugin/effect/*`); use the Effect skill for Effect implementation work.
-Respect an external plugin's established public API rather than rewriting it merely
-for style. Do not copy v1 runners/middleware into v2 or preserve obsolete parallel paths.
-Keep shared patches narrow; direct GPT prompt-file edits are an accepted exception.
-Bring ambiguous feature removal, API/persistence changes and architecture tradeoffs to
-Jon. Do not restore excluded voice, RePrompt, LSP/todowrite or deferred iOS/UI features.
-
-Current boundaries:
-
-- `packages/{schema,protocol,core,server,ai,plugin,client,cli}` own backend contracts,
-  execution, providers and CLI. Preserve v2 durable admission/history/execution semantics.
-- `packages/app` owns shared app/composer; `session-ui` owns message/tool rendering;
-  `gui-extensions` owns optional views; `android` owns the native shell.
-- `packages/core/src/plugin/tandem` owns retained provider/tool behavior; Claude OAuth
-  transport is separately maintained in `opencode-anthropic-auth-v2`.
-- After public Protocol/Server HttpApi changes, regenerate with
-  `bun run --cwd packages/client generate`; never hand-merge generated client code.
-- CLI build output is `packages/cli/dist/cli-<target>/bin/opencode`, staged/named Tandem
-  by the development/release scripts. Do not use old `packages/opencode` build commands.
-
-## Approved batch workflow
-
-Pin the approved full target SHA in `SYNC_TARGET`; choose reviewed contiguous ancestor
-boundaries in `BATCH_TARGET`. Inspect every pending subject and unclear diff, grouping
-architectural changes with their fixes and isolating mobile/provider/shared seams.
-Do not combine `--reverse` with `--max-count` when enumerating pending commits.
+First list all pending commits in apply order:
 
 ```sh
-git log --topo-order --reverse --oneline tandem-v2.."$SYNC_TARGET"
-git rev-list --count tandem-v2.."$BATCH_TARGET"
-BASE=$(git merge-base tandem-v2 "$BATCH_TARGET")
-git diff --name-status "$BASE" "$BATCH_TARGET"
-git diff --check "$BASE" "$BATCH_TARGET"
-git merge-tree --write-tree tandem-v2 "$BATCH_TARGET"
+git log --oneline --reverse tandem-v2..<sync-target>
 ```
 
-These commands require the approved SHA variables to be assigned first. Review upstream
-changes from the merge base, not a tip-to-tip comparison that misreports fork-owned files
-as deletions. Dry-run conflicts are a review gate. Adopt upstream structure and reapply
-only justified retained behavior. Escalate uncertain mobile/API/persistence resolutions;
-report every resolved conflict, including mechanical ones.
+If the list is empty, report that no upstream commits are pending and stop. Never combine `--reverse` with `--max-count`; Git applies `--max-count` before `--reverse`.
 
-Once merging/committing this batch is explicitly authorized and the worktree is ready:
+Read every subject line (and `git show --stat` for anything unclear) and group the commits into logical batches:
+
+- Each batch is a contiguous run of commits in topo order; a batch is defined by its last commit (`<target>`), since merging through `<target>` brings in everything before it.
+- Group by theme/subsystem: core/server/protocol refactors, providers, CLI/TUI, shared web UI (`packages/app`, `packages/session-ui`), client/codegen, docs/chore runs, release/version bumps.
+- Keep an architectural refactor together with its immediate follow-up fixes in one batch; never split a refactor from its fixups.
+- Cut a batch boundary where the theme changes, before and after large refactors, and before any commit that touches areas with known Tandem divergence (see `logv2.md`: Android, shared web UI, composer, providers, plugin hooks) so those merge in their own reviewable batch.
+- Prefer several focused batches over one giant one; trivial chore/docs runs can be one batch.
+
+Present the batch plan to the user before starting the first merge: `<sync-target>`, and for each batch the commit count, a one-line theme, and whether it touches known Tandem-divergent areas. Wait for the user's go-ahead; it approves advancing the baseline and the batch merge commits. Adjust if the user redirects.
+
+Before working a batch, confirm its slice:
 
 ```sh
-git merge --no-ff "$BATCH_TARGET" -m "chore(sync): merge approved upstream v2 batch"
-git status --short --branch
-git rev-list --count tandem-v2.."$SYNC_TARGET"
-git log --oneline -6
+git log --oneline --reverse tandem-v2..<target>
+git rev-list --count tandem-v2..<target>
 ```
 
-Use merge, not rebase/force-push. Unexpected dirty state or architectural conflicts stop
-the next batch. Update `logv2.md` and the baseline references with the integration outcome; record the
-approved new pin only then, not merely because fetch succeeded.
+The count must equal the batch size. If it does not, stop and inspect.
 
-## Verification and report
+## Work Batch By Batch
 
-First verification is a **real agent session with actual tool calls through normal
-admission/execution**, using the isolated launcher and an explicit development-server
-URL. Build only when needed to load changes. Do not run upstream `dev:live` discovery
-against an unspecified service; implicit version mismatch can replace a server.
+Process one batch at a time, in order. For each batch run the full cycle: Review And Dry Run → Merge → Post-Merge Gate → Verification → brief batch report. Do not start the next batch until the current one is merged, verified, and the worktree is clean.
 
-No low-level tests, test-writing or fixture repairs unless Jon explicitly requests them.
-Focused package `bun typecheck` is secondary and only useful after live verification;
-build/typecheck success is not acceptance. For blocked live checks, report the concrete
-blocker rather than substituting synthetic checks. Exercise affected retained workflows:
-provider final requests/tool round trips, Corrector queue snapshots, browser cleanup,
-image transport/preview isolation, and Android connection/draft/keyboard/zoom as relevant.
-Keep credential values out of evidence. Preserve known unsupported/unverified cases,
-including masked OAuth transparency, mask black-fill sensitivity and untested API-key mode.
+If a batch turns out to be riskier than planned (unexpected conflicts, surprise architectural change), pause and tell the user before proceeding; offer to split the batch further.
 
-After each batch report commits/theme, conflicts and resolutions, reshaped/removed seams,
-actual workflows/results, blockers and remaining commits. At completion report the
-approved baseline, worktree state and user-testable changes. Do not claim acceptance from
-source review alone.
+## Review And Dry Run
+
+Review upstream changes from the merge base to the batch target:
+
+```sh
+git merge-base tandem-v2 <target>          # use as <base>
+git show --stat --oneline --find-renames <batch commits>
+git diff --name-status <base> <target>
+git diff --check <base> <target>
+```
+
+Do not review with `git diff tandem-v2..<target>`; Tandem has fork-only files, so that comparison creates false deletion noise.
+
+Use these priorities:
+
+- Core OpenCode/server behavior: prefer current upstream unless Tandem has a documented compatibility reason.
+- Upstream architectural changes, simplifications, and refactors must be incorporated. Adopt the upstream structure first, then reapply Tandem customizations only where they still make sense. if you are not absolutly sure, consult the user.
+- Do not preserve an old Tandem implementation shape just because it is already in the fork. Understand the original intent, preserve documented behavior that is still needed, and drop obsolete code paths instead of keeping needless parallel implementations.
+- If upstream now offers a hook, setting or plugin API that can carry a Tandem customization, prefer moving the customization onto it over keeping an edit to shared code.
+- If upstream makes a significant UI or behavior change, reassess Tandem customizations against that new design. Some Tandem changes may no longer fit and can be removed, but only after understanding why they existed and confirming they are no longer useful.
+- Use judgment. If it is unclear whether a Tandem customization should survive an upstream refactor, simplification, or UI change, stop and ask the user before deciding.
+- Tandem includes a dedicated Android app (`packages/android`) that uses the shared web UI. be extra careful in the context of merging web UI changes, review what special customizations Tandem has to the web UI relative to the mobile app.
+- Shared web UI conflicts: manually produce the smallest combined final state.
+- Preserve `UPSTREAM-DIVERGENCE` comments. Remove UPSTREAM-DIVERGENCE comments, and their `logv2.md` entries, when we fully adopt upstream. Drop `UPSTREAM-DIVERGENCE(temporary)` fixes once upstream ships an equivalent fix.
+
+Dry-run before merging:
+
+```sh
+git merge-tree --write-tree tandem-v2 <target>
+```
+
+If it reports conflicts or exits nonzero, stop and follow Conflict Resolution before merging.
+
+## Conflict Resolution
+
+Default stance: incoming upstream architecture wins; Tandem customizations are reapplied on top only where they still make sense.
+
+For each conflicted file:
+
+1. Understand both sides: what upstream changed and why, and what the Tandem delta was for (check `logv2.md` and `UPSTREAM-DIVERGENCE` comments).
+2. Adopt the upstream structure first, then reapply the Tandem customization in the new shape only if its documented purpose still applies.
+3. If the Tandem customization no longer fits the new upstream design, drop it — but only after understanding why it existed.
+
+Keep the user in the loop. Resolve silently only when absolutely sure, meaning all of these hold:
+
+- The Tandem side is documented (in `logv2.md` or an `UPSTREAM-DIVERGENCE` comment) and clearly still applies, or the conflict is mechanical (adjacent-line noise, lockfiles, version bumps, generated files).
+- The resolution does not change behavior on either side beyond what upstream intends.
+- No mobile/compatibility-contract surface is affected (API shapes, platform contract, WebView/keyboard behavior).
+
+Generated client/OpenAPI files (`packages/client/src/{effect,promise}/generated/*` and the protocol's OpenAPI output) are never hand-merged: take the upstream side, then regenerate with `bun run generate` from `packages/protocol` and `packages/client` so any Tandem-only endpoints are re-emitted.
+
+For everything else — ambiguous intent, overlapping behavior changes, a Tandem customization that may be obsolete, or any judgment call about dropping fork behavior — stop and present the conflict to the user before resolving: the file, both sides' intent, and a recommended resolution with reasoning.
+
+Even for silently resolved conflicts, list each conflicted file and the chosen resolution in the batch report so nothing is resolved invisibly.
+
+## Merge
+
+Use a merge commit:
+
+```sh
+git merge --no-ff <target> -m "opencode-sync: merge upstream v2 batch through <short-sha>"
+```
+
+## Post-Merge Gate
+
+Immediately after the merge:
+
+```sh
+git status --porcelain=v2
+git rev-list --count tandem-v2..<sync-target>
+git log --oneline --decorate --max-count=6
+```
+
+If the worktree is dirty after a successful merge, stop before testing or continuing. Classify the dirty state first:
+
+```sh
+git diff --name-status HEAD
+git diff --numstat HEAD
+git reflog --date=iso --max-count=12
+```
+
+Only restore dirty files after explicit user approval.
+
+## Verification
+
+Verify on the development server (port 4098, app **Tandem Dev**), never the daily one. Commands are in `notes/tandem-setup.md`; use the pinned Bun from `contextL.md`.
+
+- When a batch changes runtime code, rebuild the development CLI (`bun script/tandem-v2.ts build`), restart the development server, and run a real agent session with actual tool calls against `http://127.0.0.1:4098`, exercising the Tandem features from `logv2.md` that the batch touched.
+- When a batch changes the shared web UI or Android, rebuild and install **Tandem Dev** (`bun run tandem:tablet -- --install --dev`) and check the affected screens; ask the user for anything that needs hands on the tablet.
+- Docs/chore-only batches need no build.
+- Then run package-local `bun typecheck` in each changed package directory. Never run tests or typecheck from repo root. Do not add or run low-level tests unless the user asks.
+
+Run builds and device checks one at a time.
+
+## Final Report
+
+After each batch, report briefly: the batch theme and commits, every conflicted file with its resolution, what was verified, and remaining commits against `<sync-target>`.
+
+After the last batch, update the recorded baseline to `<sync-target>` in `AGENTS.md`, `logv2.md` and `changelogv2.md` (add a changelog entry for the sync), and keep `logv2.md` matching any customizations dropped or reshaped. Then summarize the whole sync: batches merged, all conflict resolutions, any Tandem customizations dropped or reshaped, and whether the worktree is clean.
+
+Finally, give a summary of the updates. What functional changes to opencode were made that are user testable?
