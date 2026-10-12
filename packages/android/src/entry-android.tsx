@@ -5,9 +5,8 @@ import { createStore } from "solid-js/store"
 import { onCleanup, onMount } from "solid-js"
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification"
 import { openUrl } from "@tauri-apps/plugin-opener"
-import { Store } from "@tauri-apps/plugin-store"
 import { allowMarkdownLinkProtocol } from "@opencode/session-ui/markdown-cache"
-import { AppBaseProviders, AppInterface, createBrowserDraftStore, PlatformProvider, ServerConnection, type Platform } from "@opencode/app"
+import { AppBaseProviders, AppInterface, createBrowserDraftStore, PlatformProvider, type Platform } from "@opencode/app"
 import { bridge } from "./bridge"
 import { createServerDiscovery } from "./discovery"
 import { createTauriStorage } from "./storage"
@@ -16,7 +15,6 @@ import { isTaobaoItemUrl } from "./taobao"
 import "./android.css"
 import pkg from "../package.json"
 
-const settings = Store.load("opencode.settings.dat")
 const root = document.getElementById("root")
 allowMarkdownLinkProtocol("taobao", isTaobaoItemUrl)
 
@@ -40,16 +38,6 @@ function App() {
     },
     storage: createTauriStorage,
     draftStore: createBrowserDraftStore(),
-    getDefaultServer: async () => {
-      const value = await (await settings).get<string>("defaultServerUrl")
-      return value ? ServerConnection.Key.make(value) : null
-    },
-    setDefaultServer: async (key) => {
-      const store = await settings
-      if (key) await store.set("defaultServerUrl", key)
-      if (!key) await store.delete("defaultServerUrl")
-      await store.save()
-    },
     webviewZoom: () => state.zoom,
     setWebviewZoom: (scale) => {
       const percent = Number.isFinite(scale) ? Math.round(scale * 50) * 2 : 100

@@ -64,12 +64,11 @@ export function ConnectServerScreen(props: { url?: string } = {}) {
       return
     }
 
-    // UPSTREAM-DIVERGENCE: Require v2 and save the successful connection as Android's default.
+    // UPSTREAM-DIVERGENCE: Android requires a v2 server.
     if (platform.platform === "android" && !result.version?.startsWith("2.")) {
       setState("error", language.t("server.connect.v2Required"))
       return
     }
-    if (platform.platform === "android") await platform.setDefaultServer?.(ServerConnection.Key.make(http.url))
 
     // Signing in again keeps the name the user gave this server.
     const existing = servers.list.find(

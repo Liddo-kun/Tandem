@@ -2,7 +2,6 @@ import { createSimpleContext } from "@opencode/ui/context"
 import type { AsyncStorage, SyncStorage } from "@solid-primitives/storage"
 import type { Accessor } from "solid-js"
 import type { DesktopMenuAction } from "@/shell/commands/desktop-menu"
-import { ServerConnection } from "@/runtime/server/registry"
 import type { DraftStore } from "@/runtime/persistence/drafts"
 import type { Bridge } from "@opencode/gui-extensions/sdk/bridge"
 
@@ -82,12 +81,6 @@ type PlatformBase = {
 
   /** Fetch override */
   fetch?: typeof fetch
-
-  /** Get the configured default server URL (platform-specific) */
-  getDefaultServer?(): Promise<ServerConnection.Key | null>
-
-  /** Set the default server URL to use on app startup (platform-specific) */
-  setDefaultServer?(url: ServerConnection.Key | null): Promise<void> | void
 
   // UPSTREAM-DIVERGENCE: Optional native Android zoom and discovery.
   /** Native webview zoom level. */
