@@ -180,10 +180,10 @@ Only restore dirty files after explicit user approval.
 
 Verify on the development server (port 4098, app **Tandem Dev**), never the daily one. Commands are in `notes/tandem-setup.md`; use the pinned Bun from `contextL.md`.
 
-- When a batch changes runtime code, rebuild the development CLI (`bun script/tandem-v2.ts build`), restart the development server, and run a real agent session with actual tool calls against `http://127.0.0.1:4098`, exercising the Tandem features from `logv2.md` that the batch touched.
+- When a batch could change how an agent session behaves (session/runner, tools, prompts, providers, plugins, or Tandem features from `logv2.md`), rebuild the development CLI (`bun script/tandem-v2.ts build`), restart the development server, and run a real agent session against `http://127.0.0.1:4098`. Tailor it to what the batch touched: exercise those code paths and Tandem features, not a generic smoke test. Skip the session when the batch clearly cannot affect agent behavior or its only conflicts are obviously low-risk (imports, adjacent lines, branding strings); say in the batch report that it was skipped and why.
 - When a batch changes the shared web UI or Android, rebuild and install **Tandem Dev** (`bun run tandem:tablet -- --install --dev`) and check the affected screens; ask the user for anything that needs hands on the tablet.
 - Docs/chore-only batches need no build.
-- Then run package-local `bun typecheck` in each changed package directory. Never run tests or typecheck from repo root. Do not add or run low-level tests unless the user asks.
+- Then run package-local `bun typecheck` in each changed package directory. Never run tests or typecheck from repo root.
 
 Run builds and device checks one at a time.
 
