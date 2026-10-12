@@ -4,7 +4,13 @@ Dated user-visible changes and published releases of Tandem v2, and the source f
 
 ## Unreleased
 
-Baseline: OpenCode `upstream/v2` at `80c4a6b7c8` (2026-10-06, `@opencode/cli` 2.0.24), synced on 2026-10-06 from `40679546d4` (2026-10-03, 2.0.22). Version `2.0.24-tandem-v2.2`, installed as the daily Tandem on Jon's tablet on 2026-10-07 (`2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
+Baseline: OpenCode `upstream/v2` at `4617210822` (2026-10-10, `@opencode/cli` 2.0.26), synced on 2026-10-12 from `80c4a6b7c8` (2026-10-06, 2.0.24). Version `2.0.24-tandem-v2.2`, installed as the daily Tandem on Jon's tablet on 2026-10-07 (`2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
+
+### 2026-10-12
+
+- **Changed — Upstream sync to OpenCode 2.0.26:** merged 139 upstream v2 commits (`80c4a6b7c8`→`4617210822`) in thirteen batches. User-visible upstream changes include a pairing-link-first Connect screen and Add server dialog (with a "Use password" switch), remote pairing through OpenTunnel (`tandem pair --remote`), Word/Excel/PowerPoint previews, a recently closed tabs menu on the new-tab button, recent sessions in the empty command palette, a narrower session column with nicer text wrapping, the full tool error text when an error row is expanded, clickable file links in the timeline, worktree tools in Code Mode, no more permission prompts for reading outside the project folder, and `tandem uninstall` keeping data, config and state. Effect moved to 4.0.1. [Divergence inventory](logv2.md).
+- **Changed — Server connection:** choosing a LAN server found by discovery opens the password form with its address filled in. Tandem's own pairing-link pasting and the Android setup help under the Connect screen were dropped, since upstream now handles pairing links on both screens.
+- **Removed — Default server on Android:** upstream removed the configurable default server, so the first server you connect to is no longer saved as the default.
 
 ### 2026-10-11
 
