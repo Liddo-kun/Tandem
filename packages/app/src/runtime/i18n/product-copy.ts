@@ -20,6 +20,7 @@ export const productCopy = {
   "settings.about.description": `${Brand.product}, an open source coding agent based on OpenCode`,
   "settings.about.trademark":
     "OpenCode is a registered trademark of Anomaly Innovations, Inc. Tandem is an independent fork.",
+  "settings.about.notices.description": `${Brand.product} includes the following open source software.`,
   "project.settings.name.description": `The name shown for this project throughout ${Brand.product}`,
   "project.settings.extensions.empty.mcps.description": `MCPs available to ${Brand.product} will appear here`,
   "project.settings.extensions.empty.plugins.description": `Plugins available to ${Brand.product} will appear here`,
