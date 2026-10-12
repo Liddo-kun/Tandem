@@ -58,9 +58,6 @@ function App() {
       viewport.sync()
     },
     ...createServerDiscovery(),
-    serverSetup: {
-      serve: `tandem serve --hostname 0.0.0.0 --port ${import.meta.env.TANDEM_ANDROID_NAME === "Tandem Dev" ? "4098" : "4097"}`,
-    },
   }
 
   onMount(() => {

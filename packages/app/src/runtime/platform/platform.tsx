@@ -89,7 +89,7 @@ type PlatformBase = {
   /** Set the default server URL to use on app startup (platform-specific) */
   setDefaultServer?(url: ServerConnection.Key | null): Promise<void> | void
 
-  // UPSTREAM-DIVERGENCE: Optional native Android zoom, discovery and setup help.
+  // UPSTREAM-DIVERGENCE: Optional native Android zoom and discovery.
   /** Native webview zoom level. */
   webviewZoom?: Accessor<number>
 
@@ -99,9 +99,6 @@ type PlatformBase = {
   /** Native LAN discovery. A credential-required server is still reachable. */
   discoverServers?(onServer: (server: { url: string; authenticationRequired: boolean }) => void): Promise<void>
   cancelServerDiscovery?(): Promise<void>
-
-  /** Platform-specific connection help, kept out of shared product branding. */
-  serverSetup?: { serve: string; pair?: string }
 
   /** Whether the native desktop window is fullscreen */
   windowFullscreen?: Accessor<boolean>
