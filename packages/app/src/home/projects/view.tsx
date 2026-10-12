@@ -103,8 +103,9 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
           </Show>
           <span class="flex min-w-0 flex-1 flex-col leading-[var(--line-height-compact)]">
             <bdi class="truncate">
+              {/* UPSTREAM-DIVERGENCE(temporary): Show runs its children untracked, so a bare string kept the first project's name. */}
               <Show when={selected()} fallback={props.language.t("home.projects.all")}>
-                {(project) => displayName(project())}
+                {(project) => <>{displayName(project())}</>}
               </Show>
             </bdi>
             <Show when={props.servers.length > 1 && server()}>

@@ -65,11 +65,11 @@ export function createPromptProjectController(input: {
     const key = pathKey(controls.directory)
     const projects = controls.available.filter((project) => !project.server || project.server.key === controls.server)
 
+    // UPSTREAM-DIVERGENCE(temporary): an exact folder match wins over an earlier project listing the folder as a worktree.
     return (
-      projects.find(
-        (project) =>
-          pathKey(project.worktree) === key || project.sandboxes?.some((sandbox) => pathKey(sandbox) === key),
-      ) ?? projects.find((project) => controls.projectID && project.id === controls.projectID)
+      projects.find((project) => pathKey(project.worktree) === key) ??
+      projects.find((project) => project.sandboxes?.some((sandbox) => pathKey(sandbox) === key)) ??
+      projects.find((project) => controls.projectID && project.id === controls.projectID)
     )
   }
 
