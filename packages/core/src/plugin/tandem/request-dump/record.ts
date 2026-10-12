@@ -2,7 +2,7 @@
 import { mkdirSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { Context, Effect, Option, Schema } from "effect"
-import type { HttpClientRequest } from "effect/unstable/http"
+import type { HttpClientRequest } from "effect/http"
 
 /** Diagnostic attribution is fiber-local and never becomes provider request data. */
 export interface Attribution {

@@ -1,7 +1,7 @@
 // Tandem-owned (not in upstream): request attribution and terminal transport diagnostics.
 import { RequestExecutor, type StreamOptions, type WebSocketConnector } from "@opencode/ai/route"
 import { Effect, Layer, Stream } from "effect"
-import { HttpClient } from "effect/unstable/http"
+import { HttpClient } from "effect/http"
 import { RequestDumpRecord, type Attribution } from "./record.js"
 
 // The executor invokes this client only AFTER its per-request middleware calls handler(sent).
