@@ -1,10 +1,11 @@
 import { EOL } from "os"
-import { Effect, Option } from "effect"
+import { Effect, Option, Schedule } from "effect"
 import { Service } from "@opencode/client/effect/service"
 import { OpenCode } from "@opencode/client/promise"
 import { renderUnicodeCompact } from "uqr"
 import { Commands } from "../commands"
 import { Runtime } from "../../framework/runtime"
+import { RemoteTunnel } from "../../services/remote-tunnel"
 import { ServiceConfig } from "../../services/service-config"
 // UPSTREAM-DIVERGENCE: Explicit server pairing and Tandem command hints.
 import { ServerConnection } from "../../services/server-connection"
@@ -15,15 +16,21 @@ export default Runtime.handler(
   Effect.fn("cli.pair")(function* (input: Runtime.Input<typeof Commands.commands.pair>) {
     // UPSTREAM-DIVERGENCE: Resolve --server without requiring the implicit background service.
     const server = Option.getOrUndefined(input.server)
-    if (input.standalone || (server === undefined && (yield* ServiceConfig.read()).disabled === true))
+    const config = yield* ServiceConfig.read()
+    if (input.standalone || (server === undefined && config.disabled === true))
       return yield* Effect.fail(
         new Error(`Pairing requires a persistent server; pass --server or run \`${Brand.command} service unset disabled\` first`),
       )
+    if (input.remote && Option.isSome(input.url))
+      return yield* Effect.fail(new Error("--remote cannot be combined with --url"))
+    // UPSTREAM-DIVERGENCE: The tunnel belongs to the background service, so it cannot pair an explicit --server.
+    if (input.remote && server !== undefined)
+      return yield* Effect.fail(new Error("--remote cannot be combined with --server"))
+    // Changing the setting restarts the service, and the ensure below starts it again with the tunnel.
+    if (input.remote && config.remote !== true) yield* ServiceConfig.set("remote", "true")
     const { endpoint } = yield* ServerConnection.resolve({ server })
     const client = OpenCode.make({ baseUrl: endpoint.url, headers: Service.headers(endpoint) })
-    const urls = Option.isSome(input.url)
-      ? [input.url.value]
-      : (yield* Effect.tryPromise(() => client.server.info())).urls
+    const urls = yield* pairingURLs(client, input)
     const pairing = yield* Effect.tryPromise(() => client.server.pair())
     const links = urls.map((url) => new URL(`/auth/connect/${pairing.code}`, url).href)
     // Loopback URLs are useless to the scanning device, so the QR code only carries reachable addresses.
@@ -50,7 +57,7 @@ export default Runtime.handler(
       ].join(EOL) + EOL,
     )
 
-    if (Option.isSome(input.url)) return
+    if (input.remote || Option.isSome(input.url)) return
     const url = new URL(endpoint.url)
     if (!["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) return
     process.stderr.write(
@@ -66,6 +73,35 @@ export default Runtime.handler(
     )
   }),
 )
+
+const pairingURLs = Effect.fnUntraced(function* (
+  client: ReturnType<typeof OpenCode.make>,
+  input: Runtime.Input<typeof Commands.commands.pair>,
+) {
+  if (input.remote) return [yield* remoteURL(client)]
+  if (Option.isSome(input.url)) return [input.url.value]
+  return (yield* Effect.tryPromise(() => client.server.info())).urls
+})
+
+// The service attaches the tunnel in the background, so wait for its URL to appear in server info.
+const remoteURL = Effect.fnUntraced(function* (client: ReturnType<typeof OpenCode.make>) {
+  const tunnelURL = Effect.gen(function* () {
+    const hostname = yield* RemoteTunnel.hostname()
+    const info = yield* Effect.tryPromise(() => client.server.info())
+    const url = info.urls.find((candidate) => hostname !== undefined && new URL(candidate).hostname === hostname)
+    if (url === undefined) return yield* Effect.fail(new Error("Remote tunnel is not ready"))
+    return url
+  })
+  return yield* tunnelURL.pipe(
+    Effect.retry({ schedule: Schedule.spaced("1 second") }),
+    Effect.timeoutOrElse({
+      duration: "3 minutes",
+      orElse: () =>
+        // UPSTREAM-DIVERGENCE: Tandem command hint.
+        Effect.fail(new Error(`Timed out waiting for the remote tunnel; run \`${Brand.command} pair --remote\` again to retry`)),
+    }),
+  )
+})
 
 function isLoopback(hostname: string) {
   return (
