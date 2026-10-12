@@ -62,7 +62,8 @@ export type Inventory = {
 const description = [
   "Run JavaScript in a confined Code Mode runtime to script tool calls and HTTP requests and compose their results.",
   "`fetch` is available for HTTP requests. Imports, direct filesystem access, and timers are unavailable; all other external access goes through `tools`.",
-  "Within `{ code }`, the only callable tools are those explicitly listed in the Code Mode catalog instructions or returned by the `search` function. Inside `{ code }`, ignore tools shown outside the Code Mode catalog. They are not available in the Code Mode runtime.",
+  // UPSTREAM-DIVERGENCE: say where the catalog is, tie `search` to it, and state plainly that regular tools are unavailable.
+  'Within `{ code }`, `tools` exposes only the tools listed under the "# Code Mode" heading in your instructions (and any found with `search`, when that section says it is available). Your other tools cannot be called from inside `{ code }`.',
   'Call tools through `tools` using only exact paths and signatures from the catalog. Do not infer or normalize tool names; preserve bracket notation such as `tools.<namespace>["tool-name"](input)`.',
   "Prefer an explicit `return`; if omitted, the final top-level expression becomes the result.",
   "Await every call whose completion matters; pending calls are interrupted when execution ends. Run independent calls concurrently with `Promise.allSettled`.",
