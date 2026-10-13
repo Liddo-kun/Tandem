@@ -53,14 +53,6 @@ export const Plugin = define({
         }
       }
     })
-    // Key order is chosen during lowering, so Claude Code's tool_result shape is applied to the outgoing body.
-    yield* ctx.session.hook("http.request", (event) => Effect.gen(function* () {
-      if (event.request.method !== "POST" || !event.request.headers.get("content-type")?.includes("json")) return
-      if (!(yield* presented(event))) return
-      const body = yield* Effect.promise(() => event.request.clone().text())
-      const rewritten = ClaudePresentation.toolResultBody(body)
-      if (rewritten !== body) event.request = new Request(event.request, { body: rewritten })
-    }), { providerID: "anthropic" })
     yield* ctx.session.hook("context", hook(true))
     yield* ctx.session.hook("compaction", hook(false))
     yield* ctx.session.hook("generate", hook(false))

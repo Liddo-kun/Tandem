@@ -1,4 +1,4 @@
-// Tandem-owned (not in upstream): request attribution and terminal transport diagnostics.
+// Tandem-owned (not in upstream): request attribution, terminal transport diagnostics and Anthropic trace headers.
 import { RequestExecutor, type StreamOptions, type WebSocketConnector } from "@opencode/ai/route"
 import { Effect, Layer, Stream } from "effect"
 import { HttpClient } from "effect/http"
@@ -11,7 +11,12 @@ export const executorLayer = RequestExecutor.layer.pipe(
     Layer.effect(
       HttpClient.HttpClient,
       Effect.map(HttpClient.HttpClient, (client) =>
-        HttpClient.transform(client, (send, request) => RequestDumpRecord.http(request).pipe(Effect.andThen(send))),
+        HttpClient.transform(client, (send, request) =>
+          RequestDumpRecord.http(request).pipe(
+            // Claude Code sends no tracing headers, so Anthropic API requests do not propagate the client span.
+            Effect.andThen(request.headers["anthropic-version"] ? send.pipe(Effect.provideService(HttpClient.TracerPropagationEnabled, false)) : send),
+          ),
+        ),
       ),
     ),
   ),

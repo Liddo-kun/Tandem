@@ -7,7 +7,7 @@ structured tool events back to canonical names before validation and execution.
 Bare Corrector and browser-reader sessions are excluded. Authentication and
 transport remain owned by the external Anthropic auth plugin.
 
-The request also adds the Claude Code billing block, enables clear-thinking context
+The request also enables clear-thinking context
 management when thinking is active, and uses one-hour cache hints on supported
 Claude routes. Durable instruction values and chronological updates are unchanged.
 
@@ -33,7 +33,9 @@ the shims.
 - `plugin.ts` selects the base prompt, relocates the instruction baseline, and adjusts Skill guidance.
 - `workdir.ts` presents the shell as Claude Code's Bash tool without `workdir` when the shell is local bash (not remote workspaces or Windows), and carries the working folder between foreground commands: the shell tool is wrapped so each foreground call gets its own capture file, a `BASH_ENV` exit trap writes the final folder there if it differs from where the command started (as in Claude Code), and the next call's `workdir` is set to it. The folder does not move when a command `exec`s, replaces the EXIT trap, or a user `BASH_ENV` is set. When the Bash tool is presented, the environment's `Primary working directory:` line gets a note saying so.
 - `instructions.ts` changes only Claude-facing rendering of skills, environment text (Claude Code's `# Environment` and `# Environment update` lists), Code Mode references, and search guidance.
-- `presentation.ts` maps native tool schemas, request history (including Claude Code-style Bash results), streamed tool events, billing metadata, and clear-thinking request options. Its `toolResultBody`, applied to outgoing Anthropic request bodies, gives `tool_result` blocks Claude Code's key order.
+- `presentation.ts` maps native tool schemas, request history (including Claude Code-style Bash results), streamed tool events, and clear-thinking request options.
+- What the model never reads is presented by the external Anthropic auth plugin with a Claude subscription: Claude Code's headers, user agent and beta, the billing line with its checksum and fields, and `tool_result` key order.
+- `../request-dump/transport.ts` turns off Effect's `traceparent`/`b3` trace headers for Anthropic API requests (those with `anthropic-version`), which Claude Code does not send.
 - `anthropic.txt` is the bundled Claude base prompt for every Claude model. It follows Claude Code 2.1.291's Opus 5.5 prompt, without Claude Code-only sections.
 - `../bash-search/{plugin,shims}.ts` probes dependencies, filters tool snapshots, and supplies subprocess-local shims.
 - `packages/core/src/session/{context,model-request}.ts` applies presentation after model and plugin hooks and before transport.
@@ -48,7 +50,7 @@ results are reworded like Claude Code's.
 
 Clear-thinking is emitted only for final `enabled` or `adaptive` thinking. Bedrock's
 cache behavior is unchanged. Supported inline-cache routes cap combined manual and
-automatic markers at four, and the volatile billing block never gets a breakpoint.
+automatic markers at four.
 
 ## Debugging
 

@@ -24,8 +24,6 @@ const AUTO: CachePolicyObject = {
 
 const NONE: CachePolicyObject = {}
 const BREAKPOINT_CAP = 4
-// UPSTREAM-DIVERGENCE: identify Claude's volatile billing block so it never consumes a breakpoint.
-const billing = (text: string) => text.startsWith("x-anthropic-billing-header:")
 
 // Resolution rules:
 //   - undefined   → "auto" — caching is on by default.
@@ -98,13 +96,9 @@ const countToolHints = (tools: ReadonlyArray<ToolEntry>): number =>
 
 const markSystemBoundaries = (system: LLMRequest["system"], hint: CacheHint, budget: Budget): LLMRequest["system"] => {
   if (system.length === 0) return system
-  // UPSTREAM-DIVERGENCE: choose system cache boundaries outside Claude's billing block.
-  const first = system.findIndex((part) => !billing(part.text))
-  const last = system.findLastIndex((part) => !billing(part.text))
   let changed = false
   const next = system.map((part, index) => {
-    // UPSTREAM-DIVERGENCE: use the non-billing boundaries rather than raw array endpoints.
-    if ((index !== first && index !== last) || part.cache || budget.remaining === 0) return part
+    if ((index !== 0 && index !== system.length - 1) || part.cache || budget.remaining === 0) return part
     budget.remaining -= 1
     changed = true
     return { ...part, cache: hint }
@@ -181,7 +175,7 @@ const countHints = (request: LLMRequest) =>
 export const applyCachePolicy = (request: LLMRequest): LLMRequest => {
   const route = request.model.route.id
   if (!RESPECTS_INLINE_HINTS.has(route)) return request
-  // UPSTREAM-DIVERGENCE: normalize supported routes to one-hour hints and exclude billing breakpoints.
+  // UPSTREAM-DIVERGENCE: normalize supported routes to one-hour hints.
   const hour = route !== "bedrock-converse" &&
     (request.model.id.toLowerCase().includes("claude") ||
       ["openrouter", "vercel-ai-gateway-messages", "alibaba-chat", "alibaba-messages"].includes(route))
@@ -193,14 +187,11 @@ export const applyCachePolicy = (request: LLMRequest): LLMRequest => {
     const tools = (items: ReadonlyArray<ToolEntry>): ReadonlyArray<ToolEntry> => items.map((tool) =>
       tool.type === "namespace" ? { ...tool, tools: tools(tool.tools) } : tool.cache ? new ToolDefinition({ ...tool, cache: hint(tool.cache) }) : tool)
     const normalizedTools = tools(request.tools)
-    const system = request.system.map((part) => ({ ...part, cache: billing(part.text) ? undefined : hint(part.cache) }))
+    const system = request.system.map((part) => ({ ...part, cache: hint(part.cache) }))
     const messages = request.messages.map((message) => new Message({ ...message, content: message.content.map((part) =>
       "cache" in part && part.cache ? { ...part, cache: hint(part.cache) } : part) }))
     request = LLMRequest.update(request, { tools: normalizedTools, system, messages })
   }
-  // The per-request billing hash is never a reusable prefix breakpoint, even if manually marked.
-  if (request.system.some((part) => billing(part.text) && part.cache))
-    request = LLMRequest.update(request, { system: request.system.map((part) => billing(part.text) ? { ...part, cache: undefined } : part) })
   const policy =
     (route === "openrouter" || route === "vercel-ai-gateway-messages") &&
     (request.cache === undefined || request.cache === "auto")
