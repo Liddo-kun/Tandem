@@ -19,8 +19,6 @@ const description = (dedicatedSearch: boolean) => [
   "Executes a bash command and returns its output.",
   "",
   "- Working directory persists between calls, but prefer absolute paths. Shell state (env vars, functions) does not persist.",
-  // The lean line deters `cd` with a permission prompt Tandem lacks, so Claude Code's full-prompt instruction is added.
-  "- Try to maintain your current working directory throughout the session by using absolute paths and avoiding usage of `cd`. You may use `cd` if the User explicitly requests it. In particular, never prepend `cd <current-directory>` to a `git` command — `git` already operates on the current working tree.",
   // Like Claude Code with embedded search, find and grep are left out when Bash search replaces Glob and Grep.
   "- IMPORTANT: Avoid using this tool to run " +
     (dedicatedSearch ? "`find`, `grep`, " : "") +
