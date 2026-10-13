@@ -89,7 +89,8 @@ const env = {
   OPENCODE_DISABLE_AUTOUPDATE: "1",
   OPENCODE_TUI_CHANNEL: "dev",
   OPENCODE_CHANNEL: "dev",
-  OPENCODE_VERSION: "2.0.22-tandem-v2.0",
+  // A given version lets the development build match the daily one.
+  OPENCODE_VERSION: process.env.OPENCODE_VERSION ?? "2.0.22-tandem-v2.0",
   HUSKY: "0",
 }
 
