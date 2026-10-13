@@ -51,13 +51,15 @@ const Capture = Context.Reference<string>("tandem/ClaudeWorkdir.Capture", { defa
 const SCRIPT = [
   "__tandem_cwd_file=$TANDEM_CWD_FILE",
   "unset BASH_ENV TANDEM_CWD_FILE",
-  `trap '[ -e "$__tandem_cwd_file" ] && pwd -P 2>/dev/null >| "$__tandem_cwd_file"' EXIT`,
+  // As in Claude Code, only a command that ends in another folder moves it, so an overlapping `pwd` cannot undo a `cd`.
+  "__tandem_cwd_start=$(pwd -P 2>/dev/null)",
+  `trap '__tandem_cwd=$(pwd -P 2>/dev/null) && [ "$__tandem_cwd" != "$__tandem_cwd_start" ] && [ -e "$__tandem_cwd_file" ] && printf "%s\\n" "$__tandem_cwd" >| "$__tandem_cwd_file"' EXIT`,
   "",
 ].join("\n")
 
 /** Notes on the environment's working-directory line that the Bash tool starts there and keeps its folder. */
 export const environment = (text: string) => text.replace(
-  /^(\s*Working directory: .*)$/m,
+  /^(You have been invoked in the following environment: \n - Primary working directory: .*)$/m,
   "$1 (your Bash tool starts here and keeps its folder between commands, so don't `cd` before each command unless you're changing folders)",
 )
 
