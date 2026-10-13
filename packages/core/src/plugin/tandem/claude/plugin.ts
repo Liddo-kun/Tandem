@@ -26,7 +26,7 @@ export const Plugin = define({
     const hook = (primary: boolean) => (event: SessionHooks["context"]) => Effect.gen(function* () {
       if (primary) workdir.inactive(event.sessionID)
       if (!(yield* presented(event))) return
-      workdir.present(event, primary)
+      const bash = workdir.present(event, primary)
       const agent = (yield* ctx.agent.get({ agentID: event.agent }).pipe(Effect.orDie)).data
       if (!agent.system && event.system[0]) event.system[0] = SystemPart.make(PROMPT)
       // Identity and configured hooks insert/reorder blocks, so use the assembly marker,
@@ -37,7 +37,8 @@ export const Plugin = define({
         const first = event.messages.findIndex((message) => message.role === "user")
         if (first >= 0) {
           const message = event.messages[first]
-          event.messages[first] = new Message({ ...message, content: [Message.text(`<system-reminder>\n${initial.text}\n</system-reminder>`), ...message.content] })
+          const text = bash ? ClaudeWorkdir.environment(initial.text) : initial.text
+          event.messages[first] = new Message({ ...message, content: [Message.text(`<system-reminder>\n${text}\n</system-reminder>`), ...message.content] })
           event.system.splice(index, 1)
         }
       }

@@ -19,6 +19,8 @@ const description = (dedicatedSearch: boolean) => [
   "Executes a bash command and returns its output.",
   "",
   "- Working directory persists between calls, but prefer absolute paths. Shell state (env vars, functions) does not persist.",
+  // The lean line deters `cd` with a permission prompt Tandem lacks, so Claude Code's full-prompt instruction is added.
+  "- Try to maintain your current working directory throughout the session by using absolute paths and avoiding usage of `cd`. You may use `cd` if the User explicitly requests it. In particular, never prepend `cd <current-directory>` to a `git` command — `git` already operates on the current working tree.",
   // Like Claude Code with embedded search, find and grep are left out when Bash search replaces Glob and Grep.
   "- IMPORTANT: Avoid using this tool to run " +
     (dedicatedSearch ? "`find`, `grep`, " : "") +
@@ -53,6 +55,12 @@ const SCRIPT = [
   "",
 ].join("\n")
 
+/** Notes on the environment's working-directory line that the Bash tool starts there and keeps its folder. */
+export const environment = (text: string) => text.replace(
+  /^(\s*Working directory: .*)$/m,
+  "$1 (your Bash tool starts here and keeps its folder between commands, so don't `cd` before each command unless you're changing folders)",
+)
+
 /**
  * Claude sessions on local bash see Claude Code's Bash tool: no `workdir`, and the working directory carries over
  * between foreground commands. The real tool keeps `workdir`; it is filled in with the session's folder for each call.
@@ -60,7 +68,7 @@ const SCRIPT = [
  */
 export const make = Effect.fn("ClaudeWorkdir.make")(function* (ctx: Plugin.Context) {
   // Capture files are on this machine, so remote workspaces keep the plain tool.
-  if (ctx.location.workspaceID !== undefined || process.platform === "win32") return { present: () => {}, inactive: () => {} }
+  if (ctx.location.workspaceID !== undefined || process.platform === "win32") return { present: () => false, inactive: () => {} }
   const global = yield* Global.Service
   mkdirSync(global.tmp, { recursive: true })
   const dir = mkdtempSync(path.join(global.tmp, "claude-workdir-"))
@@ -81,8 +89,9 @@ export const make = Effect.fn("ClaudeWorkdir.make")(function* (ctx: Plugin.Conte
   yield* ctx.tool.transform((editor) => editor.update(ShellTool.name, (tool) => {
     const execute = tool.execute
     tool.execute = (input, context) => {
-      if (!active.has(context.sessionID) || !Predicate.isObject(input)) return execute(input, context)
-      const saved = input.workdir === undefined ? folders.get(context.sessionID) : undefined
+      // An explicit workdir, from history before the tool was presented without it, is a one-off.
+      if (!active.has(context.sessionID) || !Predicate.isObject(input) || input.workdir !== undefined) return execute(input, context)
+      const saved = folders.get(context.sessionID)
       const reset = saved !== undefined && !directory(saved) ? saved : undefined
       if (reset !== undefined) folders.delete(context.sessionID)
       const run = execute(saved !== undefined && reset === undefined ? { ...input, workdir: saved } : input, context).pipe(
@@ -116,10 +125,13 @@ export const make = Effect.fn("ClaudeWorkdir.make")(function* (ctx: Plugin.Conte
     }
   })).pipe(Effect.orDie)
 
-  /** Presents Claude Code's Bash tool when the shell is bash. Only primary requests decide whether calls are tracked. */
+  /**
+   * Presents Claude Code's Bash tool when the shell is bash, returning whether it did. Only primary requests decide
+   * whether calls are tracked.
+   */
   const present = (event: SessionHooks["context"], primary: boolean) => {
     const tool = event.tools[ShellTool.name]
-    if (!tool || !tool.description.includes(" using bash.")) return
+    if (!tool || !tool.description.includes(" using bash.")) return false
     if (primary) active.add(event.sessionID)
     tool.description = description(event.tools.grep !== undefined)
     const properties = tool.input.properties
@@ -131,6 +143,7 @@ export const make = Effect.fn("ClaudeWorkdir.make")(function* (ctx: Plugin.Conte
         Predicate.isObject(value) && INPUT[key] ? { ...value, description: INPUT[key] } : value,
       ]])),
     }
+    return true
   }
   const inactive = (sessionID: string) => void active.delete(sessionID)
   return { present, inactive }
