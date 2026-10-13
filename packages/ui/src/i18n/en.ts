@@ -245,6 +245,8 @@ const source = {
   "ui.message.copyMessage": "Copy message",
   "ui.message.forkMessage": "Fork to new session",
   "ui.message.revertMessage": "Revert message",
+  "ui.message.filesChanged.one": "{{count}} file changed",
+  "ui.message.filesChanged.other": "{{count}} files changed",
   "ui.message.moveToQueue": "Move to queue",
   "ui.message.pending": "Pending",
   "ui.message.deletePending": "Delete",

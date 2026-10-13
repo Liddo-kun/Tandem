@@ -8,6 +8,8 @@ import { errorMessage } from "../../util/error"
 import { DialogFork } from "./dialog-fork"
 import type { PromptInfo } from "../../prompt/history"
 import { projectedPromptInput } from "../../prompt/codec"
+// UPSTREAM-DIVERGENCE: Tandem confirms rewinds and offers a conversation-only rewind.
+import { useTandemRewindConfirm } from "./tandem-rewind"
 
 export function DialogMessage(props: {
   messageID: string
@@ -18,6 +20,8 @@ export function DialogMessage(props: {
   const clipboard = useClipboard()
   const toast = useToast()
   const client = useClient()
+  // UPSTREAM-DIVERGENCE: Tandem's rewind confirmation.
+  const confirmRewind = useTandemRewindConfirm()
   const message = createMemo(() => data.session.message.get(props.sessionID, props.messageID))
 
   return (
@@ -35,15 +39,23 @@ export function DialogMessage(props: {
           value: "session.revert",
           description: "undo messages and file changes",
           onSelect: (dialog) => {
-            const value = message()
-            if (value?.type === "user") {
-              props.setPrompt?.({
-                ...projectedPromptInput(value),
-                pasted: [],
+            // UPSTREAM-DIVERGENCE: stops the agent, then asks how to rewind, previewing the files, like Claude Code.
+            void confirmRewind(props.sessionID, props.messageID)
+              .then((files) => {
+                if (files === undefined) return
+                const value = message()
+                if (value?.type === "user") {
+                  props.setPrompt?.({
+                    ...projectedPromptInput(value),
+                    pasted: [],
+                  })
+                }
+                return client.api.session.revert.stage({
+                  sessionID: props.sessionID,
+                  messageID: props.messageID,
+                  files,
+                })
               })
-            }
-            void client.api.session.revert
-              .stage({ sessionID: props.sessionID, messageID: props.messageID })
               .catch((error) => toast.show({ message: errorMessage(error), variant: "error", duration: 5000 }))
             dialog.clear()
           },

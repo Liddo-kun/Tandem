@@ -9,6 +9,8 @@ import { extractPromptContext, extractPromptFromMessage } from "@/composer/promp
 import { promptLength } from "@/composer/prompt-parts"
 import { showToast } from "@/shell/notifications/toast"
 import type { SessionModel } from "./model"
+// UPSTREAM-DIVERGENCE: Tandem confirms rewinds and offers a conversation-only rewind.
+import { useTandemRewindConfirm } from "./tandem-rewind"
 
 export function createSessionRevert(input: {
   session: SessionModel
@@ -19,6 +21,8 @@ export function createSessionRevert(input: {
   const data = useData()
   const location = useWorkspaceLocation()
   const language = useLanguage()
+  // UPSTREAM-DIVERGENCE: Tandem's rewind confirmation.
+  const confirm = useTandemRewindConfirm()
 
   const request = async <A>(action: () => Promise<A>) =>
     action()
@@ -69,7 +73,17 @@ export function createSessionRevert(input: {
 
     if (!(await request(() => server.api.session.wait({ sessionID })))) return
 
-    if (!(await request(() => server.api.session.revert.stage({ sessionID, messageID: message.id })))) return
+    // UPSTREAM-DIVERGENCE: ask first, previewing the files and offering to leave them alone, like Claude Code. The
+    // agent is stopped before asking, so the preview includes the files its last step changed.
+    const files = await confirm({
+      sessionID,
+      messageID: message.id,
+      messages: input.session.history.messages,
+      pending: () => (input.session.data.info()?.revert?.files ?? []).map((file) => file.file),
+    })
+    if (files === undefined) return
+
+    if (!(await request(() => server.api.session.revert.stage({ sessionID, messageID: message.id, files })))) return
     // Like the TUI, pending inputs are left alone: the revert hides them, committing it drops them,
     // and redo delivers them.
     restore(target, message)

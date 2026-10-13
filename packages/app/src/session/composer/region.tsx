@@ -26,6 +26,8 @@ import type { SessionScreenLayout } from "../screen-layout"
 import { syncPromptModel } from "../session-model-helpers"
 import type { SessionTimelineInteraction } from "../timeline/interaction"
 import { createSessionRevert } from "../revert"
+// UPSTREAM-DIVERGENCE: Tandem marks prompts whose turn changed files.
+import { createTandemTurnFileCounts } from "../tandem-rewind"
 import { SessionComposerRegion } from "./session-composer-region"
 import { createSessionComposerController, type SessionComposerController } from "./controller"
 import { SessionQueuePanel } from "./queue-panel"
@@ -193,6 +195,8 @@ export function createActiveSessionRegion(input: {
   })
 
   const revertMessage: NonNullable<SessionUserActions["revert"]> = ({ messageID }) => revert.to(messageID)
+  // UPSTREAM-DIVERGENCE: per-prompt file-change counts shown beside the revert button.
+  const changedFiles = createTandemTurnFileCounts(input.session.history.messages)
 
   const notifyFailed = () => {
     showToast({ title: language.t("common.requestFailed") })
@@ -275,6 +279,12 @@ export function createActiveSessionRegion(input: {
           if (input.session.data.isChild()) return
 
           return pendingSteer
+        },
+        // UPSTREAM-DIVERGENCE: Tandem's per-prompt file-change marks; child sessions cannot revert.
+        get changedFiles() {
+          if (input.session.data.isChild()) return
+
+          return changedFiles
         },
         openAttachment,
       } satisfies SessionUserActions,

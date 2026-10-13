@@ -8,13 +8,13 @@ prompt or compaction *commits* it: hidden messages and later queued prompts are 
 - [x] App: show a pending-revert indicator, like the TUI's `RevertMessage` (`packages/tui/src/routes/session/index.tsx`),
   saying the rewind is not locked in until the next prompt and offering redo. Done: strip above the composer
   (`packages/app/src/session/composer/tandem-revert-panel.tsx`).
-- [ ] Approved, from Claude Code (app and TUI only, no server changes):
-  - [ ] Conversation-only rewind that leaves files alone. The server already accepts `files: false` on
+- [x] Approved, from Claude Code (app and TUI only, no server changes):
+  - [x] Conversation-only rewind that leaves files alone. The server already accepts `files: false` on
     `session.revert.stage`; neither client uses it.
-  - [ ] Confirm before rewinding: offer "conversation and files" / "conversation only", preview the files that will be
+  - [x] Confirm before rewinding: offer "conversation and files" / "conversation only", preview the files that will be
     reverted (from later assistant messages' `snapshot.files`), drop the files option when no file changed, and say
     what is not covered (gitignored files, files outside the project, commits and other side effects).
-  - [ ] Mark which prompts changed files, so it is clear which rewinds will touch code.
+  - [x] Mark which prompts changed files, so it is clear which rewinds will touch code.
 - [ ] Decide how to handle the file-revert limits: only the session directory inside a git repo is covered; gitignored
   files, untracked files over 2 MB, files outside the project and non-file side effects (commits, installs) are not.
   Restore is whole-file, so Jon's own edits, or another session's, made during a reverted step are undone too; redo
@@ -30,8 +30,22 @@ prompt or compaction *commits* it: hidden messages and later queued prompts are 
   record the start capture's skipped large files and treat a path as created only if it is not among them; for other
   "added" paths check the file's creation time against the step start; and/or never hard-delete on undo (keep
   removed files recoverable after the revert is committed). Moot if undo moves to per-edit backups like Claude Code.
-- [ ] Align app and TUI behavior: the app's message button interrupts a running agent first, while the TUI's message
-  "Revert" action fails with a busy error.
+- [x] Align app and TUI behavior: the app's message button interrupts a running agent first, while the TUI's message
+  "Revert" action fails with a busy error. Done: every rewind stops the agent before its dialog opens.
+- [ ] Maybe: let the app pick a later, hidden prompt while a rewind is pending, as the TUI's timeline can.
+- [ ] Upstream edge cases found 2026-10-14 (Astra review):
+  - [ ] Two clients staging at once can lose the redo state (7 of 12 trials): stage/clear are not serialized.
+  - [ ] Forks share the folder, so undo/redo in two forks is order-dependent; redoing both can leave the wrong version.
+  - [ ] Redo of a pending revert also runs prompts queued behind it.
+  - [x] Moving a pending revert with `files: false` puts back the files the earlier revert restored, overwriting edits
+    made since. Fixed in the server: it now leaves files alone and keeps them for redo.
+- [ ] Upstream edge cases found 2026-10-14 (second Astra review):
+  - [ ] A file changed by the agent and later added to `.gitignore` is deleted by undo, and redo cannot bring it back:
+    the plan uses the recorded `snapshot.files`, while the redo list filters by current ignore rules.
+  - [ ] Interrupt and wait do not stop background shell jobs, so a job started by a rewound prompt can recreate or
+    overwrite files after the rewind.
+  - [ ] Redo can go back further than expected: a conversation-only rewind captures the redo snapshot, and a later
+    file rewind reuses it, losing edits made between the two.
 - [ ] More difficult, from Claude Code (need server/core changes):
   - [ ] Make undo touch only what the session itself edited, not everything that changed in the folder during its
     steps (Jon's or other sessions' edits). Claude Code tracks only files its edit tools touch, which misses shell

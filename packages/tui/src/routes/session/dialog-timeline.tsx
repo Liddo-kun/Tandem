@@ -3,6 +3,8 @@ import { useData } from "../../context/data"
 import { DialogSelect, type DialogSelectOption } from "../../ui/dialog-select"
 import { Locale } from "../../util/locale"
 import { DialogMessage } from "./dialog-message"
+// UPSTREAM-DIVERGENCE: Tandem marks prompts whose turn changed files.
+import { tandemFilesChanged, tandemTurnFileCounts } from "./tandem-rewind"
 import { useDialog } from "../../ui/dialog"
 import type { PromptInfo } from "../../prompt/history"
 
@@ -21,12 +23,16 @@ export function DialogTimeline(props: {
   const options = createMemo((): DialogSelectOption<string>[] => {
     const messages = data.session.message.list(props.sessionID)
     const result = [] as DialogSelectOption<string>[]
+    const changed = tandemTurnFileCounts(messages)
     for (const message of messages) {
       if (message.type !== "user") continue
       result.push({
         title: message.text.replace(/\n/g, " "),
         value: message.id,
-        footer: Locale.time(message.time.created),
+        // UPSTREAM-DIVERGENCE: shows which rewinds touch files, beside the time where it is not truncated.
+        footer: changed.has(message.id)
+          ? `${tandemFilesChanged(changed.get(message.id)!)} · ${Locale.time(message.time.created)}`
+          : Locale.time(message.time.created),
         onSelect: (dialog) => {
           dialog.replace(() => (
             <DialogMessage messageID={message.id} sessionID={props.sessionID} setPrompt={props.setPrompt} />

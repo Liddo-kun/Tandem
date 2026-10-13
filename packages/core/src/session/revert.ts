@@ -34,15 +34,20 @@ export const stage = Effect.fn("SessionRevert.stage")(function* (input: {
       : yield* snapshot.capture()
     const next = yield* plan(database.db, { sessionID: input.session.id, messageID: input.messageID })
     const restore = new Map<RelativePath, Snapshot.ID>()
-    if (original) {
+    // UPSTREAM-DIVERGENCE: moving a revert without files leaves every file alone, including ones an earlier revert
+    // restored, and keeps those for redo. Upstream put them back, overwriting edits made since.
+    if (original && input.files !== false) {
       for (const file of input.session.revert?.files ?? []) restore.set(RelativePath.make(file.file), original)
     }
     if (input.files !== false) for (const [file, tree] of next) restore.set(file, tree)
     if (restore.size) yield* snapshot.restore({ files: restore })
     const paths = input.files === false ? [] : Array.from(next.keys())
-    const files = original
-      ? yield* snapshot.diff({ from: original, to: (yield* snapshot.capture()) ?? original, paths })
-      : []
+    const files =
+      input.files === false
+        ? (input.session.revert?.files ?? [])
+        : original
+          ? yield* snapshot.diff({ from: original, to: (yield* snapshot.capture()) ?? original, paths })
+          : []
     const revert = {
       messageID: input.messageID,
       snapshot: original,

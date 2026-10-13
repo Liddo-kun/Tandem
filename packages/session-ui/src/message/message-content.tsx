@@ -261,6 +261,8 @@ export function CurrentUserMessageDisplay(props: {
   })
 
   const stamp = createMemo(() => timefmt().format(props.message.time.created))
+  // UPSTREAM-DIVERGENCE: Tandem's per-prompt file-change count.
+  const changedFiles = createMemo(() => props.actions?.changedFiles?.(props.message.id) ?? 0)
 
   const copy = async () => {
     if (!props.text || !(await writeClipboard(props.text))) return
@@ -375,6 +377,15 @@ export function CurrentUserMessageDisplay(props: {
             <span data-slot="user-message-meta-tail" class="text-12-regular text-text-weak cursor-default">
               {stamp()}
             </span>
+            {/* UPSTREAM-DIVERGENCE: Tandem marks prompts whose turn changed files, next to the revert button. */}
+            <Show when={changedFiles()}>
+              {(count) => (
+                <span data-slot="user-message-meta-tail" class="text-12-regular text-text-weak cursor-default">
+                  {"\u00A0\u00B7\u00A0"}
+                  {i18n.plural("ui.message.filesChanged", count(), { count: count() })}
+                </span>
+              )}
+            </Show>
           </span>
           <Show when={pending()}>
             <MessageActionButton

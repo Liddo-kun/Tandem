@@ -69,6 +69,8 @@ import { statusLabel } from "../../component/dialog-workspace-file-changes"
 import { DialogMessage } from "./dialog-message"
 import { DialogFork } from "./dialog-fork"
 import { DialogTimeline } from "./dialog-timeline"
+// UPSTREAM-DIVERGENCE: Tandem confirms rewinds and offers a conversation-only rewind.
+import { useTandemRewindConfirm } from "./tandem-rewind"
 import { Composer } from "./composer"
 import { filetype } from "../../util/filetype"
 import parsers from "../../parsers-config"
@@ -622,6 +624,8 @@ export function Session(props: {
     current.submit()
   })
   const dialog = useDialog()
+  // UPSTREAM-DIVERGENCE: Tandem's rewind confirmation.
+  const confirmRewind = useTandemRewindConfirm()
   const renderer = useRenderer()
   const runPendingAction = createSingleFlight<string>()
   const mutatePending = async (action: PendingAction, inboxID: string, failureLabel?: string) => {
@@ -1005,9 +1009,10 @@ export function Session(props: {
           if (pendingDeliveries().has(message.id)) {
             if (!(await mutatePending("cancel", message.id))) return
           } else {
-            await client.api.session.interrupt({ sessionID })
-            await client.api.session.wait({ sessionID })
-            await client.api.session.revert.stage({ sessionID, messageID: message.id })
+            // UPSTREAM-DIVERGENCE: stops the agent, then asks how to rewind, previewing the files, like Claude Code.
+            const files = await confirmRewind(sessionID, message.id)
+            if (files === undefined) return
+            await client.api.session.revert.stage({ sessionID, messageID: message.id, files })
           }
           target?.set({
             ...projectedPromptInput(message),
