@@ -117,6 +117,10 @@ Fork-owned locations: `packages/android/`, `packages/core/src/plugin/tandem/`, `
 - **Execute row:** a `└ Session started (title)` line under the Execute row (the ID until the title is known) opens the session's tab, like a session-ID link in Markdown. It wraps upstream's Execute renderer through the Tandem registration; Execute rows shown as error cards do not get it. Files: fork-owned `packages/session-ui/src/tools/{tandem-session-start.tsx,tandem-tools.ts}`, `packages/session-ui/src/styles/tandem-tool-summary.css`.
 - **TUI:** ignoring child sessions, when the starting session is shown or has an open tab, a built-in plugin opens the new session as a background tab right after it and shows a "Session started" toast (with Open when it is not shown). Files: fork-owned `packages/tui/src/feature-plugins/tandem/session-start.ts`; shared `packages/tui/src/plugin/builtins.ts` (registration).
 
+### Undo And Redo
+
+- **Pending-revert strip (app):** while an undo is staged, a strip attached to the top of the composer (above the queue panel) reads `N messages reverted · Your next prompt makes this permanent`, lists the reverted files with their line counts (scrolling past four) and has a Redo button that runs the existing `session.redo` command. Undelivered prompts behind the boundary are not counted. The TUI already shows this as `RevertMessage`. Files: fork-owned `packages/app/src/session/composer/tandem-revert-panel.tsx`; shared `packages/app/src/session/composer/region.tsx` (import and one render line), `packages/app/src/runtime/i18n/en.ts`.
+
 ### Provider Requests And Diagnostics
 
 - OpenAI defaults to native compaction (Codex's in-band trigger, or `/responses/compact` with an API key) when no earlier provider plugin chose a policy. The token-sharing login's `summary` stands, and `providers.openai.settings.compaction` in configuration still overrides the default. Files: fork-owned `packages/core/src/plugin/tandem/openai-compaction.ts`; registered in `packages/core/src/plugin/internal.ts`.

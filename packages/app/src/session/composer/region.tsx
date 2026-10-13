@@ -29,6 +29,8 @@ import { createSessionRevert } from "../revert"
 import { SessionComposerRegion } from "./session-composer-region"
 import { createSessionComposerController, type SessionComposerController } from "./controller"
 import { SessionQueuePanel } from "./queue-panel"
+// UPSTREAM-DIVERGENCE: Tandem's pending-revert strip above the composer.
+import { TandemRevertPanel } from "./tandem-revert-panel"
 import { resolveSessionComposerSelection } from "./selection"
 import { createSessionRequestModel } from "../requests/model"
 import type { Region } from "@/runtime/extension/panels"
@@ -309,6 +311,8 @@ export function ActiveSessionComposerRegion(props: {
           keyed
           fallback={
             <div class="relative">
+              {/* UPSTREAM-DIVERGENCE: show a staged revert and its redo above the queue and composer. */}
+              <TandemRevertPanel session={props.session} />
               <SessionQueuePanel queue={props.model.queue} />
               <div class="relative z-10">
                 <Composer

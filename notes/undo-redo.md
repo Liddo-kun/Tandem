@@ -5,9 +5,9 @@ messages from the chosen user message on are hidden, files touched by later assi
 per-step whole-tree snapshots, and the pre-undo tree is kept for redo. Redo (`clear`) restores that tree. The next
 prompt or compaction *commits* it: hidden messages and later queued prompts are deleted and redo is gone.
 
-- [ ] App: show a pending-revert indicator, like the TUI's `RevertMessage` (`packages/tui/src/routes/session/index.tsx`),
-  saying the rewind is not locked in until the next prompt and offering redo. Today the app only hides the messages and
-  refills the composer; redo is reachable only via `/redo` or the command palette.
+- [x] App: show a pending-revert indicator, like the TUI's `RevertMessage` (`packages/tui/src/routes/session/index.tsx`),
+  saying the rewind is not locked in until the next prompt and offering redo. Done: strip above the composer
+  (`packages/app/src/session/composer/tandem-revert-panel.tsx`).
 - [ ] Approved, from Claude Code (app and TUI only, no server changes):
   - [ ] Conversation-only rewind that leaves files alone. The server already accepts `files: false` on
     `session.revert.stage`; neither client uses it.
