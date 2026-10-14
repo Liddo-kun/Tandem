@@ -86,10 +86,22 @@ and extension points before porting the integration. Browser-backed webfetch rem
 - [ ] Jon will compare v1 and v2 browser-fetch concurrency. v2 serializes each whole fetch process-wide
   (`serialized()` in `packages/core/src/plugin/tandem/browser-fetch/cdp-fetch.ts`, no recorded reason;
   its timeout excludes time spent waiting in line). v1 serialized only the browser launch
-  (`/home/jon/code/Tandem/packages/opencode/src/plugin/browser-fetch/cdp-fetch.ts`).
+  (`git show dev:packages/opencode/src/plugin/browser-fetch/cdp-fetch.ts`).
+
+## Webfetch screenshot warnings
+
+- [ ] Collect screenshot errors from initial and follow-up captures in Tandem's browser-fetch module,
+  and include them in the final tool content and warning metadata. Currently only the initial
+  capture's error is forwarded automatically; follow-up errors reach the reader but can be omitted
+  from its answer (`packages/core/src/plugin/tandem/browser-fetch/plugin.ts`).
+- [ ] Verify on development port 4098 with a real agent call that deliberately fails a follow-up
+  screenshot: page text should still be usable, and both the main agent and the visible tool card
+  should receive the warning. Source-confirmed on 2026-10-14; this exact failure case has not been
+  verified live. Deferred by Jon.
 
 ## After the switch-over
 
 - [ ] Retire Tandem v1 when Jon no longer needs it: `~/.local/bin/tandem-v1-server`,
   `/usr/local/bin/tandem-v1`, the Tandem v1 app (`ai.opencode.android.v1`) and `~/.local/share/tandem-v1/`
-  (about 6 GB including the September database backup). Jon decides when.
+  (about 6.7 GB including the September database backup). Jon explicitly kept this installed fallback
+  on 2026-10-14 while removing the old source checkout.

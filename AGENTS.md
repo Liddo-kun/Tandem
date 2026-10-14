@@ -1,7 +1,7 @@
 # Tandem guidance
 
 - Read `contextL.md` on Linux or `contextW.md` on Windows once at session startup.
-- This repository is Tandem: OpenCode v2 (`upstream/v2`, pinned at `4617210822`) plus Tandem's customizations, on branch `tandem-v2`. It has been the daily Tandem since the 2026-10-05 switch-over. The previous Tandem (v1) checkout, `/home/jon/code/Tandem`, is kept as a fallback and reference: do not modify it, its runtime or its data.
+- This repository is Tandem: OpenCode v2 (`upstream/v2`, pinned at `4617210822`) plus Tandem's customizations, on branch `tandem-v2`, with its own `.git` directory. It has been the daily Tandem since the 2026-10-05 switch-over. V1 source is preserved on the `dev` branch; its old `/home/jon/code/Tandem` checkout was removed. Keep the installed v1 fallback, widget, Android app and data unless Jon asks to retire them. Backup locations are in `notes/tandem-setup.md`.
 - `logv2.md` inventories Tandem's customizations of OpenCode. `notes/todo-after-v2.md` holds deferred work.
 - Avoid adding upstream divergence wherever possible, whether adding features or fixing bugs. Before editing upstream-shared code, actively look for alternative ways to accomplish the same task through existing upstream behavior, configuration, public plugins/extensions, or Tandem-owned modules. Only change shared code when those alternatives cannot reasonably satisfy the request, and keep the remaining seams minimal. Direct GPT prompt-file edits are accepted.
 - Stay strictly within the user's requested scope. Do not add unrequested features or behaviors, especially when they introduce additional upstream divergence.

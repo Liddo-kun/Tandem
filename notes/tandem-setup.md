@@ -38,6 +38,14 @@ password, with the XDG folders pointed at `~/.local/share/tandem-v1/{config,data
 **Tandem v1** (`ai.opencode.android.v1`). The old v1 APK, `~/.profile` and `~/.bashrc` are kept in
 `~/.local/share/tandem-v1/`.
 
+The old `~/code/Tandem` source checkout was removed on 2026-10-14; the installed v1 fallback, widget,
+app and data remain. `~/code/Tandem-v2` now has its own `.git` directory, preserving the `dev` branch
+and all other local branches. V1's 283 pending commits were pushed to `origin/dev` (`e4cff28994`).
+Its source and local-only files, excluding rebuildable dependencies/build outputs, are archived in
+`~/.local/share/tandem-v2/backups/v1-source-2026-10-14/source-and-local-files.tar.gz`; that folder also
+records its uncommitted deletions and original Git metadata. The standalone `cdp-fetch` command now
+links to `~/.local/lib/cdp-fetch/cdp-fetch.ts` and does not depend on either checkout.
+
 ## Development server
 
 From `/home/jon/code/Tandem-v2`, with the pinned Bun (`~/.local/share/tandem-v2/toolchain/bun-1.4.2/bin`)
@@ -105,7 +113,7 @@ mismatched signature; the daily app is never uninstalled. Logs: `/tmp/tandem/v2/
 `android-init.log`; Gradle and other caches are under `/tmp/tandem/v2`.
 
 **Signing:** the daily app uses its existing key, `packages/android/{release.keystore,keystore.properties}`
-(ignored by Git; the original is in the v1 checkout's `packages/android/`), certificate SHA-256
+(ignored by Git; private backup in `~/.local/share/tandem-v2/production-signing/`), certificate SHA-256
 `90af42e463563021e8dcc7b9203aa6cb8852b123806b5450a9e9c95c10f8d10b`. Never create a new key for it. The
 test app's key is in `~/.local/share/tandem-v2/android-signing/`, created on first build.
 `TANDEM_ANDROID_KEYSTORE_PROPERTIES` selects other existing signing properties.
