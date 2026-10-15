@@ -37,6 +37,8 @@ import { SessionRunnerRetry } from "./runner/retry.js"
 import { toLLMMessages } from "./runner/to-llm-message.js"
 import { contentFilterError, toSessionError } from "./to-session-error.js"
 import { SessionUsage } from "./usage.js"
+// UPSTREAM-DIVERGENCE: Claude models compact like Claude Code in a fork-owned module.
+import { ClaudeCompaction } from "../plugin/tandem/claude/compaction.js"
 
 export type Settings = {
   auto: boolean
@@ -191,6 +193,8 @@ export const layer = Layer.effect(
     const models = yield* SessionRunnerModel.Service
     const db = (yield* Database.Service).db
     const requests = yield* SessionModelRequest.Service
+    // UPSTREAM-DIVERGENCE: services Claude compaction needs for its transcript and restored context.
+    const claudeServices = yield* ClaudeCompaction.services
 
     const state = State.create<Settings, Editor>({
       name: "session-compaction",
@@ -211,7 +215,9 @@ export const layer = Layer.effect(
       if (trigger.reason === "auto" && !due(context, calculateCeiling(context.model.limit, settings.buffer)))
         return { status: "skipped" }
       const native = context.model.compaction?.type === "native"
-      const agent = native ? undefined : yield* agents.get(Agent.ID.make("compaction"))
+      // UPSTREAM-DIVERGENCE: non-bare Claude sessions summarize with their main model, never the compaction agent.
+      const claude = ClaudeCompaction.applies(context)
+      const agent = native || claude ? undefined : yield* agents.get(Agent.ID.make("compaction"))
       const model =
         (agent?.model &&
           (yield* models
@@ -228,7 +234,10 @@ export const layer = Layer.effect(
         trigger.reason === "overflow" ? Math.min(cap, Math.floor(estimateContext(context) * SHRINK_STEPS[0])) : cap
 
       const selected = model === context.model ? trigger : { ...trigger, context: { ...context, model } }
-      const compaction = native
+      // UPSTREAM-DIVERGENCE: Claude compaction replaces the summary; `publish` stores its checkpoint metadata.
+      const compaction: Effect.Effect<Result, Failure> = claude
+        ? ClaudeCompaction.compact({ ...claudeServices, trigger: selected, budget, ceiling: cap, requests, bus, db, stream })
+        : native
         ? compactNatively(selected, budget, settings.keep)
         : summarize(selected, budget, settings.keep)
       return yield* compaction.pipe(
@@ -677,7 +686,8 @@ export const layer = Layer.effect(
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [Agent.node, Bus.node, Database.node, llmClient, Model.node, SessionModelRequest.node, SessionRunnerModel.node],
+  // UPSTREAM-DIVERGENCE: dependencies of Claude compaction's transcript and restored context.
+  deps: [Agent.node, Bus.node, Database.node, llmClient, Model.node, SessionModelRequest.node, SessionRunnerModel.node, ...ClaudeCompaction.nodes],
 })
 
 /** History loads from the latest completed compaction, so a previous one is always the first message. */
