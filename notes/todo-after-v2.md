@@ -99,6 +99,24 @@ and extension points before porting the integration. Browser-backed webfetch rem
   should receive the warning. Source-confirmed on 2026-10-14; this exact failure case has not been
   verified live. Deferred by Jon.
 
+## Ideas from Claude Code (2.1.292–2.1.299)
+
+- [ ] Consider idle compaction (Claude Code 2.1.299). Claude Code compacts a conversation of 200K+
+  tokens that has sat idle for about 54 minutes, just before its one-hour prompt cache expires, so
+  the next message doesn't reprocess the whole uncached history. `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS`
+  changes the 200K minimum and `"idleCompaction": false` in settings turns it off. For Tandem this
+  would mean a timer per idle session, driven by the provider's cache TTL, that runs
+  `SessionCompaction`, plus `idle` and `idleMinTokens` options beside `auto`/`buffer`/`keep` in the
+  compaction config (`packages/core/src/config/plugin/compaction.ts`). First check which TTL
+  Tandem's cache breakpoints use (5 minutes or 1 hour), since the timer only pays off if it fires
+  before that expiry.
+- [ ] Let `/compact` take text, as Claude Code's `/compact <text>` does. Claude Code adds the text to
+  the summary prompt as `\n\nAdditional Instructions:\n<text>`, just before its closing `REMINDER`
+  paragraph (see `opus context and compaction/cc-compaction2.md`). Tandem's `/compact` and the
+  `session.compact` endpoint (`packages/protocol/src/groups/session.ts`) take no text today, so this
+  needs a protocol field, client regeneration and a way to type the text in the TUI. Deferred by Jon
+  on 2026-10-16, while Claude Code-style compaction for Claude models was being designed.
+
 ## After the switch-over
 
 - [ ] Retire Tandem v1 when Jon no longer needs it: `~/.local/bin/tandem-v1-server`,
