@@ -1,8 +1,9 @@
 # Claude presentation and Bash search
 
 Tandem presents Claude requests in a Claude Code-compatible shape. It selects a
-Claude-specific base prompt, moves the initial rendered instruction baseline into
-the first user message, maps local tool names and selected input keys, and maps
+Claude-specific base prompt, places the initial rendered instruction baseline as
+Claude Code places its context (instruction files in the first user message, the rest
+as a system message after it), maps local tool names and selected input keys, and maps
 structured tool events back to canonical names before validation and execution.
 Bare Corrector and browser-reader sessions are excluded. Authentication and
 transport remain owned by the external Anthropic auth plugin.
@@ -30,9 +31,9 @@ the shims.
 
 ## Implementation
 
-- `plugin.ts` selects the base prompt, relocates the instruction baseline, and adjusts Skill guidance.
+- `plugin.ts` selects the base prompt, places the instruction baseline, and adjusts Skill guidance. The instruction files become the first user message's own `<system-reminder>` and the rest a system message after it; after a compaction, the first user message after the checkpoint is used, or the start of the checkpoint itself when none follows. Without native mid-conversation system messages (Claude before Opus 4.8 and 5, or a provider other than `anthropic`), the rest is a second reminder. The compaction request always uses the reminder form, because shrinking it drops system messages.
 - `workdir.ts` presents the shell as Claude Code's Bash tool without `workdir` when the shell is local bash (not remote workspaces or Windows), and carries the working folder between foreground commands: the shell tool is wrapped so each foreground call gets its own capture file, a `BASH_ENV` exit trap writes the final folder there if it differs from where the command started (as in Claude Code), and the next call's `workdir` is set to it. The folder does not move when a command `exec`s, replaces the EXIT trap, or a user `BASH_ENV` is set. When the Bash tool is presented, the environment's `Primary working directory:` line gets a note saying so.
-- `instructions.ts` changes only Claude-facing rendering of skills, environment text (Claude Code's `# Environment` and `# Environment update` lists), Code Mode references, and search guidance.
+- `instructions.ts` changes only Claude-facing rendering and order: AGENTS.md files as Claude Code's labelled instruction block (rendered last so `split` can separate them), environment first, then the Code Mode catalog and guidance, then the date; skills, environment text (Claude Code's `# Environment` and `# Environment update` lists), Code Mode references, and search guidance.
 - `presentation.ts` maps native tool schemas, request history (including Claude Code-style Bash results), streamed tool events, and clear-thinking request options.
 - What the model never reads is presented by the external Anthropic auth plugin with a Claude subscription: Claude Code's headers, user agent and beta, the billing line with its checksum and fields, and `tool_result` key order.
 - `../request-dump/transport.ts` turns off Effect's `traceparent`/`b3` trace headers for Anthropic API requests (those with `anthropic-version`), which Claude Code does not send.

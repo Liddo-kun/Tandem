@@ -1,6 +1,9 @@
 export * as ClaudeInstructions from "./instructions.js"
 
+import { realpathSync } from "fs"
+import { join } from "path"
 import type { Schema } from "effect"
+import { Global } from "@opencode/util/global"
 import type { Instructions } from "../../../instructions/index.js"
 import { ClaudePresentation } from "./presentation.js"
 import { BashSearch } from "../bash-search/plugin.js"
@@ -36,9 +39,46 @@ const environment = (text: string, current: Schema.Json, previous?: Schema.Json)
   return text.replace(ENVIRONMENT, () => [...heading, ...items.map((line) => ` - ${line}`)].join("\n"))
 }
 
+/** Claude Code's opening line for instruction files. `split` relies on it to find where they start. */
+const FILES = "Codebase and user instructions are shown below. Be sure to adhere to these instructions. IMPORTANT: These instructions OVERRIDE any default behavior and you MUST follow them exactly as written."
+
+/**
+ * The global AGENTS.md as discovery stores it: resolved, under the Global service's config folder. Resolved once
+ * per process so a stored baseline keeps its bytes.
+ */
+let globalFile: ReadonlySet<string> | undefined
+const isGlobal = (path: string) => {
+  if (!globalFile) {
+    const file = join(process.env.OPENCODE_CONFIG_DIR ?? Global.Path.config, "AGENTS.md")
+    globalFile = new Set([file, (() => { try { return realpathSync(file) } catch { return file } })()])
+  }
+  return globalFile.has(path)
+}
+
+/** Claude Code's instruction-file block: its opening line, then each file labelled by kind. */
+const files = (value: Schema.Json) => {
+  if (!Array.isArray(value) || value.length === 0) return undefined
+  const entries = value.flatMap((file) =>
+    file && typeof file === "object" && !Array.isArray(file) && typeof file.path === "string" && typeof file.content === "string"
+      ? [`Contents of ${file.path} (${isGlobal(file.path) ? "user's private global instructions for all projects" : "project instructions, checked into the codebase"}):\n\n${file.content.trimEnd()}`]
+      : [])
+  return entries.length === value.length ? [FILES, ...entries].join("\n\n") : undefined
+}
+
+/** Claude Code's context order: environment, tool catalogs and guidance, other sources, date; instruction files last for `split`. */
+const ORDER = ["core/environment", "core/codemode", "core/mcp-guidance", "core/reference-guidance", "core/skill-guidance"]
+const rank = (key: string) => key === "core/instructions" ? ORDER.length + 2 : key === "core/date" ? ORDER.length + 1 : ORDER.includes(key) ? ORDER.indexOf(key) : ORDER.length
+
+/** Splits a baseline rendered by `present` into its instruction files and the remaining context. */
+export function split(text: string) {
+  const start = text.startsWith(`${FILES}\n\n`) ? 0 : text.indexOf(`\n\n${FILES}\n\n`)
+  if (start < 0) return { files: undefined, context: text }
+  return { files: text.slice(start === 0 ? 0 : start + 2), context: text.slice(0, start) || undefined }
+}
+
 /** Presentation-only renderers: stored source values/hashes and frozen updates remain v2-owned. */
 export function present(sources: Instructions.List, shellSearch: boolean): Instructions.List {
-  return sources.map((source) => {
+  return [...sources].sort((a, b) => rank(a.key) - rank(b.key)).map((source) => {
     const render = (text: string | undefined, current?: Schema.Json, previous?: Schema.Json) => {
       if (text === undefined) return text
       if (source.key === "core/environment" && current !== undefined) text = environment(text, current, previous)
@@ -51,6 +91,6 @@ export function present(sources: Instructions.List, shellSearch: boolean): Instr
       if (source.key === "core/codemode") text = ClaudePresentation.executeReferences(text)
       return shellSearch && source.key.startsWith("core/") ? BashSearch.stripGuidance(text) : text
     }
-    return { ...source, initial: (value) => render(source.initial(value), value), changed: (before, after) => render(source.changed(before, after), after, before), removed: (before) => render(source.removed(before)) }
+    return { ...source, initial: (value) => render((source.key === "core/instructions" ? files(value) : undefined) ?? source.initial(value), value), changed: (before, after) => render(source.changed(before, after), after, before), removed: (before) => render(source.removed(before)) }
   })
 }
