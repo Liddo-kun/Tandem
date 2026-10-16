@@ -1,3 +1,4 @@
+import { cancel, confirm, isCancel, log } from "@clack/prompts"
 import { EOL } from "os"
 import { Effect, Option, Schedule } from "effect"
 import { Service } from "@opencode/client/effect/service"
@@ -26,8 +27,11 @@ export default Runtime.handler(
     // UPSTREAM-DIVERGENCE: The tunnel belongs to the background service, so it cannot pair an explicit --server.
     if (input.remote && server !== undefined)
       return yield* Effect.fail(new Error("--remote cannot be combined with --server"))
-    // Changing the setting restarts the service, and the ensure below starts it again with the tunnel.
-    if (input.remote && config.remote === undefined) yield* ServiceConfig.set("remote", "true")
+    if (input.remote && config.remote === undefined) {
+      if (!(yield* remoteConsent(config, input))) return
+      // Changing the setting restarts the service, and the ensure below starts it again with the tunnel.
+      yield* ServiceConfig.set("remote", "true")
+    }
     const { endpoint } = yield* ServerConnection.resolve({ server })
     const client = OpenCode.make({ baseUrl: endpoint.url, headers: Service.headers(endpoint) })
     const urls = yield* pairingURLs(client, input)
@@ -73,6 +77,54 @@ export default Runtime.handler(
     )
   }),
 )
+
+// UPSTREAM-DIVERGENCE: Tandem product name and command in the remote-access warning.
+export const remoteWarning = [
+  `This will expose your ${Brand.product} server to the internet.`,
+  "Traffic is end-to-end encrypted, and access requires your server password.",
+  `To pair locally instead, run \`${Brand.command} pair\` without the --remote flag.`,
+].join(EOL)
+
+export interface RemoteConsentPrompt {
+  readonly interactive: () => boolean
+  readonly confirm: () => Promise<boolean | symbol>
+}
+
+const terminalPrompt: RemoteConsentPrompt = {
+  interactive: () => Boolean(process.stdin.isTTY && process.stdout.isTTY),
+  confirm: () => confirm({ message: "Expose your server to the internet?", initialValue: true }),
+}
+
+// Remote access is only explained and accepted the first time it is turned on; once accepted, pairing goes straight
+// through. Returns whether remote access may be enabled.
+export const remoteConsent = Effect.fn("cli.pair.remote-consent")(function* (
+  config: ServiceConfig.Info,
+  input: { readonly yes: boolean },
+  terminal: RemoteConsentPrompt = terminalPrompt,
+) {
+  if (config.remote !== undefined || config.remoteAccepted === true) return true
+  if (!input.yes && !terminal.interactive()) {
+    process.stderr.write([remoteWarning, "Run interactively or pass --yes to continue."].join(EOL) + EOL)
+    process.exitCode = 1
+    return false
+  }
+  log.warn(remoteWarning)
+  if (!input.yes) {
+    const accepted = yield* Effect.promise(terminal.confirm)
+    // UPSTREAM-DIVERGENCE: Tandem command in the declined-consent hints.
+    if (isCancel(accepted)) {
+      cancel(`Remote access was not enabled. To pair locally, run \`${Brand.command} pair\`.`)
+      process.exitCode = 130
+      return false
+    }
+    if (accepted !== true) {
+      log.info(`Remote access was not enabled. To pair locally, run \`${Brand.command} pair\`.`)
+      return false
+    }
+  }
+  yield* ServiceConfig.acceptRemote()
+  return true
+})
 
 const pairingURLs = Effect.fnUntraced(function* (
   client: ReturnType<typeof OpenCode.make>,
