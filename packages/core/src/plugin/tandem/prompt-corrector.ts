@@ -157,8 +157,9 @@ export const Plugin = define({
 
     yield* ctx.session.hook("prompt", (event) =>
       Effect.gen(function* () {
+        // Opt-in: only prompts whose client explicitly enabled Corrector (the app's toggle) are corrected.
         const metadata = TandemAuxiliary.readCorrectorMetadata(event.metadata)
-        if (!metadata || metadata.tandemCorrectorDisabled === true) return
+        if (metadata?.tandemCorrectorDisabled !== false) return
         const session = yield* ctx.session.get({ sessionID: event.sessionID }).pipe(Effect.orDie)
         if (
           session.metadata?.tandemAuxiliary === "corrector" ||

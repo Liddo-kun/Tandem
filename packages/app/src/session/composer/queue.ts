@@ -77,7 +77,7 @@ export function createSessionQueue(input: {
         input.draft.set(prompt, promptLength(prompt))
         change.context.forEach((item) => input.draft.context.add(item))
         // UPSTREAM-DIVERGENCE: Undo retains the queued Corrector snapshot.
-        input.draft.correctorDisabled.set(TandemAuxiliary.readCorrectorMetadata(change.item.payload.metadata)?.tandemCorrectorDisabled ?? false)
+        input.draft.correctorDisabled.set(TandemAuxiliary.readCorrectorMetadata(change.item.payload.metadata)?.tandemCorrectorDisabled ?? true)
         input.restoreFocus(promptLength(prompt))
 
         return
@@ -279,7 +279,7 @@ export function createSessionQueue(input: {
     const text = queuedPromptText(item)
     input.draft.mode.set("normal")
     // UPSTREAM-DIVERGENCE: Edit with the queued Corrector snapshot.
-    input.draft.correctorDisabled.set(TandemAuxiliary.readCorrectorMetadata(item.payload.metadata)?.tandemCorrectorDisabled ?? false)
+    input.draft.correctorDisabled.set(TandemAuxiliary.readCorrectorMetadata(item.payload.metadata)?.tandemCorrectorDisabled ?? true)
     input.draft.set(
       [{ type: "text", content: text, start: 0, end: text.length }, ...queuedPromptAttachments(item)],
       text.length,
@@ -533,7 +533,7 @@ async function editedPromptInput(
       ...Object.fromEntries(Object.entries(payload?.metadata ?? {}).filter(([key]) =>
         key !== "tandemPromptCorrectorOriginal" && key !== "tandemPromptCorrectorProcessed")),
       comments: notes ? (payload?.metadata?.["comments"] ?? []) : [],
-      tandemCorrectorDisabled: TandemAuxiliary.readCorrectorMetadata(payload?.metadata)?.tandemCorrectorDisabled ?? false,
+      tandemCorrectorDisabled: TandemAuxiliary.readCorrectorMetadata(payload?.metadata)?.tandemCorrectorDisabled ?? true,
       tandemPromptCorrectorRanges: request.correctorRanges,
       displayText: request.displayText,
       attachments: request.attachments,

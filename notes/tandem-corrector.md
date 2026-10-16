@@ -4,7 +4,9 @@ Corrector copy-edits a prompt before it is admitted to the session: spelling, pu
 capitalization, wrong-word autocorrect and dictation artifacts, including clear technical symbols,
 paths and names. It returns only the corrected message; ambiguous wording stays unchanged. The composer
 **Corrector** button and General settings share one per-client setting, `settings.v3.general.corrector`,
-which defaults to off.
+which defaults to off. Correction is opt-in on the server: only prompts sent with
+`tandemCorrectorDisabled: false` (the app with the toggle on) are corrected. The CLI, TUI and API callers
+that don't send it are never corrected.
 
 Code: `packages/core/src/plugin/tandem/prompt-corrector.ts` (registered in `plugin/internal.ts`),
 shared metadata in `packages/util/src/tandem-auxiliary.ts`, client in `packages/app/src/settings/model.tsx`
@@ -16,7 +18,7 @@ Set in the server environment (or the development launcher's `environment.json`)
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `TANDEM_PROMPT_CORRECTOR` | on | `0`, `false`, `off`, `no` disable (case-insensitive). |
+| `TANDEM_PROMPT_CORRECTOR` | on | `0`, `false`, `off`, `no` disable it for every client, including the app toggle (case-insensitive). |
 | `TANDEM_PROMPT_CORRECTOR_MAX` | `600` | Maximum trimmed length (UTF-16) of each authored text range; `0` is uncapped. |
 | `TANDEM_PROMPT_CORRECTOR_MODEL` | unset | Explicit `provider/model`, optionally `#variant`. |
 | `TANDEM_PROMPT_CORRECTOR_VARIANT` | unset | Overrides the selected model's variant. |
@@ -33,8 +35,9 @@ provider. Only the default model and the 600 limit have been tested live.
 
 - Only nonempty authored text ranges are corrected. File, agent and skill mentions are protected;
   attachments and generated context are untouched. Mention offsets and `displayText` shift with accepted
-  edits. API callers without range metadata expose their whole raw text, so producers of generated text
-  must send empty ranges or `tandemCorrectorDisabled: true`.
+  edits. An opted-in caller without range metadata exposes its whole raw text.
+- A queued prompt without the setting (sent by another client) stays uncorrected when the app edits,
+  undoes or resends it.
 - Accepted text becomes the stored prompt; a changed original is kept in `tandemPromptCorrectorOriginal`.
   Empty, failed or rejected corrections keep the original. A result is rejected if it grows beyond
   `1.5 × input + 40` characters or, for inputs up to 4,000 characters, if its case-insensitive edit
