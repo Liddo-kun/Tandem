@@ -1,7 +1,7 @@
 # Tandem guidance
 
 - Read `contextL.md` on Linux or `contextW.md` on Windows once at session startup.
-- This repository is Tandem: OpenCode v2 (`upstream/v2`, pinned at `4617210822`) plus Tandem's customizations, on branch `tandem-v2`, with its own `.git` directory. It has been the daily Tandem since the 2026-10-05 switch-over. V1 source is preserved on the `dev` branch; its old `/home/jon/code/Tandem` checkout was removed. Keep the installed v1 fallback, widget, Android app and data unless Jon asks to retire them. Backup locations are in `notes/tandem-setup.md`.
+- This repository is Tandem: OpenCode v2 (`upstream/dev`, pinned at `4617210822`) plus Tandem's customizations, on branch `tandem-v2`, with its own `.git` directory. It has been the daily Tandem since the 2026-10-05 switch-over. V1 source is preserved on Tandem's own `dev` branch (not upstream's); its old `/home/jon/code/Tandem` checkout was removed. Keep the installed v1 fallback, widget, Android app and data unless Jon asks to retire them. Backup locations are in `notes/tandem-setup.md`.
 - `logv2.md` inventories Tandem's customizations of OpenCode. `notes/todo-after-v2.md` holds deferred work.
 - Avoid adding upstream divergence wherever possible, whether adding features or fixing bugs. Before editing upstream-shared code, actively look for alternative ways to accomplish the same task through existing upstream behavior, configuration, public plugins/extensions, or Tandem-owned modules. Only change shared code when those alternatives cannot reasonably satisfy the request, and keep the remaining seams minimal. Direct GPT prompt-file edits are accepted.
 - Stay strictly within the user's requested scope. Do not add unrequested features or behaviors, especially when they introduce additional upstream divergence.
@@ -11,7 +11,7 @@
 - Commit, push, publish, install to the daily setup or restart the daily server only on Jon's explicit instruction. Tandem's own commits use `personal: <summary>`, as in v1.
 - Verify changes with a real agent session and actual tools on the development server (port 4098) before they are installed to the daily setup; build as necessary. Focused post-change typechecks are useful only after live verification; builds/typechecks do not establish that a feature works.
 - All temporary files belong under `/tmp/tandem` on this tablet. Use `/tmp/tandem/v2` for development logs and scratch work.
-- The official source branch is `upstream/v2`; use the pinned baseline for diffs. Advance the baseline only through the `tandem-opencode-sync` skill with Jon's approval.
+- The official source branch is `upstream/dev`, where upstream promoted v2 on 2026-10-10; `upstream/v2` is frozen and `upstream/v1` is OpenCode 1. Use the pinned baseline for diffs. Advance the baseline only through the `tandem-opencode-sync` skill with Jon's approval.
 - Test clients against the development server with an explicit `--server` URL. Implicit connections, upstream `dev:live` scripts and client commands such as `tandem debug ...` can discover, replace or spawn a managed service, including the daily one.
 
 ## Working in the code

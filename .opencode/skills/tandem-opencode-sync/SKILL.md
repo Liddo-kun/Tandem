@@ -1,6 +1,6 @@
 ---
 name: tandem-opencode-sync
-description: Use when syncing official OpenCode upstream/v2 into Tandem-v2, especially when the user says get us up to date from opencode upstream, upstream sync, opencode update, fresh pull, batch merge, or remaining commits.
+description: Use when syncing official OpenCode v2 (upstream/dev) into Tandem-v2, especially when the user says get us up to date from opencode upstream, upstream sync, opencode update, fresh pull, batch merge, or remaining commits.
 ---
 
 # Tandem OpenCode Sync
@@ -11,9 +11,9 @@ Use this skill to update the Tandem repo (`~/code/Tandem-v2` on Ubuntu) from off
 
 When the user says "get us up to date from opencode upstream", do not rely on previous chat history or remembered SHAs. Recompute the sync state from Git.
 
-- Resume point: `git merge-base tandem-v2 upstream/v2` (the pinned baseline recorded in `AGENTS.md`; if they differ, stop and inspect)
-- End target: current `upstream/v2` after `git fetch --no-tags upstream v2`
-- Pending commits: `git rev-list --topo-order --reverse tandem-v2..upstream/v2`
+- Resume point: `git merge-base tandem-v2 upstream/dev` (the pinned baseline recorded in `AGENTS.md`; if they differ, stop and inspect)
+- End target: current `upstream/dev` after `git fetch --no-tags upstream dev`
+- Pending commits: `git rev-list --topo-order --reverse tandem-v2..upstream/dev`
 - If the user asks to get up to date, process all pending commits, broken into logical batches and worked batch by batch, unless review or dry-run finds risk.
 - Only use an older pinned target if the user explicitly asks to continue that older target.
 
@@ -23,7 +23,7 @@ Read `contextL.md` (or `contextW.md` on Windows), `logv2.md` and `notes/todo-aft
 
 - Read `logv2.md` in full before any merge or conflict resolution.
 - Use `tandem-v2` as the Tandem branch unless the user says otherwise.
-- Use `upstream/v2` as official OpenCode. Never use `dev`, `upstream/dev` or the v1 checkout (`~/code/Tandem`).
+- Use `upstream/dev` as official OpenCode. Upstream promoted v2 to `dev` on 2026-10-10 (`5caf1f9f6f`); `upstream/v2` is frozen and `upstream/v1` carries OpenCode 1. Never use `upstream/v2`, `upstream/v1`, Tandem's own local `dev`/`origin/dev` branch (Tandem v1 source) or the v1 checkout (`~/code/Tandem`).
 - Use merge, not rebase, for normal sync work.
 - Do not use `origin/tandem-v2` to choose the next upstream batch; it may be stale.
 - Do not run tests or typechecks from the repo root.
@@ -50,11 +50,11 @@ git remote add upstream https://github.com/sst/opencode.git
 Fetch and pin the sync target for this session:
 
 ```sh
-git fetch --no-tags upstream v2
-git rev-parse upstream/v2   # pin this SHA as <sync-target>
+git fetch --no-tags upstream dev
+git rev-parse upstream/dev   # pin this SHA as <sync-target>
 ```
 
-The pin is session-local. A future fresh session should fetch again and recompute from `tandem-v2..upstream/v2` unless the user asks for a specific older target.
+The pin is session-local. A future fresh session should fetch again and recompute from `tandem-v2..upstream/dev` unless the user asks for a specific older target.
 
 ## Plan Logical Batches
 
