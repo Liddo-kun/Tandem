@@ -35,6 +35,7 @@ type Entry =
   | { type: "assistant"; message: SessionMessageAssistant }
   | { type: "notice"; message: Notice }
   | { type: "idle"; message: FailedIdle }
+  | { type: "diff"; message: SessionMessageIdle; from: string; files: string[] }
 
 type Content = SessionMessageAssistant["content"][number]
 
@@ -81,6 +82,7 @@ export type TimelineProjectionInput = {
   timelineDetail?: TimelineDetail
   pendingInputIDs?: ReadonlySet<string>
   queuedCompactionIDs?: readonly string[]
+  turnDiffs?: boolean
   previousRows?: TimelineRow.TimelineRow[]
 }
 
@@ -97,6 +99,7 @@ export function createTimelineProjection(input: TimelineProjectionInput) {
     undefined,
     input.timelineDetail,
     input.queuedCompactionIDs,
+    input.turnDiffs,
   )
 
   const rows = reuseTimelineRows(input.previousRows, projection.rows)
@@ -135,6 +138,8 @@ export function createReactiveTimelineProjection(input: {
   timelineDetail?: Accessor<TimelineDetail>
   pendingInputIDs?: Accessor<ReadonlySet<string>>
   queuedCompactionIDs?: Accessor<readonly string[]>
+  /** Summarize each finished turn's changed files after it. */
+  turnDiffs?: Accessor<boolean>
 }) {
   // UPSTREAM-DIVERGENCE: show Claude narration (signed as thinking) as assistant text in every timeline.
   const source = input.sessionMessages
@@ -176,6 +181,7 @@ export function createReactiveTimelineProjection(input: {
             textVisible().get(content)!(),
       input.timelineDetail?.(),
       input.queuedCompactionIDs?.(),
+      input.turnDiffs?.(),
     ),
   )
 
@@ -238,6 +244,7 @@ export namespace Timeline {
     isRenderable = renderable,
     detail?: TimelineDetail,
     queuedCompactionIDs: readonly string[] = [],
+    turnDiffs = false,
   ) {
     type Turn = {
       id: string
@@ -251,6 +258,8 @@ export namespace Timeline {
     const turnByUserID = new Map<string, Turn>()
     const leading: Notice[] = []
     let current: Turn | undefined
+    // Everything since the last idle marker is one turn, including prompts steered in meanwhile.
+    let execution: { opener: string; turn: Turn; files: Set<string> } | undefined
 
     messages.forEach((message) => {
       if (isNotice(message)) {
@@ -276,38 +285,32 @@ export namespace Timeline {
         turnByUserID.set(message.id, turn)
         current = turn
 
+        // Undelivered input has not joined the turn yet.
+        if (!pendingInputIDs?.has(message.id))
+          execution = { opener: execution?.opener ?? message.id, turn, files: execution?.files ?? new Set() }
+
         return
       }
 
-      if (isFailedIdle(message)) {
-        const last = current?.entries.at(-1)
+      if (message.type === "idle") {
+        appendIdle(message)
 
-        if (
-          last?.type === "notice" &&
-          last.message.type === "compaction" &&
-          last.message.status === "failed" &&
-          !isInterrupted(last.message.error)
-        )
-          return
-
-        const lastStep = current?.entries.findLast((entry) => entry.type === "assistant" || entry.type === "idle")
-
-        if (lastStep?.type === "assistant" && lastStep.message.error && !isInterrupted(lastStep.message.error)) return
-
-        if (current && !current.shell) {
-          current.entries.push({ type: "idle", message })
-
-          return
-        }
-
-        const turn: Turn = { id: message.id, time: message.time, entries: [{ type: "idle", message }] }
-        turns.push(turn)
-        current = turn
+        // The summary follows the turn's last prompt, after any failure the marker reports.
+        // Sorted like the diff route's git order, so the list keeps its order when the diffs arrive.
+        if (turnDiffs && execution?.files.size)
+          execution.turn.entries.push({
+            type: "diff",
+            message,
+            from: execution.opener,
+            files: [...execution.files].sort(),
+          })
+        execution = undefined
 
         return
       }
 
       if (message.type !== "assistant") return
+      message.snapshot?.files?.forEach((file) => execution?.files.add(file))
       const existing = current?.user ? current : undefined
 
       if (existing?.user) {
@@ -328,6 +331,33 @@ export namespace Timeline {
       current = turn
     })
 
+    function appendIdle(message: SessionMessageIdle) {
+      if (!isFailedIdle(message)) return
+      const last = current?.entries.at(-1)
+
+      if (
+        last?.type === "notice" &&
+        last.message.type === "compaction" &&
+        last.message.status === "failed" &&
+        !isInterrupted(last.message.error)
+      )
+        return
+
+      const lastStep = current?.entries.findLast((entry) => entry.type === "assistant" || entry.type === "idle")
+
+      if (lastStep?.type === "assistant" && lastStep.message.error && !isInterrupted(lastStep.message.error)) return
+
+      if (current && !current.shell) {
+        current.entries.push({ type: "idle", message })
+
+        return
+      }
+
+      const turn: Turn = { id: message.id, time: message.time, entries: [{ type: "idle", message }] }
+      turns.push(turn)
+      current = turn
+    }
+
     const activeMessageID =
       turns.findLast((turn) => !pendingInputIDs?.has(turn.id) || turn.entries.some((entry) => entry.type === "idle"))
         ?.id ?? turns.at(-1)?.id
@@ -345,6 +375,7 @@ export namespace Timeline {
             entry.type === "notice"
               ? visibleNotice(entry.message)
               : entry.type === "idle" ||
+                entry.type === "diff" ||
                 !!entry.message.error ||
                 !!entry.message.retry ||
                 entry.message.content.some((content) => isRenderable(content, showReasoning, detail)),
@@ -561,6 +592,19 @@ export namespace Timeline {
                 text: unwrapErrorMessage(entry.message.error.message),
               }),
             )
+
+          return
+        case "diff":
+          appendAssistantSegment(assistantSegment)
+          assistantSegment = []
+          rows.push(
+            new TimelineRow.TurnDiff({
+              userMessageID: turnID,
+              messageID: entry.message.id,
+              from: entry.from,
+              files: entry.files,
+            }),
+          )
 
           return
         case "notice":

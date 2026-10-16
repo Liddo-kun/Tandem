@@ -64,6 +64,8 @@ export function PatchSummary(props: {
   path: string
   file: Pick<ApplyPatchFile, "path" | "type" | "additions" | "deletions">
   pending: boolean
+  /** False while a turn summary lists paths before their change counts load. */
+  counted?: boolean
 }) {
   const i18n = useI18n()
 
@@ -95,7 +97,7 @@ export function PatchSummary(props: {
               <bdi dir="ltr">{props.path}</bdi>
             </span>
           </div>
-          <Show when={!props.pending}>
+          <Show when={!props.pending && props.counted !== false}>
             <ToolPreview text={preview()} />
           </Show>
         </div>
