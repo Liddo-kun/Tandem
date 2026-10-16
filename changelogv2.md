@@ -4,7 +4,11 @@ Dated user-visible changes and published releases of Tandem v2, and the source f
 
 ## Unreleased
 
-Baseline: OpenCode `upstream/dev` at `654b79b27e` (2026-10-15, `@opencode/cli` 2.0.29), synced on 2026-10-16; upstream promoted v2 to `dev` on 2026-10-10 and froze `v2`. Version `2.0.24-tandem-v2.2`, installed as the daily Tandem on Jon's tablet on 2026-10-07 (`2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
+Baseline: OpenCode `upstream/dev` at `bc5ebf00a4` (2026-10-16, `@opencode/cli` 2.0.31), synced on 2026-10-17; upstream promoted v2 to `dev` on 2026-10-10 and froze `v2`. Version `2.0.24-tandem-v2.2`, installed as the daily Tandem on Jon's tablet on 2026-10-07 (`2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
+
+### 2026-10-17
+
+- **Changed — Upstream sync to OpenCode 2.0.31:** merged 78 upstream commits (`654b79b27e`→`bc5ebf00a4`) in five batches. User-visible upstream changes include reworked TUI dialogs (shared headers, footers with the label first, one padding; a redesign behind the new-designs experiment), a TUI diff side panel that opens by default with responsive layouts, `/copy` copying the last assistant message, `/editor` explaining when no editor is set, session sharing removed, `OPENCODE_DISABLE_CLAUDE_CODE` honored, model reasoning settings read from config, numeric MCP timeouts accepted, configured limits applied before model transforms, the Anthropic cache format honored on Bedrock Converse, a steadier review pane when the side terminal toggles, long file names fading in the file tree, and the tool group count sliding when it changes. [Divergence inventory](logv2.md).
 
 ### 2026-10-16
 
