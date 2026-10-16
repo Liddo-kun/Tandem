@@ -9,6 +9,45 @@
   justify-content: center;
 }
 
+[data-titlebar-tab] :is([data-slot="tab-unread-dot"], [data-slot="tab-avatar-unread-dot"]) {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: var(--v2-background-bg-accent);
+  pointer-events: none;
+}
+
+[data-titlebar-tab] [data-slot="project-avatar-slot"] {
+  position: relative;
+}
+
+[data-titlebar-tab] [data-slot="tab-avatar-unread-dot"] {
+  display: none;
+  inset-inline-end: -3px;
+  top: -3px;
+}
+
+[data-titlebar-tab] [data-slot="tab-unread-slot"] {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  display: flex;
+  margin-block: auto;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  [data-titlebar-tab]:not(:where([data-slot="mobile-tabs-drawer"] *)):is(:hover, :has(:focus-visible))
+    [data-slot="tab-unread-slot"] {
+    display: none;
+  }
+}
+
 [data-titlebar-tab],
 [data-titlebar-tab-action] {
   --tab-base: var(--v2-background-bg-deep);
@@ -77,7 +116,8 @@
   --tab-overlay: var(--v2-overlay-simple-overlay-pressed);
 }
 
-[data-titlebar-tab]:is(:hover, [data-state="pressed"]) [data-slot="tab-close"] {
+[data-titlebar-tab]:is(:hover, :has(:focus-visible), [data-state="pressed"], [data-unread="true"])
+  [data-slot="tab-close"] {
   background: linear-gradient(var(--tab-overlay), var(--tab-overlay)), var(--tab-base);
 }
 
@@ -95,6 +135,31 @@
 
 [data-slot="vertical-tabs-sidebar"] [data-titlebar-tab-list][data-orientation="vertical"] {
   gap: 4px;
+}
+
+/* Each link owns half the gap, without expanding its painted background or close button. */
+[data-slot="vertical-tabs-sidebar"] [data-titlebar-tab] {
+  --tab-hit-before: 0px;
+  --tab-hit-after: 0px;
+  --tab-link-inset: 6px;
+  overflow: visible;
+  padding-inline: 0;
+}
+
+[data-slot="vertical-tabs-sidebar"] [data-titlebar-tab-link] {
+  align-self: flex-start;
+  height: calc(100% + var(--tab-hit-before) + var(--tab-hit-after));
+  margin-block-start: calc(-1 * var(--tab-hit-before));
+  padding-block: var(--tab-hit-before) var(--tab-hit-after);
+  padding-inline: var(--tab-link-inset);
+}
+
+[data-slot="vertical-tabs-sidebar"] [data-titlebar-tab-slot] + [data-titlebar-tab-slot] [data-titlebar-tab] {
+  --tab-hit-before: 2px;
+}
+
+[data-slot="vertical-tabs-sidebar"] [data-titlebar-tab-slot]:has(+ [data-titlebar-tab-slot]) [data-titlebar-tab] {
+  --tab-hit-after: 2px;
 }
 
 [data-titlebar-tab-slot] {
@@ -132,8 +197,11 @@
 }
 
 [data-titlebar-tab][data-title-overflow="true"]:not([data-editing="true"]) [data-slot="tab-link"],
-[data-titlebar-tab]:is(:hover, [data-active="true"]):not([data-editing="true"]) [data-slot="tab-link"] {
-  --tab-title-fade-offset: 4px;
+[data-titlebar-tab]:is(:hover, :has(:focus-visible), [data-active="true"], [data-unread="true"]):not(
+    [data-editing="true"]
+  )
+  [data-slot="tab-link"] {
+  --tab-title-fade-offset: calc(4px + var(--tab-link-inset, 0px));
   -webkit-mask-image: linear-gradient(
     to right,
     black 0,
@@ -151,7 +219,10 @@
 }
 
 [data-titlebar-tab][data-title-overflow="true"]:not([data-editing="true"]):dir(rtl) [data-slot="tab-link"],
-[data-titlebar-tab]:is(:hover, [data-active="true"]):not([data-editing="true"]):dir(rtl) [data-slot="tab-link"] {
+[data-titlebar-tab]:is(:hover, :has(:focus-visible), [data-active="true"], [data-unread="true"]):not(
+    [data-editing="true"]
+  ):dir(rtl)
+  [data-slot="tab-link"] {
   -webkit-mask-image: linear-gradient(
     to left,
     black 0,
@@ -168,13 +239,16 @@
   );
 }
 
-[data-titlebar-tab]:is(:hover, [data-active="true"]):not([data-editing="true"]) [data-slot="tab-link"] {
-  --tab-title-fade-offset: 24px;
+[data-titlebar-tab]:is(:hover, :has(:focus-visible), [data-active="true"], [data-unread="true"]):not(
+    [data-editing="true"]
+  )
+  [data-slot="tab-link"] {
+  --tab-title-fade-offset: calc(24px + var(--tab-link-inset, 0px));
 }
 
 [data-titlebar-tab][data-title-overflow="true"]:not(:hover):not([data-active="true"]):not([data-editing="true"])
   [data-slot="tab-link"] {
-  padding-inline-end: 0;
+  padding-inline-end: var(--tab-link-inset, 0px);
 }
 
 [data-titlebar-tab] [data-slot="tab-title"] {
@@ -196,10 +270,15 @@
 }
 
 @media (hover: none) {
+  [data-titlebar-tab] [data-slot="tab-unread-slot"] {
+    inset-inline-end: 20px;
+  }
+
   /* UPSTREAM-DIVERGENCE: The title's mask below already hides it before the X's strokes, so touch drops the close
      button's opaque backdrop and the title stays visible up to the button. A tapped tab keeps :hover on touch. */
   [data-titlebar-tab] [data-slot="tab-close"],
-  [data-titlebar-tab]:is(:hover, [data-state="pressed"]) [data-slot="tab-close"] {
+  [data-titlebar-tab]:is(:hover, :has(:focus-visible), [data-state="pressed"], [data-unread="true"])
+    [data-slot="tab-close"] {
     background: none;
   }
 
@@ -207,7 +286,7 @@
   [data-titlebar-tab][data-title-overflow="true"]:not([data-editing="true"]) [data-slot="tab-link"] {
     /* UPSTREAM-DIVERGENCE: Touch always shows the X, so keep the title opaque up to the close button's edge and fade
        it over the button's padding, ending where the X's strokes begin. */
-    --tab-title-fade-offset: 12px;
+    --tab-title-fade-offset: calc(12px + var(--tab-link-inset, 0px));
     /* UPSTREAM-DIVERGENCE: Android WebView leaves a masked title stale (blank or a stray fragment) when its tab
        resizes inside the overflowing, scrolling strip; its own layer repaints the mask with the tab. */
     will-change: transform;
@@ -231,22 +310,54 @@
   [data-titlebar-tab]:dir(rtl) [data-slot="tab-link"] {
     --tab-title-fade-direction: to left;
   }
+
+  [data-titlebar-tab][data-unread="true"]:not([data-editing="true"]) [data-slot="tab-link"] {
+    /* UPSTREAM-DIVERGENCE: Matches the shorter touch fade above, ending just before the unread dot left of the X. */
+    --tab-title-fade-offset: calc(34px + var(--tab-link-inset, 0px));
+  }
 }
 
 @container (44px < width <= 64px) {
-  [data-titlebar-tab]:not([data-orientation="vertical"]):not([data-editing="true"]):is(:hover, [data-active="true"])
+  [data-titlebar-tab]:not([data-orientation="vertical"]):not([data-editing="true"]):is(
+      :hover,
+      :has(:focus-visible),
+      [data-active="true"],
+      [data-unread="true"]
+    )
     [data-slot="tab-link"] {
     -webkit-mask-image: none;
     mask-image: none;
   }
 
-  [data-titlebar-tab]:not([data-orientation="vertical"]):not([data-editing="true"]):is(:hover, [data-active="true"])
+  [data-titlebar-tab]:not([data-orientation="vertical"]):not([data-editing="true"]):is(
+      :hover,
+      :has(:focus-visible),
+      [data-active="true"],
+      [data-unread="true"]
+    )
     [data-titlebar-tab-title] {
     visibility: hidden;
   }
 }
 
 @container (max-width: 44px) {
+  [data-titlebar-tab]:not([data-orientation="vertical"]) [data-slot="tab-avatar-unread-dot"] {
+    display: block;
+    width: 6px;
+    height: 6px;
+  }
+
+  [data-titlebar-tab][data-unread="true"]:not([data-orientation="vertical"]) [data-slot="project-avatar-surface"] {
+    -webkit-mask-image: radial-gradient(circle 4.5px at 100% 0, transparent 4px, black 5px);
+    mask-image: radial-gradient(circle 4.5px at 100% 0, transparent 4px, black 5px);
+  }
+
+  [data-titlebar-tab][data-unread="true"]:not([data-orientation="vertical"]):dir(rtl)
+    [data-slot="project-avatar-surface"] {
+    -webkit-mask-image: radial-gradient(circle 4.5px at 0 0, transparent 4px, black 5px);
+    mask-image: radial-gradient(circle 4.5px at 0 0, transparent 4px, black 5px);
+  }
+
   [data-titlebar-tab]:not([data-orientation="vertical"]) [data-titlebar-tab-link] {
     justify-content: center;
     gap: 0;
