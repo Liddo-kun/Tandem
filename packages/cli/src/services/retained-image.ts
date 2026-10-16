@@ -54,7 +54,7 @@ export const relocate = Effect.fnUntraced(function* (directory: string, destinat
 
 /**
  * Whether the running binary was installed by a package manager or the curl installer, the installs
- * bun can hang on. The updater decides the same question from the package manifest it already reads.
+ * whose upgrades replace it in place. The updater decides the same question from the install location.
  */
 // UPSTREAM-DIVERGENCE: Recognize the Tandem Windows install path for retained service images.
 export function installed(home: string) {
@@ -63,6 +63,7 @@ export function installed(home: string) {
   const executable = path.resolve(process.execPath)
   return (
     executable.split(path.sep).includes("node_modules") ||
+    /[\\/]winget[\\/]packages[\\/]/i.test(executable) ||
     executable === path.resolve(home, `.${Brand.app}`, "bin", `${Brand.command}.exe`)
   )
 }
