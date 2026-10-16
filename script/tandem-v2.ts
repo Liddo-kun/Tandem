@@ -38,7 +38,7 @@ const homes = Object.fromEntries(
   ["config", "data", "cache", "state"].map((name) => [name, path.join(development, name)]),
 )
 await Promise.all(
-  [development, path.dirname(executable), "/tmp/tandem/v2", ...Object.values(homes).map((dir) => path.join(dir, "tandem"))].map(
+  [development, path.dirname(executable), "/tmp/tandem", ...Object.values(homes).map((dir) => path.join(dir, "tandem"))].map(
     (directory) => mkdir(directory, { recursive: true, mode: 0o700 }),
   ),
 )
@@ -79,7 +79,8 @@ const env = {
   XDG_DATA_HOME: homes.data,
   XDG_CACHE_HOME: homes.cache,
   XDG_STATE_HOME: homes.state,
-  TMPDIR: "/tmp/tandem/v2",
+  // Global roots append "tandem" to TMPDIR; share /tmp/tandem with the daily server.
+  TMPDIR: "/tmp",
   OPENCODE_CONFIG_DIR: path.join(homes.config, "tandem"),
   OPENCODE_CONFIG: undefined,
   OPENCODE_CONFIG_CONTENT: undefined,

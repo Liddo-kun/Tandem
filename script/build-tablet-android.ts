@@ -77,10 +77,9 @@ const config = dev
   : desktop
     ? path.join(root, "packages/android/src-tauri/tauri.desktop.conf.json")
     : undefined
-const logDir = "/tmp/tandem/v2"
+const logDir = "/tmp/tandem"
 await fs.mkdir(logDir, { recursive: true })
-process.env["TMPDIR"] = path.join(logDir, "tmp")
-await fs.mkdir(process.env["TMPDIR"], { recursive: true })
+process.env["TMPDIR"] = logDir
 process.env["GRADLE_USER_HOME"] = path.join(logDir, "gradle")
 process.env["XDG_CACHE_HOME"] = path.join(logDir, "cache")
 process.env["BUN_INSTALL_CACHE_DIR"] = path.join(logDir, "bun-install-cache")

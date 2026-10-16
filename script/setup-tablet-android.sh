@@ -12,10 +12,10 @@ NDK_URL="https://github.com/lzhiyong/termux-ndk/releases/download/android-ndk/an
 SDK_URL="https://github.com/lzhiyong/termux-ndk/releases/download/android-sdk/android-sdk-aarch64.7z"
 BT_URL="https://github.com/Commit451/android-arm-build-tools/releases/download/platform-tools-36.0.0/android-build-tools-36.0.0-linux-arm64-20260522.tar.xz"
 SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
-mkdir -p /tmp/tandem/v2/tmp
-export TMPDIR=/tmp/tandem/v2/tmp
-export XDG_CACHE_HOME=/tmp/tandem/v2/cache
-WORK="$(mktemp -d /tmp/tandem/v2/android-setup.XXXXXX)"
+mkdir -p /tmp/tandem
+export TMPDIR=/tmp/tandem
+export XDG_CACHE_HOME=/tmp/tandem/cache
+WORK="$(mktemp -d /tmp/tandem/android-setup.XXXXXX)"
 trap 'rm -rf "$WORK"' EXIT
 
 [ "$(uname -m)" = "aarch64" ] || { echo "ERROR: aarch64 Linux only (this host: $(uname -m))." >&2; exit 1; }

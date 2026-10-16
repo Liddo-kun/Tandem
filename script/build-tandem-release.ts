@@ -44,7 +44,7 @@ then stage Tandem artifacts. No iOS, publication, installation or service restar
   --package-only              Package existing outputs without building
   --android-variant <name>    production (default) or side-by-side v2
   --debug-android             Build/package debug APK, not a release
-  --log-dir <dir>             Full logs (Linux default /tmp/tandem/v2/release)
+  --log-dir <dir>             Full logs (Linux default /tmp/tandem/release)
   --out <dir>                 Empty/new staging directory
   --cli-dist <dir>            Existing CLI outputs; requires --package-only
   --android-outputs <dir>     Existing Android outputs; requires --package-only
@@ -85,7 +85,7 @@ if (
 process.env.PATH = [path.dirname(bun), process.env.PATH].filter(Boolean).join(path.delimiter)
 const logDir = path.resolve(
   values["log-dir"] ??
-    (process.platform === "win32" ? path.join(os.tmpdir(), "tandem-v2/release") : "/tmp/tandem/v2/release"),
+    (process.platform === "win32" ? path.join(os.tmpdir(), "tandem/release") : "/tmp/tandem/release"),
 )
 const version =
   values.version ??
@@ -132,10 +132,10 @@ if (!values["package-only"] && !values["skip-android"]) {
     ]
       .filter(Boolean)
       .join(" ")
-    process.env.TMPDIR = "/tmp/tandem/v2/tmp"
-    process.env.GRADLE_USER_HOME = "/tmp/tandem/v2/gradle"
-    process.env.XDG_CACHE_HOME = "/tmp/tandem/v2/cache"
-    process.env.BUN_INSTALL_CACHE_DIR = "/tmp/tandem/v2/bun-install-cache"
+    process.env.TMPDIR = "/tmp/tandem"
+    process.env.GRADLE_USER_HOME = "/tmp/tandem/gradle"
+    process.env.XDG_CACHE_HOME = "/tmp/tandem/cache"
+    process.env.BUN_INSTALL_CACHE_DIR = "/tmp/tandem/bun-install-cache"
     await fs.mkdir(process.env.TMPDIR, { recursive: true })
   }
 }

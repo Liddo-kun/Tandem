@@ -10,7 +10,7 @@
 - Do not fix OpenCode upstream bugs (behavior broken in pristine upstream, independent of Tandem's additions) without Jon's agreement. Apparent bugs can be intended behavior or caused by Tandem's own integration: report the symptom, the pristine-upstream code path and whether newer upstream changed it, then wait. Approved fixes use `UPSTREAM-DIVERGENCE(temporary):` and belong in `logv2.md`'s temporary-fix section.
 - Commit, push, publish, install to the daily setup or restart the daily server only on Jon's explicit instruction. Tandem's own commits use `personal: <summary>`, as in v1.
 - Verify changes with a real agent session and actual tools on the development server (port 4098) before they are installed to the daily setup; build as necessary. Focused post-change typechecks are useful only after live verification; builds/typechecks do not establish that a feature works.
-- All temporary files belong under `/tmp/tandem` on this tablet. Use `/tmp/tandem/v2` for development logs and scratch work.
+- All temporary files, including development logs and scratch work, belong under `/tmp/tandem` on this tablet. Do not add a `v2` directory.
 - The official source branch is `upstream/dev`, where upstream promoted v2 on 2026-10-10; `upstream/v2` is frozen and `upstream/v1` is OpenCode 1. Use the pinned baseline for diffs. Advance the baseline only through the `tandem-opencode-sync` skill with Jon's approval.
 - Test clients against the development server with an explicit `--server` URL. Implicit connections, upstream `dev:live` scripts and client commands such as `tandem debug ...` can discover, replace or spawn a managed service, including the daily one.
 

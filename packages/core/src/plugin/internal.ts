@@ -114,6 +114,7 @@ import { BashSearch } from "./tandem/bash-search/plugin.js"
 import { ClaudePlugin } from "./tandem/claude/plugin.js"
 import { ToolGuidancePlugin } from "./tandem/tool-guidance/plugin.js" // UPSTREAM-DIVERGENCE: keep tool wording in a Tandem-owned transform.
 import { SessionStartPlugin } from "./tandem/session-start.js" // UPSTREAM-DIVERGENCE: Tandem-owned opencode.session_start tool.
+import { ImageLocationPlugin } from "./tandem/image-location.js" // UPSTREAM-DIVERGENCE: expose saved image paths through request hooks.
 
 const services = [
   Agent.Service,
@@ -290,6 +291,7 @@ const post = [
   BrowserFetchPlugin.Policy,
   PromptCorrectorPlugin.Policy,
   TandemAuxiliaryPlugin.Policy,
+  ImageLocationPlugin.Plugin, // UPSTREAM-DIVERGENCE: save user images and append their local paths before dispatch.
   ToolGuidancePlugin.Plugin, // UPSTREAM-DIVERGENCE: customize tool wording before Bash-search and Claude presentation.
   BashSearch.Plugin,
   ClaudePlugin.Plugin,

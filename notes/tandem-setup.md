@@ -62,7 +62,8 @@ Everything lives in `~/.local/share/tandem-v2/development/`: `bin/tandem`, expli
 (`config`, `data`, `cache`, `state`; the database is `data/tandem/opencode.db`), `server-password`, and
 `environment.json`, a JSON object of `TANDEM_*` string values that override the inherited environment
 (merge edits rather than replacing the file). The launcher clears inherited `OPENCODE_CONFIG*`, sets
-`TMPDIR=/tmp/tandem/v2`, and keeps the server's loaded settings until it restarts. Its config folder
+`TMPDIR=/tmp` (the runtime appends `tandem`, giving `/tmp/tandem` for all scratch features), and keeps
+the server's loaded settings until it restarts. Development and daily Tandem share this scratch root. Its config folder
 links to the daily `AGENTS.md`, `opencode.jsonc` and `skills`, so it has the daily subagents, skills
 and settings; replace a link with a copy to try a setting on development only. App: **Tandem Dev**
 (`app.liddokun.tandem.v2`); enter `http://192.168.1.85:4098` manually or pair with
@@ -109,8 +110,8 @@ loads the Android toolchain, and regenerates the shared generated project
 (`packages/android/src-tauri/gen/android`, ignored by Git) when it was set up for another app, so
 build the apps one at a time. It installs to `127.0.0.1:5555` unless `--device` is given, after
 checking the APK's application ID. `--overwrite` (test app only) uninstalls a test app with a
-mismatched signature; the daily app is never uninstalled. Logs: `/tmp/tandem/v2/android-build.log` and
-`android-init.log`; Gradle and other caches are under `/tmp/tandem/v2`.
+mismatched signature; the daily app is never uninstalled. Logs: `/tmp/tandem/android-build.log` and
+`android-init.log`; Gradle and other caches are under `/tmp/tandem`.
 
 **Signing:** the daily app uses its existing key, `packages/android/{release.keystore,keystore.properties}`
 (ignored by Git; private backup in `~/.local/share/tandem-v2/production-signing/`), certificate SHA-256
@@ -135,10 +136,10 @@ Only when Jon asks. Updating the tablet itself needs none of this.
 
 1. Run `bun run tandem:tablet` so the Android project is set up for the daily app.
 2. With the pinned Bun on PATH and `BUNDLETOOL_JAR` pointing at a `bundletool-all` JAR (download it to
-   `/tmp/tandem/v2/release-tools/` if missing):
+   `/tmp/tandem/release-tools/` if missing):
    `bun script/build-tandem-release.ts --version <version> --strict --out dist/tandem-release-<version>`.
    This builds the CLI for every platform plus the signed APK and AAB, and stages them with
-   `manifest.json` and `SHA256SUMS` (logs in `/tmp/tandem/v2/release`). `--required-common` also
+   `manifest.json` and `SHA256SUMS` (logs in `/tmp/tandem/release`). `--required-common` also
    requires Linux, macOS and Windows on arm64 and x64; `--help` lists the skip and package-only options.
    Use a new, empty staging directory.
 3. Write release notes from the previous **Tandem** tag and the Unreleased entries in `changelogv2.md`
