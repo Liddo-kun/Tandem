@@ -115,6 +115,7 @@ import { ClaudePlugin } from "./tandem/claude/plugin.js"
 import { ToolGuidancePlugin } from "./tandem/tool-guidance/plugin.js" // UPSTREAM-DIVERGENCE: keep tool wording in a Tandem-owned transform.
 import { SessionStartPlugin } from "./tandem/session-start.js" // UPSTREAM-DIVERGENCE: Tandem-owned opencode.session_start tool.
 import { ImageLocationPlugin } from "./tandem/image-location.js" // UPSTREAM-DIVERGENCE: expose saved image paths through request hooks.
+import { HiddenModelsPlugin } from "./tandem/hidden-models.js" // UPSTREAM-DIVERGENCE: drop retired model versions from every catalog.
 
 const services = [
   Agent.Service,
@@ -287,6 +288,7 @@ const post = [
   ConfigProviderPlugin.Plugin,
   ConfigWebSearchPlugin.Plugin,
   ConfigPolicyPlugin.Plugin,
+  HiddenModelsPlugin.Plugin, // UPSTREAM-DIVERGENCE: after configuration, so configured copies of retired models go too.
   // UPSTREAM-DIVERGENCE: apply Tandem policies and Claude/Bash-search presentation after upstream plugins.
   BrowserFetchPlugin.Policy,
   PromptCorrectorPlugin.Policy,

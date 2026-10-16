@@ -8,6 +8,7 @@ Baseline: OpenCode `upstream/dev` at `bc5ebf00a4` (2026-10-16, `@opencode/cli` 2
 
 ### 2026-10-17
 
+- **Removed — Retired models:** the model list no longer offers Claude Haiku 4.5, Opus 4.7, Opus 5 and Sonnet 5; GPT-6 Sol, GPT-5.6 Terra, GPT-5.5 and GPT-5.3 Codex Spark; GLM 4.5, 4.6, 4.7, 5, 5.1, 5.2 and the GLM Turbo models; or Kimi K2.6, on any provider, including their fast and other variants. The Corrector uses Claude Haiku 5.5 for Claude sessions instead of Haiku 4.5.
 - **Changed — Upstream sync to OpenCode 2.0.31:** merged 78 upstream commits (`654b79b27e`→`bc5ebf00a4`) in five batches. User-visible upstream changes include reworked TUI dialogs (shared headers, footers with the label first, one padding; a redesign behind the new-designs experiment), a TUI diff side panel that opens by default with responsive layouts, `/copy` copying the last assistant message, `/editor` explaining when no editor is set, session sharing removed, `OPENCODE_DISABLE_CLAUDE_CODE` honored, model reasoning settings read from config, numeric MCP timeouts accepted, configured limits applied before model transforms, the Anthropic cache format honored on Bedrock Converse, a steadier review pane when the side terminal toggles, long file names fading in the file tree, and the tool group count sliding when it changes. [Divergence inventory](logv2.md).
 
 ### 2026-10-16

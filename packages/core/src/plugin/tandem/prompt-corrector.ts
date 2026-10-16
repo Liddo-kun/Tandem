@@ -51,8 +51,8 @@ const TITLE = "Prompt corrector (Tandem)"
 // Debug roots can be listed/pruned across Locations; lifecycle tracking must share that scope.
 const active = new Set<Session.ID>()
 const PRIORITY = [
-  "claude-haiku-4-5",
-  "claude-haiku-4.5",
+  "claude-haiku-5-5",
+  "claude-haiku-5.5",
   "3-5-haiku",
   "3.5-haiku",
   "gemini-3-flash",
