@@ -24,6 +24,7 @@ export function SessionUserMessage(props: {
   displayText?: string
   comments?: SessionUserComment[]
   references?: SessionUserAttachmentReference[]
+  voice?: boolean
   historicalAgent: string
   historicalModel: SessionMessageAssistant["model"]
   actions?: SessionUserActions
@@ -35,6 +36,7 @@ export function SessionUserMessage(props: {
       text={props.displayText ?? props.message.text}
       comments={props.comments}
       references={props.references}
+      voice={props.voice}
       agent={props.historicalAgent}
       model={props.historicalModel}
       actions={props.actions}
