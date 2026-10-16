@@ -1,4 +1,6 @@
 import { LLMClient, RequestExecutor } from "@opencode/ai/route"
+import { Effect, Layer } from "effect"
+import { FetchHttpClient, HttpClient } from "effect/http"
 import { Socket } from "effect/socket"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { httpClient } from "@opencode/util/effect/app-node-platform"
@@ -6,10 +8,22 @@ import { WebSocketConstructor } from "./websocket-constructor.js"
 // UPSTREAM-DIVERGENCE: decorate the injected model HTTP client with owned final-send diagnostics.
 import { RequestDump } from "../plugin/tandem/request-dump/transport.js"
 
+// Bun's fetch ends a request after five quiet minutes, before provider routes' own header and chunk timeouts.
+const withoutBunTimeout = Layer.effect(
+  HttpClient.HttpClient,
+  Effect.gen(function* () {
+    const client = yield* HttpClient.HttpClient
+    return HttpClient.transformResponse(
+      client,
+      Effect.provideService(FetchHttpClient.RequestInit, { timeout: false } as BunFetchRequestInit),
+    )
+  }),
+)
+
 export const requestExecutor = makeGlobalNode({
   service: RequestExecutor.Service,
   // UPSTREAM-DIVERGENCE: keep diagnostics out of @opencode/ai's network executor.
-  layer: RequestDump.executorLayer,
+  layer: RequestDump.executorLayer.pipe(Layer.provide(withoutBunTimeout)),
   deps: [httpClient],
 })
 

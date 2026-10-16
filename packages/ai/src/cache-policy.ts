@@ -174,9 +174,9 @@ const countHints = (request: LLMRequest) =>
 
 export const applyCachePolicy = (request: LLMRequest): LLMRequest => {
   const route = request.model.route.id
-  if (!RESPECTS_INLINE_HINTS.has(route)) return request
-  // UPSTREAM-DIVERGENCE: normalize supported routes to one-hour hints.
-  const hour = route !== "bedrock-converse" &&
+  // UPSTREAM-DIVERGENCE: normalize supported routes to one-hour hints, wherever hints are lowered.
+  const hour = (RESPECTS_INLINE_HINTS.has(route) || request.model.compatibility?.cacheFormat !== undefined) &&
+    route !== "bedrock-converse" &&
     (request.model.id.toLowerCase().includes("claude") ||
       ["openrouter", "vercel-ai-gateway-messages", "alibaba-chat", "alibaba-messages"].includes(route))
   if (hour) {
@@ -192,15 +192,7 @@ export const applyCachePolicy = (request: LLMRequest): LLMRequest => {
       "cache" in part && part.cache ? { ...part, cache: hint(part.cache) } : part) }))
     request = LLMRequest.update(request, { tools: normalizedTools, system, messages })
   }
-  const policy =
-    (route === "openrouter" || route === "vercel-ai-gateway-messages") &&
-    (request.cache === undefined || request.cache === "auto")
-      ? gatewayPolicy(request.model.id)
-      : route === "alibaba-chat" && (request.cache === undefined || request.cache === "auto")
-        ? request.model.id.toLowerCase().startsWith("qwen")
-          ? QWEN
-          : NONE
-        : resolve(request.cache)
+  const policy = selectPolicy(request)
   if (!policy.tools && !policy.system && !policy.messages) return request
 
   // UPSTREAM-DIVERGENCE: automatic hints share the supported route's one-hour TTL.
@@ -212,4 +204,18 @@ export const applyCachePolicy = (request: LLMRequest): LLMRequest => {
 
   if (tools === request.tools && system === request.system && messages === request.messages) return request
   return LLMRequest.update(request, { tools, system, messages })
+}
+
+// A declared cache format overrides the route allowlist and its model-ID heuristics.
+const selectPolicy = (request: LLMRequest): CachePolicyObject => {
+  const format = request.model.compatibility?.cacheFormat
+  const route = request.model.route.id
+  const auto = request.cache === undefined || request.cache === "auto"
+  if (format === "alibaba") return auto ? QWEN : { ...resolve(request.cache), tools: false }
+  if (format === "anthropic") return resolve(request.cache)
+  if (!RESPECTS_INLINE_HINTS.has(route)) return NONE
+  if (!auto) return resolve(request.cache)
+  if (route === "openrouter" || route === "vercel-ai-gateway-messages") return gatewayPolicy(request.model.id)
+  if (route === "alibaba-chat") return request.model.id.toLowerCase().startsWith("qwen") ? QWEN : NONE
+  return AUTO
 }
