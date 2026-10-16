@@ -8,6 +8,7 @@ Baseline: OpenCode `upstream/dev` at `c5aabae288` (2026-10-13, `@opencode/cli` 2
 
 ### 2026-10-16
 
+- **Changed — Agent and model on messages:** messages keep showing their agent and model on the tablet in portrait; only screens narrower than 692 CSS pixels hide them.
 - **Changed — Upstream sync to OpenCode 2.0.28:** upstream moved v2 development to its `dev` branch, so Tandem now follows `upstream/dev`. Merged upstream's v2-to-`dev` merge and the next 79 commits (`4617210822`→`c5aabae288`) in six batches. User-visible upstream changes include `tandem pair --remote` asking before it first exposes the server to the internet (`--yes` skips it), projects whose folders are gone being archived, a submitted prompt showing in the same frame the composer clears, full-window video previews, images and audio in the review panel, per-project auto-accept permissions, unread state kept on the server, Home sessions grouped by day, the agent and model no longer repeated on each message on narrow screens, the edit tool keeping mixed line endings, a 500k context for gpt-6.1-sol over ChatGPT, and Claude on Databricks and Snowflake Cortex now getting cache breakpoints (one-hour, like other Claude routes). [Divergence inventory](logv2.md).
 
 ### 2026-10-13

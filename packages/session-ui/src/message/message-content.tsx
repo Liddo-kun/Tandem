@@ -254,7 +254,8 @@ export function CurrentUserMessageDisplay(props: {
   const timefmt = createMemo(() => new Intl.DateTimeFormat(i18n.locale(), { timeStyle: "short" }))
 
   // Mobile shows the current agent and model in the composer and switch notices, so repeating them per message is noise.
-  const mobile = createMediaQuery("(max-width: 767px)")
+  // UPSTREAM-DIVERGENCE: phones only; the Y700 in portrait (692 CSS px) keeps the agent and model.
+  const mobile = createMediaQuery("(width < 692px)")
 
   const metaHead = createMemo(() => {
     const agent = props.agent
@@ -642,7 +643,8 @@ export function AssistantTextContent(props: {
   })
 
   // Mobile omits the per-response agent and model; see CurrentUserMessageDisplay.
-  const mobile = createMediaQuery("(max-width: 767px)")
+  // UPSTREAM-DIVERGENCE: phones only; the Y700 in portrait (692 CSS px) keeps the agent and model.
+  const mobile = createMediaQuery("(width < 692px)")
 
   const meta = createMemo(() => {
     const agent = props.message.agent
