@@ -296,6 +296,7 @@ export function TerminalPane(props: {
       <Show when={!failure()} fallback={<text fg={theme.text.feedback.error.base}>{failure()}</text>}>
         <>
           <embeddedTerminal
+            transparentBackground={themes.currentTokens().background.raised.base.a === 0}
             ref={(value) => {
               terminal = value
               props.onFocusRequest?.(() => {
