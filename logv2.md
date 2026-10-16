@@ -12,7 +12,7 @@ This file is the inventory of what Tandem v2 adds to, or changes in, official Op
 
 ## Current OpenCode divergence
 
-Current-state inventory against pinned OpenCode v2 base **`4617210822`**, as of **2026-10-12**. Each entry names upstream-shared files Tandem edits (carrying `UPSTREAM-DIVERGENCE` markers unless noted as inventory-only) and the fork-owned files a sync must account for. Reference files and symbols, not line numbers.
+Current-state inventory against pinned OpenCode v2 base **`c5aabae288`** (`upstream/dev`), as of **2026-10-16**. Each entry names upstream-shared files Tandem edits (carrying `UPSTREAM-DIVERGENCE` markers unless noted as inventory-only) and the fork-owned files a sync must account for. Reference files and symbols, not line numbers.
 
 Fork-owned locations: `packages/android/`, `packages/core/src/plugin/tandem/`, `packages/ai/src/tandem/`, `packages/util/src/{brand,tandem-auxiliary}.ts`, `script/` Tandem scripts, `notes/`, and individually headed `Tandem-owned (not in upstream)` files inside upstream packages. The Claude auth plugin lives outside this repository, in `~/code/opencode-anthropic-auth-v2`.
 
@@ -133,7 +133,7 @@ Fork-owned locations: `packages/android/`, `packages/core/src/plugin/tandem/`, `
 
 ### Temporary Upstream Bug Fixes
 
-Fixes for bugs present in pristine upstream, marked `UPSTREAM-DIVERGENCE(temporary)`. Remove each with its markers when upstream ships an equivalent fix. None was fixed in upstream v2 as of `4617210822` (2026-10-10).
+Fixes for bugs present in pristine upstream, marked `UPSTREAM-DIVERGENCE(temporary)`. Remove each with its markers when upstream ships an equivalent fix. None was fixed upstream as of `c5aabae288` (2026-10-13).
 
 - **Deleted-session refresh race:** a background metadata read that is still pending when a session is deleted shows a false "Request failed / Session not found" error, or brings the deleted session's metadata back. Ordinary clients can hit this; Tandem's short-lived auxiliary sessions (Corrector, web reader) make it frequent. The client keeps a set of sessions deleted while it runs, ignores missing-session errors for those IDs from background refreshes, and drops them from late metadata/family results. Explicit reads still reject. Files: `packages/client/src/solid/data.ts`.
 - **Promise plugin `DeepMutable`:** branded IDs are mapped into object-like types, so IDs read from an editor cannot be passed back to editor methods. Type-only fix; the external auth plugin needs it to typecheck. Files: `packages/plugin/src/promise/types.ts`.

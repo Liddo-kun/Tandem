@@ -4,7 +4,11 @@ Dated user-visible changes and published releases of Tandem v2, and the source f
 
 ## Unreleased
 
-Baseline: OpenCode `upstream/v2` at `4617210822` (2026-10-10, `@opencode/cli` 2.0.26), synced on 2026-10-12 from `80c4a6b7c8` (2026-10-06, 2.0.24). Version `2.0.24-tandem-v2.2`, installed as the daily Tandem on Jon's tablet on 2026-10-07 (`2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
+Baseline: OpenCode `upstream/dev` at `c5aabae288` (2026-10-13, `@opencode/cli` 2.0.28), synced on 2026-10-16 from `upstream/v2` at `4617210822` (2026-10-10, 2.0.26); upstream promoted v2 to `dev` on 2026-10-10 and froze `v2`. Version `2.0.24-tandem-v2.2`, installed as the daily Tandem on Jon's tablet on 2026-10-07 (`2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
+
+### 2026-10-16
+
+- **Changed — Upstream sync to OpenCode 2.0.28:** upstream moved v2 development to its `dev` branch, so Tandem now follows `upstream/dev`. Merged upstream's v2-to-`dev` merge and the next 79 commits (`4617210822`→`c5aabae288`) in six batches. User-visible upstream changes include `tandem pair --remote` asking before it first exposes the server to the internet (`--yes` skips it), projects whose folders are gone being archived, a submitted prompt showing in the same frame the composer clears, full-window video previews, images and audio in the review panel, per-project auto-accept permissions, unread state kept on the server, Home sessions grouped by day, the agent and model no longer repeated on each message on narrow screens, the edit tool keeping mixed line endings, a 500k context for gpt-6.1-sol over ChatGPT, and Claude on Databricks and Snowflake Cortex now getting cache breakpoints (one-hour, like other Claude routes). [Divergence inventory](logv2.md).
 
 ### 2026-10-13
 
