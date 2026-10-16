@@ -10,6 +10,7 @@ import type { PromptInfo } from "../../prompt/history"
 import { projectedPromptInput } from "../../prompt/codec"
 // UPSTREAM-DIVERGENCE: Tandem confirms rewinds and offers a conversation-only rewind.
 import { useTandemRewindConfirm } from "./tandem-rewind"
+import { useNewDesigns } from "../../config"
 
 export function DialogMessage(props: {
   messageID: string
@@ -22,11 +23,13 @@ export function DialogMessage(props: {
   const client = useClient()
   // UPSTREAM-DIVERGENCE: Tandem's rewind confirmation.
   const confirmRewind = useTandemRewindConfirm()
+  const newDesigns = useNewDesigns()
   const message = createMemo(() => data.session.message.get(props.sessionID, props.messageID))
 
   return (
     <DialogSelect
       title="Message Actions"
+      renderFilter={!newDesigns()}
       options={[
         {
           title: "Jump to",
