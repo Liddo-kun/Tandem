@@ -8,7 +8,7 @@ Baseline: OpenCode `upstream/dev` at `bc5ebf00a4` (2026-10-16, `@opencode/cli` 2
 
 ### 2026-10-20
 
-- **Compatibility — Corrector debug cleanup:** follows every page of upstream's paginated session list, preserving the configured retention count beyond the first 50 sessions.
+- **Compatibility — Corrector debug cleanup:** uses upstream's public plugin session-list API and follows every page, preserving the configured retention count beyond the first 50 sessions.
 
 ### 2026-10-17
 
