@@ -1,6 +1,6 @@
 import type { OpenCodeClient } from "@opencode/client/effect"
-import { SessionsCursor } from "@opencode/protocol/groups/session"
 import { AbsolutePath } from "@opencode/schema/schema"
+import { Session } from "@opencode/schema/session"
 import { FSUtil } from "@opencode/util/fs-util"
 // UPSTREAM-DIVERGENCE: Central Tandem display/auth-command identity.
 import { Brand } from "@opencode/util/brand"
@@ -175,7 +175,7 @@ export function make(input: {
             : {}),
           order: "desc",
           limit: 100,
-          ...(params.cursor ? { cursor: Schema.decodeSync(SessionsCursor)(params.cursor) } : {}),
+          ...(params.cursor ? { cursor: Schema.decodeSync(Session.ListCursor)(params.cursor) } : {}),
         })
         .pipe(Effect.catch(ACPClient.classify))
       return {
