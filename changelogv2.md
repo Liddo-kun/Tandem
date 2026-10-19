@@ -8,6 +8,8 @@ Baseline: OpenCode `upstream/dev` at `bc5ebf00a4` (2026-10-16, `@opencode/cli` 2
 
 ### 2026-10-20
 
+- **Tooling — Android typechecking:** follows upstream's TypeScript 7 compiler upgrade.
+
 - **Compatibility — Corrector debug cleanup:** uses upstream's public plugin session-list API and follows every page, preserving the configured retention count beyond the first 50 sessions.
 
 ### 2026-10-17

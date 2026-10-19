@@ -5,7 +5,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "typecheck": "tsgo -b",
+    "typecheck": "tsc -b",
     "dev": "vite",
     "build": "vite build",
     "prepare:android": "python3 generate-icons.py && bun patch-android-generated.ts",
@@ -24,7 +24,7 @@
   "devDependencies": {
     "@tauri-apps/cli": "^2",
     "@types/bun": "catalog:",
-    "@typescript/native-preview": "catalog:",
+    "@typescript/native": "catalog:",
     "typescript": "catalog:",
     "vite": "8.2.2"
   }
