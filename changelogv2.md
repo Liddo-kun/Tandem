@@ -4,10 +4,11 @@ Dated user-visible changes and published releases of Tandem v2, and the source f
 
 ## Unreleased
 
-Baseline: OpenCode `upstream/dev` at `bc5ebf00a4` (2026-10-16, `@opencode/cli` 2.0.31), synced on 2026-10-17; upstream promoted v2 to `dev` on 2026-10-10 and froze `v2`. Version `2.0.24-tandem-v2.2`, installed as the daily Tandem on Jon's tablet on 2026-10-07 (`2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
+Baseline: OpenCode `upstream/dev` at `ba06ff9e0b` (2026-10-19, `@opencode/cli` 2.0.32), synced on 2026-10-20; upstream promoted v2 to `dev` on 2026-10-10 and froze `v2`. Version `2.0.24-tandem-v2.2`, installed as the daily Tandem on Jon's tablet on 2026-10-07 (`2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
 
 ### 2026-10-20
 
+- **Changed — Upstream sync to OpenCode 2.0.32:** merged all 62 fetched upstream commits (`bc5ebf00a4`→`ba06ff9e0b`) in 19 batches without conflicts. Free models remain visible alongside paid models in the picker; missing-location recovery shares the searchable worktree submenu; shell completion waits for output capture; provider streams tolerate new events and null Responses fields; buffered generations gain bounded retries; and skill discovery avoids dependency trees and stops at six directory levels. APIs now support session archiving/restoration and archive-state filtering, editing saved permissions, plugin session pagination, and experimental voice connections requiring an OpenAI or xAI API key. Also includes filesystem-denial handling, model catalog refreshes, a TUI resize-listener optimization, TypeScript 7, Nix fixes, and website/docs maintenance. [Verification and compatibility adjustments](notes/archive/upstream-sync-2026-10-20.md).
 - **Tooling — Android typechecking:** follows upstream's TypeScript 7 compiler upgrade.
 
 - **Compatibility — Corrector debug cleanup:** uses upstream's public plugin session-list API and follows every page, preserving the configured retention count beyond the first 50 sessions.
