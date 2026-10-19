@@ -6,6 +6,10 @@ Dated user-visible changes and published releases of Tandem v2, and the source f
 
 Baseline: OpenCode `upstream/dev` at `bc5ebf00a4` (2026-10-16, `@opencode/cli` 2.0.31), synced on 2026-10-17; upstream promoted v2 to `dev` on 2026-10-10 and froze `v2`. Version `2.0.24-tandem-v2.2`, installed as the daily Tandem on Jon's tablet on 2026-10-07 (`2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
 
+### 2026-10-20
+
+- **Compatibility — Corrector debug cleanup:** follows every page of upstream's paginated session list, preserving the configured retention count beyond the first 50 sessions.
+
 ### 2026-10-17
 
 - **Removed — Retired models:** the model list no longer offers Claude Haiku 4.5, Opus 4.7, Opus 5 and Sonnet 5; GPT-6 Sol, GPT-5.6 Terra, GPT-5.5 and GPT-5.3 Codex Spark; GLM 4.5, 4.6, 4.7, 5, 5.1, 5.2 and the GLM Turbo models; or Kimi K2.6, on any provider, including their fast and other variants. The Corrector uses Claude Haiku 5.5 for Claude sessions instead of Haiku 4.5.

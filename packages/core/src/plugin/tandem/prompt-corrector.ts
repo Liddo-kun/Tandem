@@ -78,8 +78,13 @@ export const Plugin = define({
     })
     const prune = Effect.fn("PromptCorrector.prune")(function* () {
       if (!keep) return
-      const all = yield* sessions.list({ parentID: null })
-      const mine = all.data
+      let page = yield* sessions.list({ parentID: null })
+      const all = [...page.data]
+      while (page.cursor.next) {
+        page = yield* sessions.list({ cursor: page.cursor.next })
+        all.push(...page.data)
+      }
+      const mine = all
         .filter((session) => session.metadata?.tandemAuxiliary === "corrector" && !active.has(session.id))
         .toSorted((a, b) => DateTime.toEpochMillis(b.time.created) - DateTime.toEpochMillis(a.time.created))
       yield* Effect.forEach(
