@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url"
 import { FileSystem } from "../filesystem.js"
 import { DecodeError, ResizerUnavailableError, SizeError, type Limits } from "../image.js"
 
-const JPEG_QUALITIES = [80, 85, 70, 55, 40]
+// UPSTREAM-DIVERGENCE: try JPEG from best to smallest and stop at 70; a smaller size beats heavier compression.
+const JPEG_QUALITIES = [90, 80, 70]
 
 export const make = Effect.gen(function* () {
   const loadPhoton = yield* Effect.cached(
