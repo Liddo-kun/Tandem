@@ -26,13 +26,13 @@
 
 ## Build, install and restart
 
+- **Daily installs:** combine the documented CLI build and atomic installation in one shell call; use a 600000 ms timeout for builds. Rebuild Android only when its sources or shared UI dependencies changed since the installed version. Run CLI and APK builds sequentially.
 - Install dependencies with the pinned Bun: `bun install --frozen-lockfile`.
 - Development CLI: `bun script/tandem-v2.ts build` stages `packages/cli/dist/cli-linux-arm64/bin/opencode` as the development `bin/tandem`. Restarting the development server picks it up.
 - Android app: `bun run tandem:tablet -- --install` builds and installs the daily **Tandem** app; add `--dev` for the **Tandem Dev** test app, or `--desktop` for the side-by-side **Tandem Desktop** app (`app.liddokun.tandem.desktop`, production key) used to connect to Tandem on the Windows desktop. It switches to Bun 1.4.2 and sets up the shared Android project for the selected app itself. The daily app is signed with its existing key (`packages/android/{release.keystore,keystore.properties}`, ignored by Git), never a new one.
 - Daily CLI, with the pinned Bun on PATH and a new version such as `2.0.22-tandem-v2.2`:
   `OPENCODE_CHANNEL=latest OPENCODE_VERSION=<version> bun run --cwd packages/cli build --single`, then
   `sudo install -m 755 packages/cli/dist/cli-linux-arm64/bin/opencode /usr/local/bin/tandem.new && sudo mv /usr/local/bin/tandem.new /usr/local/bin/tandem`. It takes effect when the daily server restarts.
-- Daily server restart: `setsid nohup tandem-restart-daily >/dev/null 2>&1 </dev/null &`. It waits until the server is idle, restarts it through its widget and logs to `~/.local/share/tandem-v2/restart-daily.log`; it works from a session on the daily server.
 - Native Android insets have one owner, `packages/android/src/viewport.ts`; check keyboard/titlebar/composer changes at different zooms and orientations.
 - Android touch checks must use real fingers or `adb -s <serial> shell input touchscreen ...`. Do not use CDP `Input.synthesizeScrollGesture` in the WebView: it can leave Chromium's active-touch counter stuck and contaminate later scrolling checks. CDP remains useful for inspection and tracing. Reproduce on a freshly started development app after any synthetic-input experiment.
 - GitHub operations target `Liddo-kun/Tandem` explicitly, because this checkout also has the OpenCode remote.

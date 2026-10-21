@@ -17,9 +17,7 @@ Built-in features of the desktop and web app, each behind the SDK in `src/sdk/`.
 
 ## SDK docs
 
-- Every exported declaration in `src/sdk/`, every interface member, every field of an object type (options, results, union members) and every parameter has TSDoc. Say what it is, when to use it, its default, and what happens on failure. Document each value of a union. Primitives, token kinds, registries and context properties carry an `@example`.
-- `bun run lint` runs `script/sdk-docs.ts`, which fails on a missing doc comment or `@param`, a `@param` that names no parameter, a `ctx.<member>` in the guide or this file that no context declares, and a guide code block marked `<!-- source: path -->` (a whole file) or `<!-- source: path#name -->` (the declaration, object property or call named `name`, with the comments directly above it) that differs from that shipping source.
-- When you change the SDK, change its TSDoc and the guide in the same change. When the check names a guide block your change made stale, copy the new source into the guide; do not reword the source to fit the guide.
+- Every exported declaration, member, field and parameter in `src/sdk/` has TSDoc. When you change the SDK, update its TSDoc and the README guide in the same change. `bun run lint` (`script/sdk-docs.ts`) fails on missing docs and on guide code blocks marked `<!-- source: path#name -->` that no longer match the source; copy the new source into the guide rather than rewording the source.
 
 ## Host boundary
 
@@ -66,17 +64,8 @@ An instance lives from `setup` until it is disabled, reloaded, removed, or its w
 
 ## Solid
 
-Read [You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect) and [Solid.js Best Practices](https://www.brenelz.com/posts/solid-js-best-practices/) before writing reactive code here. In short:
-
 - `bun run lint` bans importing `createEffect`, `createRenderEffect` and `createComputed` outside `src/sdk/`. Run side work per provider generation or value with `createKeyed(source, fn, { otherwise })`, fetch with `createLatest`, and keep per-visit state with `createVisitState`.
-- Derive, don't sync. A value computed from other state is a `createMemo` or a plain function, never an effect that calls a setter. Never mirror state into a second store, signal, or `Map` through an effect.
-- An effect (`createKeyed`) synchronizes with something outside Solid: the DOM, a third-party widget, an embed, an Ipc subscription, a chunk preload. Comment what it syncs with when that isn't obvious. A source that builds an object is a new key on every read; pass `equals` to compare the fields that should run it again.
-- Logic caused by a user action belongs in that action's handler, not in an effect that watches the state the action changed. If several handlers share it, call one function from each.
-- Reset state on an identity change by keying the subtree (`<Show keyed>`) or by storing an id and deriving the selection from it. To forget a selection when the user navigates away and back, use `createVisitState`. Never reset state in an effect.
-- No effect chains, and no effect that notifies a parent: update everything in the same handler or `batch`.
-- Don't destructure props; read `props.x` so the getter stays reactive (`splitProps` when you must). Call signals when passing them as JSX props. Use `<Show>` and `<For>`, not `&&` and `.map`, in JSX.
-- Use `createStore` for objects and collections, `createSignal` for single values.
-- Async data goes through `createLatest`, a resource, or a guarded promise that ignores stale results, under the Suspense rules below, never an effect that fetches and then sets.
+- Use `createKeyed` only to synchronize with something outside Solid (the DOM, a third-party widget, an embed, an Ipc subscription, a chunk preload). Derive values with `createMemo` or plain functions, put user-action logic in the handler, and reset state by keying the subtree (`<Show keyed>`) or with `createVisitState`, never in an effect. A source that builds an object is a new key on every read; pass `equals`.
 
 ## Performance
 
@@ -96,10 +85,5 @@ Read [You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-a
 
 ## Tests
 
-- Follow the Tests section of `packages/app/AGENTS.md`.
-- Unit-test pure logic that carries a contract: path and security checks, storage migration, protocol parsing, archive validation.
-- UI behavior is proven by the app e2e keeper suites in `packages/app/e2e/regression/`. Do not add unit tests that repeat them.
-- Test a main-process entry through its `Ipc` contract with real inputs, not through Electron mocks.
-- The hosts own their contracts, so an extension does not test them again: main storage in `packages/desktop/src/main/extension/storage.test.ts`, the real window host in `packages/app/component-tests/extension-host.spec.ts`, and the built-in graph in `packages/app/component-tests/extension-graph.spec.ts`.
-- For lifetime and ordering contracts, drive the race the user hits: a reload during async setup, a rejection that beats its event, a store that loads late (the e2e fixtures can hold desktop storage reads), an Ipc that goes away and returns.
-- The real window host runs only in the component tests (`packages/app/component-tests/extension-*.spec.ts`, with `extension-host.fixture.tsx`); they include the graph matrix, which boots every built-in with each optional provider disabled. Run them with `PLAYWRIGHT_STORYBOOK_PORT=3294 bunx playwright test --config playwright.components.config.ts extension-` from `packages/app`.
+- Follow the Tests section of `packages/app/AGENTS.md`. Unit-test pure logic that carries a contract (path and security checks, storage migration, protocol parsing, archive validation); UI behavior belongs to the app e2e keeper suites in `packages/app/e2e/regression/`.
+- Test a main-process entry through its `Ipc` contract with real inputs, not Electron mocks. The hosts' own contracts are tested in `packages/desktop/src/main/extension/storage.test.ts` and `packages/app/component-tests/extension-{host,graph}.spec.ts`; do not retest them.
