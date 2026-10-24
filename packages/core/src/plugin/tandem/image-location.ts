@@ -63,7 +63,8 @@ export const Plugin = define({
       const hash = createHash("sha256").update(bytes).digest("hex").slice(0, 12)
       const target = path.join(global.tmp, "attachments", `${hash}.${extension}`)
       // The conversation retains the bytes; recreate scratch files if they have been cleared.
-      if (!(yield* fs.exists(target))) yield* fs.writeWithDirs(target, bytes, 0o600)
+      // Default (umask) mode, so copies into Android shared storage stay readable by other apps.
+      if (!(yield* fs.exists(target))) yield* fs.writeWithDirs(target, bytes)
       return { path: target, ...dimensions(bytes) } satisfies Saved
     })
 
