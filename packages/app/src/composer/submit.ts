@@ -152,7 +152,8 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
       if (value.mode === "normal" && !command) {
         // The timeline shows a steer, and any switches it makes, as the composer clears; a queued prompt shows in
         // the queue once admitted.
-        if (value.delivery === "steer")
+        // UPSTREAM-DIVERGENCE: a prompt the Corrector rewrites appears once the server has admitted it.
+        if (value.delivery === "steer" && value.correctorDisabled)
           session.handoff.set({
             message: handoffMessage(value),
             selection: {
@@ -556,6 +557,8 @@ async function sendPrompt(
       model: selectionModel(value.selection),
     },
     prepare: staged ? undefined : () => (committed ??= commit()),
+    // UPSTREAM-DIVERGENCE: a prompt the Corrector rewrites appears once the server has admitted it.
+    optimistic: value.correctorDisabled,
   }
 
   await session.data.session.prompt(admission).catch(() => session.data.session.prompt(admission))

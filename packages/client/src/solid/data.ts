@@ -1629,8 +1629,16 @@ export function createData(config: CreateDataInput) {
       // upsert that same ID with the server's payload. Server admission is
       // idempotent per ID, so retrying with the identical payload cannot
       // double-admit.
-      prompt(input: SessionPromptInput & { gate?: Promise<unknown>; prepare?: () => Promise<unknown> }) {
-        const { gate, prepare, ...request } = input
+      prompt(
+        input: SessionPromptInput & {
+          gate?: Promise<unknown>
+          prepare?: () => Promise<unknown>
+          // UPSTREAM-DIVERGENCE: `false` shows the prompt only once the server admits it. Tandem's Corrector rewrites
+          // a prompt before admission, which can take seconds, and until then the server cannot move or delete it.
+          optimistic?: boolean
+        },
+      ) {
+        const { gate, prepare, optimistic, ...request } = input
         const id = request.id ?? SessionMessage.ID.create()
         // A retry may reuse an ID that is already rendered — and possibly
         // already durable. Admit optimistically only for new IDs so a failed
@@ -1638,7 +1646,7 @@ export function createData(config: CreateDataInput) {
         const fresh =
           !messageIndex.get(request.sessionID)?.has(id) &&
           !store.session.pending[request.sessionID]?.some((item) => item.id === id)
-        if (fresh) {
+        if (fresh && optimistic !== false) {
           const files = optimisticFiles(request.files)
           const payload: Extract<SessionInboxInfo, { type: "user" }>["payload"] = {
             text: request.text,
@@ -1667,12 +1675,19 @@ export function createData(config: CreateDataInput) {
             return api().session.prompt({ ...request, id })
           },
           gate,
-        ).catch((error) => {
-          // Roll back only rows this call admitted and the server has not
-          // acknowledged: anything else is server state.
-          if (fresh && outbox.delete(id)) retractLocal(request.sessionID, id)
-          throw error
-        })
+        )
+          .then((result) => {
+            // UPSTREAM-DIVERGENCE(temporary): upstream bug — a prompt whose echo was missed while the event stream
+            // was down stayed unacknowledged, so every later pending read kept it as pending. The server admitted it.
+            outbox.delete(id)
+            return result
+          })
+          .catch((error) => {
+            // Roll back only rows this call admitted and the server has not
+            // acknowledged: anything else is server state.
+            if (fresh && outbox.delete(id)) retractLocal(request.sessionID, id)
+            throw error
+          })
       },
       sync(sessionID: string, options?: { children?: boolean }) {
         return sync.run(options?.children ? `session.family:${sessionID}` : `session:${sessionID}`, async () => {
