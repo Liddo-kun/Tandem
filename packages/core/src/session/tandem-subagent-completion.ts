@@ -32,9 +32,9 @@ export const collectSubagentCompletion = Effect.fnUntraced(function* (
     )
       return []
     const parts = message.content.filter((part) => part.type === "text")
-    const final = parts.some((part) => part.state?.phase === "final_answer")
+    const final = parts.some((part) => part.native?.phase === "final_answer")
     const answer = parts
-      .filter((part) => (final ? part.state?.phase === "final_answer" : part.state?.phase !== "commentary"))
+      .filter((part) => (final ? part.native?.phase === "final_answer" : part.native?.phase !== "commentary"))
       .map((part) => part.text)
       .filter((value) => value.length > 0)
       .join("\n\n")

@@ -29,7 +29,7 @@ import { background, restore, shellCommands, skillsNote } from "./restore.js"
 import { writeTranscript } from "./transcript.js"
 
 type Failure = { readonly error: SessionError.Error }
-type Compacted = { readonly text: string; readonly recent: string; readonly metadata: Record<string, unknown> }
+type Compacted = { readonly text: string; readonly metadata: Record<string, unknown> }
 
 /** Claude models in sessions other than bare auxiliary ones; the same Claude detection as the request builder. */
 export const applies = (context: SessionContext.Loaded) =>
@@ -143,7 +143,7 @@ export const compact = Effect.fn("ClaudeCompaction.compact")(function* (input: E
   const first = context.messages[0]
   const previous = first?.type === "compaction" && first.status === "completed" ? ClaudeCheckpoint.read(first.metadata) : undefined
   const transcript = yield* writeTranscript({ db, fs, sessionID, directory: location.directory, tmp: global.tmp }).pipe(Effect.orElseSucceed(() => undefined))
-  if (trigger.reason !== "manual") yield* input.bus.publish(SessionEvent.Compaction.Started, { sessionID, reason: "auto", recent: "" })
+  if (trigger.reason !== "manual") yield* input.bus.publish(SessionEvent.Compaction.Started, { sessionID, reason: "auto" })
   const policy = yield* SessionRunnerRetry.policy(sessionID)
   for (let count = split.length - 1; count >= 1; count--) {
     const older = split.slice(0, count).flat()
@@ -191,7 +191,7 @@ export const compact = Effect.fn("ClaudeCompaction.compact")(function* (input: E
         restored: [...restored.restored, ...tasks, ...(restored.skills.length ? [skillsNote(restored.skills)] : [])],
         files: restored.files, skills: restored.skills, transcript,
       }
-      return { text, recent: "", metadata: { [ClaudeCheckpoint.KEY]: { ...info, kept: shortenKept(info, input.ceiling, context.model.ref) } } }
+      return { text, metadata: { [ClaudeCheckpoint.KEY]: { ...info, kept: shortenKept(info, input.ceiling, context.model.ref) } } }
     }
   }
   return yield* Effect.fail<Failure>({ error: { type: "compaction.failed", message: "Compaction produced no summary" } })
