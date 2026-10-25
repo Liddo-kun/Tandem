@@ -78,7 +78,7 @@ const decoded = new Map<string, boolean>()
 
 function isNarration(content: Content): content is Reasoning {
   if (content.type !== "reasoning") return false
-  const signature = content.state?.signature
+  const signature = content.native?.signature
   if (typeof signature !== "string" || signature.length === 0) return false
   let result = decoded.get(signature)
   if (result === undefined) {
@@ -102,7 +102,7 @@ function asText(content: Content): Content {
   if (!isNarration(content)) return content
   let text = texts.get(content)
   if (!text) {
-    text = { type: "text", text: content.text, state: content.state }
+    text = { type: "text", text: content.text, native: content.native }
     texts.set(content, text)
     narrations.add(text)
   }
