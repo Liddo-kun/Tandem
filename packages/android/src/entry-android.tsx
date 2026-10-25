@@ -60,12 +60,8 @@ function App() {
       platform.openExternal(link.href)
     }
     document.addEventListener("click", openLink)
-    const stopResume = bridge.on("resume", () => {
-      viewport.sync()
-      // Feed the lifecycle signals the v2 stream client already understands.
-      window.dispatchEvent(new Event("pageshow"))
-      document.dispatchEvent(new Event("visibilitychange"))
-    })
+    // The WebView's own visibilitychange already wakes the stream client on resume.
+    const stopResume = bridge.on("resume", () => viewport.sync())
     onCleanup(stop)
     onCleanup(stopResume)
     onCleanup(() => document.removeEventListener("click", openLink))

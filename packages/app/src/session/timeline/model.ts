@@ -1,6 +1,5 @@
-import { createEffect, createMemo, createResource, type Accessor } from "solid-js"
+import { createMemo, createResource, type Accessor } from "solid-js"
 import type { SessionMessageInfo } from "@opencode/client/promise"
-import { useServerSDK } from "@/runtime/server/client"
 import { useData } from "@/runtime/server/current"
 import { getSessionMessageHandoff } from "@/session/handoff"
 import type { SessionModel } from "../model"
@@ -11,7 +10,6 @@ const leadingTurnPageLimit = 3
 
 export function createTimelineModel(input: { session: Pick<SessionModel, "identity" | "history" | "ownership"> }) {
   const data = useData()
-  const serverSDK = useServerSDK()
 
   const [resource] = createResource(
     () => input.session.identity.sessionID(),
@@ -32,16 +30,6 @@ export function createTimelineModel(input: { session: Pick<SessionModel, "identi
       return id
     },
   )
-
-  // UPSTREAM-DIVERGENCE(temporary): upstream bug — events missed while the event stream is down are not replayed,
-  // so the open transcript kept stale messages and pending inputs. Reload both once it reconnects; the disconnect
-  // invalidated them, and otherwise this joins the resource's load. Remove when upstream fixes it.
-  createEffect(() => {
-    const id = input.session.identity.sessionID()
-
-    if (!id || serverSDK.connection.status() !== "connected") return
-    void Promise.all([data.session.message.sync(id), data.session.pending.sync(id)]).catch(() => undefined)
-  })
 
   const ready = createMemo(() => {
     const id = input.session.identity.sessionID()

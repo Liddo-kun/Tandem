@@ -9,7 +9,7 @@ import { hasPersistentPtyConnectTicketURL } from "@opencode/protocol/groups/pers
 import { isPairingConnectURL } from "@opencode/protocol/groups/server"
 import { Global } from "@opencode/util/global"
 import { Cause, Context, Effect, Exit, Latch, Layer, Option, Ref, Scope } from "effect"
-import { HttpMiddleware, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
+import { HttpEffect, HttpMiddleware, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
 import { NetAddress } from "effect/net"
 import { createServer } from "node:http"
 import { ServerAuth } from "./auth"
@@ -44,6 +44,20 @@ const errorResponseLogger = HttpMiddleware.make((app) =>
   ),
 )
 
+// UPSTREAM-DIVERGENCE: compressing a large response delays its first byte by seconds and barely shrinks inline
+// photos (a 42 MB session page took 2.6 s to gzip for a 30% saving), so large bodies are sent uncompressed.
+const uncompressedLimit = 1024 * 1024
+
+const uncompressedLarge = HttpMiddleware.make((app) =>
+  HttpEffect.withPreResponseHandler(app, (_, response) =>
+    Effect.succeed(
+      "contentLength" in response.body && (response.body.contentLength ?? 0) > uncompressedLimit
+        ? HttpServerResponse.setHeader(response, "content-encoding", "identity")
+        : response,
+    ),
+  ),
+)
+
 export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
   options: ServerOptions,
   lifecycle?: Lifecycle<E, R>,
@@ -71,6 +85,8 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
     .serve(
       (transform ? transform(app) : app).pipe(
         HttpMiddleware.compression(),
+        // UPSTREAM-DIVERGENCE: large bodies skip compression; applied after it so its handler runs first.
+        uncompressedLarge,
         HttpMiddleware.cors({ allowedOrigins: (origin) => isAllowedCorsOrigin(origin, options), maxAge: 86_400 }),
       ),
       errorResponseLogger,
