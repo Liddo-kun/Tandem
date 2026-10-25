@@ -640,6 +640,7 @@ export type ModelCompatibility = {
   requireFinishReason?: boolean
   requireAssistantAfterTool?: boolean
   supportsPromptCacheKey?: boolean
+  streamUsage?: boolean
   cacheFormat?: ModelCacheFormat
   supportsThinkingBlockBinding?: boolean
   supportsEffortUpdates?: boolean
@@ -652,6 +653,7 @@ export type ProviderCompatibility = {
   requireFinishReason?: boolean
   requireAssistantAfterTool?: boolean
   supportsPromptCacheKey?: boolean
+  streamUsage?: boolean
   cacheFormat?: ModelCacheFormat
 }
 
@@ -2346,6 +2348,7 @@ export type ConfigEntry =
         }
         experimental?: {
           portable_shell_scanner?: boolean
+          todo?: boolean
           subagent_depth?: number
           policies?: Array<{
             action: "provider.use" | "tool.use" | "integration.use"
