@@ -2,7 +2,7 @@
 
 ## Environment
 
-- Tandem requires Bun 1.4.2: `/home/jon/.local/share/tandem-v2/toolchain/bun-1.4.2/bin`. Global Bun stays 1.3.14; put the pinned one first on PATH so build subprocesses inherit it.
+- Tandem requires Bun 1.4.4: `/home/jon/.local/share/tandem-v2/toolchain/bun-1.4.4/bin`. Global Bun stays 1.3.14; put the pinned one first on PATH so build subprocesses inherit it.
 - Three servers run on this tablet (setup, logins, flags, app build and releases: `notes/tandem-setup.md`):
 
 | | Daily Tandem | Development | Tandem v1 fallback |
@@ -29,7 +29,7 @@
 - **Daily installs:** combine the documented CLI build and atomic installation in one shell call; use a 600000 ms timeout for builds. Rebuild Android only when its sources or shared UI dependencies changed since the installed version. Run CLI and APK builds sequentially.
 - Install dependencies with the pinned Bun: `bun install --frozen-lockfile`.
 - Development CLI: `bun script/tandem-v2.ts build` stages `packages/cli/dist/cli-linux-arm64/bin/opencode` as the development `bin/tandem`. Restarting the development server picks it up.
-- Android app: `bun run tandem:tablet -- --install` builds and installs the daily **Tandem** app; add `--dev` for the **Tandem Dev** test app, or `--desktop` for the side-by-side **Tandem Desktop** app (`app.liddokun.tandem.desktop`, production key) used to connect to Tandem on the Windows desktop. It switches to Bun 1.4.2 and sets up the shared Android project for the selected app itself. The daily app is signed with its existing key (`packages/android/{release.keystore,keystore.properties}`, ignored by Git), never a new one.
+- Android app: `bun run tandem:tablet -- --install` builds and installs the daily **Tandem** app; add `--dev` for the **Tandem Dev** test app, or `--desktop` for the side-by-side **Tandem Desktop** app (`app.liddokun.tandem.desktop`, production key) used to connect to Tandem on the Windows desktop. It switches to Bun 1.4.4 and sets up the shared Android project for the selected app itself. The daily app is signed with its existing key (`packages/android/{release.keystore,keystore.properties}`, ignored by Git), never a new one.
 - Daily CLI, with the pinned Bun on PATH and a new version such as `2.0.22-tandem-v2.2`:
   `OPENCODE_CHANNEL=latest OPENCODE_VERSION=<version> bun run --cwd packages/cli build --single`, then
   `sudo install -m 755 packages/cli/dist/cli-linux-arm64/bin/opencode /usr/local/bin/tandem.new && sudo mv /usr/local/bin/tandem.new /usr/local/bin/tandem`. It takes effect when the daily server restarts.

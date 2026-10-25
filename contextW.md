@@ -6,7 +6,7 @@
   - The Claude plugin is a bundled copy of `opencode-anthropic-auth-v2` (`bun build src/v2.ts --target bun`) in `C:\Program_Files\Tandem\plugins\anthropic-auth-v2`; rebundle it after plugin changes.
   - Update by cross-building `--target=opencode-windows-x64` on the tablet and replacing the binary while the server is stopped.
 - Windows host: `ssh jon@JJ` (PowerShell). For substantial remote commands, upload a `.ps1` and invoke it with `powershell -ExecutionPolicy Bypass -File`; do not chain with `&&`.
-- Existing Bun is `C:\Program_Files\Bun\bin\bun.exe`; use an isolated Bun 1.4.2 for Tandem and propagate its PATH to subprocesses.
+- Existing Bun is `C:\Program_Files\Bun\bin\bun.exe`; use an isolated Bun 1.4.4 for Tandem and propagate its PATH to subprocesses.
 - Existing `XDG_CONFIG_HOME` is `C:\Program_Files\Config`. A local development server must override config/data/cache/state and service identity, not reuse Tandem or official OpenCode roots.
 - `~/code` is mirrored to `C:\Users\Jon\code` by Syncthing. Do not manually copy edits through the SMB mirror.
 - Build CLI from `packages/cli`: `bun run --cwd packages/cli build --single`. Consume `packages/cli/dist/cli-<target>/`, preserving upstream package scopes and target naming.

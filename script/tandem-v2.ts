@@ -7,7 +7,7 @@ import path from "node:path"
 // UPSTREAM-DIVERGENCE: development must never elect or replace the daily server.
 const root = path.resolve(import.meta.dirname, "..")
 const development = path.join(os.homedir(), ".local/share/tandem-v2/development")
-const toolchain = path.join(os.homedir(), ".local/share/tandem-v2/toolchain/bun-1.4.2/bin")
+const toolchain = path.join(os.homedir(), ".local/share/tandem-v2/toolchain/bun-1.4.4/bin")
 const executable = path.join(development, "bin/tandem")
 const passwordFile = path.join(development, "server-password")
 const environmentFile = path.join(development, "environment.json")
@@ -30,8 +30,8 @@ The stable development password is stored in ${passwordFile}.`)
 if (!["build", "serve", "cli", "source", "vite", "paths"].includes(command)) {
   throw new Error(`Unknown development command: ${command}`)
 }
-if (process.versions.bun !== "1.4.2") {
-  throw new Error(`Use Bun 1.4.2: ${path.join(toolchain, "bun")} script/tandem-v2.ts ${command}`)
+if (process.versions.bun !== "1.4.4") {
+  throw new Error(`Use Bun 1.4.4: ${path.join(toolchain, "bun")} script/tandem-v2.ts ${command}`)
 }
 
 const homes = Object.fromEntries(

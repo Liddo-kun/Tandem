@@ -48,7 +48,7 @@ links to `~/.local/lib/cdp-fetch/cdp-fetch.ts` and does not depend on either che
 
 ## Development server
 
-From `/home/jon/code/Tandem-v2`, with the pinned Bun (`~/.local/share/tandem-v2/toolchain/bun-1.4.2/bin`)
+From `/home/jon/code/Tandem-v2`, with the pinned Bun (`~/.local/share/tandem-v2/toolchain/bun-1.4.4/bin`)
 first on PATH:
 
 ```sh

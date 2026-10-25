@@ -57,7 +57,7 @@ See notes/tandem-setup.md (Publishing a GitHub release).`)
   process.exit(0)
 }
 
-if (Bun.version !== "1.4.2") throw new Error("Use the pinned Bun 1.4.2 toolchain")
+if (Bun.version !== "1.4.4") throw new Error("Use the pinned Bun 1.4.4 toolchain")
 if (!["production", "v2"].includes(values["android-variant"]))
   throw new Error("--android-variant must be production or v2")
 if (values["skip-cli"] && values["skip-android"]) throw new Error("Cannot skip every artifact kind")

@@ -17,9 +17,9 @@ const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)))
 const args = process.argv.slice(2)
 
 // Rerun under the pinned Bun so `bun run tandem:tablet` works from any shell.
-if (Bun.version !== "1.4.2") {
-  const pinned = path.join(os.homedir(), ".local/share/tandem-v2/toolchain/bun-1.4.2/bin/bun")
-  if (!existsSync(pinned)) throw new Error(`Tandem builds need Bun 1.4.2: ${pinned}`)
+if (Bun.version !== "1.4.4") {
+  const pinned = path.join(os.homedir(), ".local/share/tandem-v2/toolchain/bun-1.4.4/bin/bun")
+  if (!existsSync(pinned)) throw new Error(`Tandem builds need Bun 1.4.4: ${pinned}`)
   const proc = Bun.spawn([pinned, fileURLToPath(import.meta.url), ...args], { stdio: ["inherit", "inherit", "inherit"] })
   process.exit(await proc.exited)
 }
@@ -338,7 +338,7 @@ function printHelp() {
 Builds the Tandem release APK (app.liddokun.tandem, production key) natively on aarch64 Linux,
 the side-by-side Tandem Dev test app (app.liddokun.tandem.v2) with --dev, or the side-by-side
 Tandem Desktop app (app.liddokun.tandem.desktop, production key) with --desktop. Reruns itself under
-the pinned Bun 1.4.2 and regenerates the shared Android project when it belongs to another app.
+the pinned Bun 1.4.4 and regenerates the shared Android project when it belongs to another app.
 
 Options:
   --install      adb install -r the APK after building
