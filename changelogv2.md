@@ -6,6 +6,10 @@ Dated user-visible changes and published releases of Tandem v2, and the source f
 
 Baseline: OpenCode `upstream/dev` at `157ad7f22a` (2026-10-19, `@opencode/cli` 2.0.32), synced on 2026-10-20; upstream promoted v2 to `dev` on 2026-10-10 and froze `v2`. Version `2.0.24-tandem-v2.2`, installed as the daily Tandem on Jon's tablet on 2026-10-07 (`2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
 
+### 2026-10-23
+
+- **Fixed - Windows webfetch:** the browser fetcher starts its own Chrome when a fetch needs it, as on Linux, instead of relying on the Windows server script to open one at startup. Closing that window no longer breaks webfetch; the next fetch reopens it. [Webfetch](logv2.md#browser-backed-webfetch).
+
 ### 2026-10-20
 
 - **Changed — Follow-up upstream sync:** merged 14 more commits (`ba06ff9e0b`→`157ad7f22a`) in eight batches. Adds MiniMax M3.1 Flash Free to the bundled catalog, fixes apostrophes in terminal flowcharts, upgrades OpenTUI to 0.6.6, reports removed running shells as killed, and keeps terminal clients waiting through transport failures and long requests. Upstream summary compaction now includes recent conversation too; its default automatic-compaction reserve rises to 15% of the context limit, at least 16k where the window permits. Tandem's Claude summary/checkpoint behavior is preserved. Three mechanical TUI conflicts retained Tandem branding and rewind confirmation while adopting upstream's APIs. [Verification and test limitations](notes/archive/upstream-sync-2026-10-20-followup.md).

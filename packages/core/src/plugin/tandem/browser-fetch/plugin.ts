@@ -44,10 +44,10 @@ function render(page: Page) {
   ].filter((line) => line !== "").join("\n")
 }
 
-async function captured(input: { url: string; format?: string }, base: string, signal: AbortSignal, budget: Budget) {
+async function captured(input: { url: string; format?: string }, base: string, profile: string, signal: AbortSignal, budget: Budget) {
   const host = new URL(input.url).hostname.toLowerCase()
   if (budget.blocked.has(host)) throw new FetchError("This site already refused this call; do not retry it", "blocked")
-  const page = await fetchPage({ url: input.url, html: input.format === "html", timeout: 60, base, signal, artifacts: budget.artifacts }).catch((error) => {
+  const page = await fetchPage({ url: input.url, html: input.format === "html", timeout: 60, base, profile, signal, artifacts: budget.artifacts }).catch((error) => {
     if (error instanceof FetchError && error.code === "blocked") {
       budget.blocked.add(host)
       if (error.site) budget.blocked.add(error.site.toLowerCase())
@@ -67,12 +67,12 @@ async function captured(input: { url: string; format?: string }, base: string, s
 }
 
 // Await the native CDP finalizer on Effect interruption, including cancellation during tab acquisition.
-function capture(input: { url: string; format?: string }, base: string, budget: Budget) {
+function capture(input: { url: string; format?: string }, base: string, profile: string, budget: Budget) {
   return Effect.scoped(Effect.gen(function* () {
     const operation = yield* Effect.acquireRelease(
       Effect.sync(() => {
         const controller = new AbortController()
-        const work = captured(input, base, controller.signal, budget)
+        const work = captured(input, base, profile, controller.signal, budget)
         // Mark rejection handled before an interrupt can prevent the await from being installed.
         void work.catch(() => {})
         return { controller, work }
@@ -94,6 +94,7 @@ export const Plugin = define({
     const global = yield* Global.Service
     const permission = yield* Permission.Service
     const directory = path.join(global.tmp, "webfetch")
+    const profile = path.join(global.data, "chrome")
     const budgets = new Map<string, Budget>()
 
     yield* ctx.agent.transform((editor) => {
@@ -129,7 +130,7 @@ export const Plugin = define({
             return yield* new Tool.Error({ message: "Reader fetch budget exhausted (12 follow-ups / 5 searches); answer from existing evidence" })
           budget.total++
           if (search) budget.searches++
-          const fetched = yield* capture(input, `${budget.prefix}-followup-${budget.total}`, budget)
+          const fetched = yield* capture(input, `${budget.prefix}-followup-${budget.total}`, profile, budget)
           return { content: `${fetched.content}\n\n[Follow-up budget: ${budget.total}/12; search budget: ${budget.searches}/5]` }
         }).pipe(Effect.mapError(failure)),
       })
@@ -152,7 +153,7 @@ export const Plugin = define({
           }))
           yield* Effect.tryPromise({ try: () => prune(directory), catch: failure })
           // A failed initial capture never creates or prompts an auxiliary session.
-          const fetched = yield* capture(input, `${prefix}-initial`, budget)
+          const fetched = yield* capture(input, `${prefix}-initial`, profile, budget)
           const configured = yield* ctx.agent.get({ agentID: Agent.ID.make(TandemAuxiliary.readerAgent) })
           if (!configured.data?.model) return yield* new Tool.Error({ message: "web-fetcher is disabled or has no configured model" })
           const child = yield* Effect.acquireRelease(

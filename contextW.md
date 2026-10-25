@@ -1,7 +1,7 @@
 # Tandem — Windows context
 
 - The daily Tandem runs on Jon's tablet (port 4097, see `contextL.md`). This Windows host also runs Tandem v2 (v1 was removed on 2026-10-09):
-  - Binary `C:\Program_Files\tandem.exe`, server on port 4096, started by `C:\Program_Files\Tandem\tandem-server.ps1` (Desktop shortcut "Tandem server"). The script clears `OPENCODE_DB`, which the user environment keeps for the official `opencode.exe`, and points browser-backed webfetch at a separate Chrome instance (installed Chrome, profile `C:\Program_Files\Data\tandem\chrome`, CDP `127.0.0.1:9223`), starting it if needed.
+  - Binary `C:\Program_Files\tandem.exe`, server on port 4096, started by `C:\Program_Files\Tandem\tandem-server.ps1` (Desktop shortcut "Tandem server"). The script clears `OPENCODE_DB`, which the user environment keeps for the official `opencode.exe`. Browser-backed webfetch starts its own Chrome on demand (installed Chrome, profile `C:\Program_Files\Data\tandem\chrome`, CDP `127.0.0.1:9223`); closing that window is harmless, as the next fetch reopens it.
   - Standard Tandem folders under the user's XDG roots: `C:\Program_Files\{Config,Data,Cache}\tandem`; `service.json` (hostname, port, password) is in the config folder.
   - The Claude plugin is a bundled copy of `opencode-anthropic-auth-v2` (`bun build src/v2.ts --target bun`) in `C:\Program_Files\Tandem\plugins\anthropic-auth-v2`; rebundle it after plugin changes.
   - Update by cross-building `--target=opencode-windows-x64` on the tablet and replacing the binary while the server is stopped.

@@ -103,7 +103,7 @@ async function version(endpoint: string, signal: AbortSignal) {
     .catch(() => undefined)
 }
 
-async function bootstrap(android: boolean, signal: AbortSignal) {
+async function bootstrap(android: boolean, profile: string, signal: AbortSignal) {
   const override = android ? process.env.TANDEM_BROWSER_FETCH_ANDROID_ENDPOINT : process.env.TANDEM_BROWSER_FETCH_ENDPOINT
   const endpoint = override ?? (android ? "127.0.0.1:9222" : "127.0.0.1:9223")
   const existing = await version(endpoint, signal)
@@ -115,6 +115,13 @@ async function bootstrap(android: boolean, signal: AbortSignal) {
     if (!target) throw new FetchError("adb-reconnect did not find Android Chrome", "unavailable")
     await run(["adb", "-s", target, "forward", "tcp:9222", "localabstract:chrome_devtools_remote"], signal)
     await run(["adb", "-s", target, "shell", "am", "start", "-n", "com.android.chrome/com.google.android.apps.chrome.Main"], signal)
+  } else if (process.platform === "win32") {
+    // Chrome refuses CDP on its default profile, so it gets a dedicated one. An elevated server's
+    // launch relaunches itself unelevated; the endpoint poll below waits for that browser.
+    const launcher = process.env.TANDEM_BROWSER_FETCH_LAUNCHER ?? path.join(process.env.ProgramFiles ?? "C:\\Program Files", "Google\\Chrome\\Application\\chrome.exe")
+    await stat(launcher).catch(() => { throw new FetchError(`Browser launcher unavailable: ${launcher}`, "unavailable") })
+    Bun.spawn([launcher, `--remote-debugging-port=${endpoint.split(":").at(-1)}`, `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check",
+      "--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding", "--disable-features=CalculateNativeWinOcclusion"], { stdout: "ignore", stderr: "ignore", stdin: "ignore" }).unref()
   } else {
     if (process.platform !== "linux") throw new FetchError("Start regular Chrome with CDP and set TANDEM_BROWSER_FETCH_ENDPOINT=host:port", "unavailable")
     await stat("/tmp/.X11-unix/X0").catch(() => { throw new FetchError("X display :0 is unavailable; start the desktop or set TANDEM_BROWSER_FETCH_ENDPOINT", "unavailable") })
@@ -306,14 +313,14 @@ async function screenshots(page: Cdp, base: string, signal: AbortSignal, artifac
   }
 }
 
-async function attempt(input: { url: string; html: boolean; timeout: number; base: string; android: boolean; signal: AbortSignal; artifacts: ArtifactBudget }): Promise<Page> {
+async function attempt(input: { url: string; html: boolean; timeout: number; base: string; profile: string; android: boolean; signal: AbortSignal; artifacts: ArtifactBudget }): Promise<Page> {
   const deadline = AbortSignal.timeout(input.timeout * 1000)
   const signal = AbortSignal.any([input.signal, deadline])
   let browser: Cdp | undefined
   let cdp: Cdp | undefined
   let target: string | undefined
   try {
-    const ready = await bootstrap(input.android, signal)
+    const ready = await bootstrap(input.android, input.profile, signal)
     browser = await Cdp.connect(ready.version.webSocketDebuggerUrl, signal)
     // Acquisition is intentionally not aborted mid-command: receive the ID then close it on cancellation.
     target = (await browser.send("Target.createTarget", Schema.Struct({ targetId: Schema.String }), { url: "about:blank" })).targetId
@@ -397,7 +404,7 @@ async function attempt(input: { url: string; html: boolean; timeout: number; bas
   }
 }
 
-export async function fetchPage(input: { url: string; html: boolean; timeout: number; base: string; signal: AbortSignal; artifacts: ArtifactBudget }): Promise<Page> {
+export async function fetchPage(input: { url: string; html: boolean; timeout: number; base: string; profile: string; signal: AbortSignal; artifacts: ArtifactBudget }): Promise<Page> {
   const url = new URL(input.url)
   if (!["http:", "https:"].includes(url.protocol)) throw new FetchError("URL must use HTTP or HTTPS")
   return serialized(input.signal, async () => {
@@ -409,7 +416,7 @@ export async function fetchPage(input: { url: string; html: boolean; timeout: nu
       throw error
     })
     if (first.pageState === "blocked") throw new FetchError("Site is refusing this network (rate limit / unusual traffic); do not retry this site", "blocked", new URL(first.url).hostname)
-    const result = first.pageState === "never-ready" && first.via !== "Android Chrome" && !process.env.TANDEM_BROWSER_FETCH_ENDPOINT
+    const result = first.pageState === "never-ready" && first.via !== "Android Chrome" && process.platform === "linux" && !process.env.TANDEM_BROWSER_FETCH_ENDPOINT
       ? await attempt({ ...input, base: `${input.base}-android`, android: true }) : first
     if (result.pageState === "blocked") throw new FetchError("Site is refusing this network; do not retry this site", "blocked", new URL(result.url).hostname)
     if (result.pageState === "never-ready") throw new FetchError("Site never delivered real content; only a placeholder was available")

@@ -9,7 +9,7 @@ with browser cookies; PDFs use `pdftotext -layout` when available.
 
 - `TANDEM_BROWSER_FETCH=0` disables the plugin and leaves upstream `webfetch` active. The default is on.
 - Desktop CDP defaults to `127.0.0.1:9223`. `TANDEM_BROWSER_FETCH_ENDPOINT=host:port` selects an existing endpoint and disables automatic Android fallback.
-- `TANDEM_BROWSER_FETCH_LAUNCHER` defaults to `~/.local/bin/chromium-x`.
+- `TANDEM_BROWSER_FETCH_LAUNCHER` defaults to `~/.local/bin/chromium-x` on Linux. On Windows it defaults to the installed Chrome, which is started on demand with CDP on the endpoint's port and a dedicated profile, `<Global.data>/chrome`, because Chrome refuses CDP on its default profile.
 - Android CDP defaults to `127.0.0.1:9222`. `TANDEM_BROWSER_FETCH_ANDROID_ENDPOINT=host:port` selects an existing endpoint.
 - `agents["web-fetcher"]` may override the model, system prompt, and request settings. Its default model is `openai/gpt-6.1-sol#medium`, with medium text verbosity.
 - PDF text extraction needs `pdftotext` from `poppler-utils`. Without it, the downloaded path is still returned.
@@ -24,7 +24,7 @@ with browser cookies; PDFs use `pdftotext -layout` when available.
 
 Browser work is serialized process-wide, including bootstrap and tab cleanup. Only
 owned tabs are closed. An existing profile owner is never killed or unlocked.
-Desktop unavailability or a persistent placeholder may fall back to Android, but
+On Linux, desktop unavailability or a persistent placeholder may fall back to Android, but
 an explicit desktop endpoint never does. Rate-limit pages are not retried.
 
 Each fetch captures at most four 1600px-high slices. Page text is capped at 2 MiB,
