@@ -9,12 +9,14 @@ import { hasPersistentPtyConnectTicketURL } from "@opencode/protocol/groups/pers
 import { isPairingConnectURL } from "@opencode/protocol/groups/server"
 import { Global } from "@opencode/util/global"
 import { Cause, Context, Effect, Exit, Latch, Layer, Option, Ref, Scope } from "effect"
-import { HttpEffect, HttpMiddleware, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
+import { HttpMiddleware, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
 import { NetAddress } from "effect/net"
 import { createServer } from "node:http"
 import { ServerAuth } from "./auth"
 import { isAllowedCorsOrigin } from "./cors"
 import { authorizedRequest, unauthorizedResponse } from "./middleware/authorization"
+// UPSTREAM-DIVERGENCE: Tandem's parallel gzip for large responses.
+import { parallelGzipLarge } from "./middleware/tandem-parallel-gzip"
 import { withoutParentSpan } from "./request-tracing"
 import { createRoutes } from "./routes"
 import { ServerInfo } from "./server-info"
@@ -40,20 +42,6 @@ const errorResponseLogger = HttpMiddleware.make((app) =>
   HttpMiddleware.logger(
     Effect.tap(app, (response) =>
       response.status < 400 ? HttpMiddleware.withLoggerDisabled(Effect.void) : Effect.void,
-    ),
-  ),
-)
-
-// UPSTREAM-DIVERGENCE: compressing a large response delays its first byte by seconds and barely shrinks inline
-// photos (a 42 MB session page took 2.6 s to gzip for a 30% saving), so large bodies are sent uncompressed.
-const uncompressedLimit = 1024 * 1024
-
-const uncompressedLarge = HttpMiddleware.make((app) =>
-  HttpEffect.withPreResponseHandler(app, (_, response) =>
-    Effect.succeed(
-      "contentLength" in response.body && (response.body.contentLength ?? 0) > uncompressedLimit
-        ? HttpServerResponse.setHeader(response, "content-encoding", "identity")
-        : response,
     ),
   ),
 )
@@ -85,8 +73,8 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
     .serve(
       (transform ? transform(app) : app).pipe(
         HttpMiddleware.compression(),
-        // UPSTREAM-DIVERGENCE: large bodies skip compression; applied after it so its handler runs first.
-        uncompressedLarge,
+        // UPSTREAM-DIVERGENCE: large bodies are gzipped on several threads; applied after it so its handler runs first.
+        parallelGzipLarge,
         HttpMiddleware.cors({ allowedOrigins: (origin) => isAllowedCorsOrigin(origin, options), maxAge: 86_400 }),
       ),
       errorResponseLogger,

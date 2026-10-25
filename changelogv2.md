@@ -8,7 +8,7 @@ Baseline: OpenCode `upstream/dev` at `157ad7f22a` (2026-10-19, `@opencode/cli` 2
 
 ### 2026-10-25
 
-- **Fixed - Slow sessions with photos:** opening or reconnecting to a session with many photos no longer waits seconds on the server. The check of each photo's base64 text uses upstream's newer linear check instead of a pattern that backtracked for seconds, and responses over 1 MiB are sent uncompressed: a 42 MB session page took 2.6 s to compress for a 30% saving, and now arrives in about 0.2 s locally. [Base64 check](logv2.md#temporary-upstream-bug-fixes), [large responses](logv2.md#identity-cli-and-local-service).
+- **Fixed - Slow sessions with photos:** opening or reconnecting to a session with many photos no longer waits seconds on the server. The check of each photo's base64 text uses upstream's newer linear check instead of a pattern that backtracked for seconds, and responses of 1 MiB or more are gzipped on several threads: a 42 MB session page took 2.6 s to compress and now takes about 0.15 s, still 30% smaller. In the Android app it arrives in about 0.45 s instead of 4-5 s. [Base64 check](logv2.md#temporary-upstream-bug-fixes), [large responses](logv2.md#identity-cli-and-local-service).
 
 ### 2026-10-23
 
