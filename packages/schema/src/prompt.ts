@@ -18,7 +18,6 @@ export const FileSource = Schema.Union([
   .annotate({ identifier: "Prompt.FileSource" })
 export type FileSource = typeof FileSource.Type
 
-// UPSTREAM-DIVERGENCE(temporary): upstream bd2ba0a685, ahead of the baseline. Sessions with photos took 7-10s to load.
 // The canonical pattern backtracks on large inputs, so it only supplies metadata (OpenAPI, errors) while an equivalent linear check runs.
 export const Base64 = Schema.String.check(
   Schema.makeFilter(

@@ -150,8 +150,16 @@ const remoteURL = Effect.fnUntraced(function* (client: ReturnType<typeof OpenCod
     Effect.timeoutOrElse({
       duration: "3 minutes",
       orElse: () =>
-        // UPSTREAM-DIVERGENCE: Tandem command hint.
-        Effect.fail(new Error(`Timed out waiting for the remote tunnel; run \`${Brand.command} pair --remote\` again to retry`)),
+        Effect.fail(
+          new Error(
+            [
+              // UPSTREAM-DIVERGENCE: Tandem command hints.
+              `Timed out waiting for the remote tunnel; run \`${Brand.command} pair --remote\` again to retry.`,
+              // The service may not inherit the shell's environment, and Bun ignores the Windows system (WinINET) proxy.
+              `Behind an HTTP proxy, give the background service its address with \`${Brand.command} service set env HTTPS_PROXY <url>\` (and \`NO_PROXY\` for hosts to reach directly).`,
+            ].join(EOL),
+          ),
+        ),
     }),
   )
 })
