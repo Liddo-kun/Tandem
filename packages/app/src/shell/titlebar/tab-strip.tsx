@@ -409,7 +409,9 @@ export function TitlebarTabStrip(props: {
                 // UPSTREAM-DIVERGENCE: A touch swipe on the horizontal strip scrolls it; reorder from the vertical list.
                 (event.pointerType === "touch" && !vertical()) ||
                 (event.target instanceof Element &&
-                  !!event.target.closest('[data-slot="tab-close"], [contenteditable="true"]')),
+                  !!event.target.closest(
+                    '[data-slot="tab-close"], [contenteditable="true"], [contenteditable="plaintext-only"]',
+                  )),
             }),
           ]}
           modifiers={[
