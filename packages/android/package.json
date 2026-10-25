@@ -5,7 +5,8 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "bun check --no-script -b",
+    "typecheck:tsc": "tsc -b",
     "dev": "vite",
     "build": "vite build",
     "prepare:android": "python3 generate-icons.py && bun patch-android-generated.ts",

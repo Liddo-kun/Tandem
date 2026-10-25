@@ -15,7 +15,6 @@ import { Job } from "../../../job.js"
 import { Location } from "../../../location.js"
 import type { SessionCompaction } from "../../../session/compaction.js"
 import type { SessionContext } from "../../../session/context.js"
-import { SessionEvent } from "../../../session/event.js"
 import { InstructionState } from "../../../session/instruction-state.js"
 import type { SessionMessage } from "../../../session/message.js"
 import { SessionModelRequest } from "../../../session/model-request.js"
@@ -143,7 +142,6 @@ export const compact = Effect.fn("ClaudeCompaction.compact")(function* (input: E
   const first = context.messages[0]
   const previous = first?.type === "compaction" && first.status === "completed" ? ClaudeCheckpoint.read(first.metadata) : undefined
   const transcript = yield* writeTranscript({ db, fs, sessionID, directory: location.directory, tmp: global.tmp }).pipe(Effect.orElseSucceed(() => undefined))
-  if (trigger.reason !== "manual") yield* input.bus.publish(SessionEvent.Compaction.Started, { sessionID, reason: "auto" })
   const policy = yield* SessionRunnerRetry.policy(sessionID)
   for (let count = split.length - 1; count >= 1; count--) {
     const older = split.slice(0, count).flat()
