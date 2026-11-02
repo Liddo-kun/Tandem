@@ -87,7 +87,8 @@ export function setSelectionRange(parent: HTMLElement, range: Range, start: numb
   edge(parent, "end", to)
 }
 
-export function getTextLength(node: Node): number {
+// UPSTREAM-DIVERGENCE: Android native ranges measure text without the trailing caret BR.
+function getTextLength(node: Node): number {
   if (node.nodeType === Node.TEXT_NODE) return (node.textContent ?? "").replace(/\u200B/g, "").length
 
   // UPSTREAM-DIVERGENCE: The Android trailing caret BR is a line box, not authored text.
@@ -101,20 +102,6 @@ export function getTextLength(node: Node): number {
   }
 
   return length
-}
-
-export function getCursorPosition(parent: HTMLElement): number {
-  const selection = window.getSelection()
-
-  if (!selection || selection.rangeCount === 0) return 0
-  const range = selection.getRangeAt(0)
-
-  if (!parent.contains(range.startContainer)) return 0
-  const preCaretRange = range.cloneRange()
-  preCaretRange.selectNodeContents(parent)
-  preCaretRange.setEnd(range.startContainer, range.startOffset)
-
-  return getTextLength(preCaretRange.cloneContents())
 }
 
 export function setCursorPosition(parent: HTMLElement, position: number) {

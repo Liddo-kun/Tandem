@@ -19,6 +19,7 @@ export const productCopy = {
   "error.page.report.prefix": `Please report this error to the ${Brand.product} project`,
   "error.page.report.discord": "on GitHub",
   "error.chain.mcpFailed": `MCP server "{{name}}" failed. Note, ${Brand.product} does not support MCP authentication yet.`,
+  "voice.assistant": `${Brand.product}:`,
   "settings.about.website": "github.com/Liddo-kun/Tandem",
   "settings.about.description": `${Brand.product}, an open source coding agent based on OpenCode`,
   "settings.about.trademark":

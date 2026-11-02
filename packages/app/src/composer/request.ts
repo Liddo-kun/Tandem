@@ -1,6 +1,8 @@
 import { encodeFilePath, getFilename } from "@opencode/util/path"
 // UPSTREAM-DIVERGENCE: Share authored Corrector range metadata with the backend plugin.
 import type { TandemAuxiliary } from "@opencode/util/tandem-auxiliary"
+import { parseSessionMention } from "@opencode/util/session-mention"
+import { serializePrompt } from "./prompt-parts"
 import type { FileSelection } from "@/workspaces/files/model"
 import type {
   AgentPart,
@@ -11,12 +13,15 @@ import type {
   NoteContextItem,
   PathAttachmentPart,
   Prompt,
+  QuoteComment,
+  QuoteContextItem,
   SkillPart,
 } from "@/composer/state"
 import {
   formatAttachmentReference,
   formatCommentNote,
   formatNoteComment,
+  formatQuoteComment,
   type PromptAttachmentReference,
   type PromptComment,
 } from "@/composer/comment-note"
@@ -67,7 +72,7 @@ const parseCommentMentions = (comment: string) => {
   return Array.from(comment.matchAll(mention)).flatMap((match) => {
     const path = (match[2] ?? "").replace(/[.,!?;:)}\]"']+$/, "")
 
-    if (!path) return []
+    if (!path || parseSessionMention(`@${path}`)) return []
 
     return [path]
   })
@@ -99,24 +104,42 @@ export function noteComment(item: NoteContextItem, comment: string) {
   return note
 }
 
+/** The sent form of a quote: its comment travels only when the user wrote one. */
+export function quoteComment(item: QuoteContextItem) {
+  const quote: QuoteComment = { type: "quote", text: item.text }
+  const comment = item.comment?.trim()
+
+  if (comment) quote.comment = comment
+
+  if (item.source) quote.source = { ...item.source }
+
+  return quote
+}
+
 export function buildPromptRequest(input: BuildPromptRequestInput): PromptRequest {
+  const prompt = serializePrompt(input.prompt)
+
+  const text = input.prompt.some((part) => part.type === "session")
+    ? prompt.map((part) => ("content" in part ? part.content : "")).join("")
+    : input.text
+
   // UPSTREAM-DIVERGENCE: Correct authored text only, excluding mentions and attachment/context content.
   let position = 0
-  const correctorRanges = input.prompt.flatMap((part) => {
+  const correctorRanges = prompt.flatMap((part) => {
     if (!("content" in part)) return []
     const start = position
     position += part.content.length
-    return part.type === "text" && part.content.length && input.text.trim()
+    return part.type === "text" && part.content.length && text.trim()
       ? [{ start, end: position }]
       : []
   })
-  const skills = input.prompt.filter(isSkillAttachment).map((attachment) => ({
+  const skills = prompt.filter(isSkillAttachment).map((attachment) => ({
     id: attachment.id,
     name: attachment.name,
     mention: { start: attachment.start, end: attachment.end, text: attachment.content },
   }))
 
-  const files = input.prompt.filter(isFileAttachment).map((attachment) => {
+  const files = prompt.filter(isFileAttachment).map((attachment) => {
     const path = absolute(input.sessionDirectory, attachment.path)
 
     return {
@@ -128,7 +151,7 @@ export function buildPromptRequest(input: BuildPromptRequestInput): PromptReques
     }
   })
 
-  const agents = input.prompt.filter(isAgentAttachment).map((attachment) => ({
+  const agents = prompt.filter(isAgentAttachment).map((attachment) => ({
     name: attachment.name,
     mention: { start: attachment.start, end: attachment.end, text: attachment.content },
   }))
@@ -154,6 +177,13 @@ export function buildPromptRequest(input: BuildPromptRequestInput): PromptReques
       comments.push(noteComment(item, comment))
 
       return mentioned(comment)
+    }
+
+    if (item.type === "quote") {
+      const quote = quoteComment(item)
+      comments.push(quote)
+
+      return quote.comment ? mentioned(quote.comment) : []
     }
 
     const path = absolute(input.sessionDirectory, item.path)
@@ -191,11 +221,17 @@ export function buildPromptRequest(input: BuildPromptRequestInput): PromptReques
 
   return {
     text: [
-      ...(input.text.trim() ? [input.text] : []),
+      ...(text.trim() ? [text] : []),
       ...attachments.map(formatAttachmentReference),
-      ...comments.map((comment) => (comment.type === "note" ? formatNoteComment(comment) : formatCommentNote(comment))),
+      ...comments.map((comment) => {
+        if (comment.type === "note") return formatNoteComment(comment)
+
+        if (comment.type === "quote") return formatQuoteComment(comment)
+
+        return formatCommentNote(comment)
+      }),
     ].join("\n"),
-    displayText: input.text,
+    displayText: text,
     // UPSTREAM-DIVERGENCE: Send authored correction ranges with the composed request.
     correctorRanges,
     files: [...files, ...context, ...inline],
