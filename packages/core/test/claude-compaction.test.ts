@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { LanguageModel, LLMRequest, Message } from "@opencode/ai"
+import { LanguageModel, LLMRequest, Message } from "@opencode/ai/effect"
 import { OpenAIChat } from "@opencode/ai/protocols"
 import { Schema } from "effect"
 import { ClaudeCompaction } from "../src/plugin/tandem/claude/compaction.js"

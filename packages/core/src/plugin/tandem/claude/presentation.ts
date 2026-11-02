@@ -1,6 +1,6 @@
 export * as ClaudePresentation from "./presentation.js"
 
-import { LanguageModel, LLMRequest, Message, ToolChoice, ToolDefinition, type LLMEvent, type ToolEntry, type ToolResultPart } from "@opencode/ai"
+import { LanguageModel, LLMRequest, Message, ToolChoice, ToolDefinition, type LLMEvent, type ToolEntry, type ToolResultPart } from "@opencode/ai/effect"
 import { Stream } from "effect"
 
 export const isClaude = (id: string) => id.toLowerCase().includes("claude")

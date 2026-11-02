@@ -1,5 +1,5 @@
 import { expect } from "bun:test"
-import { Message } from "@opencode/ai"
+import { Message } from "@opencode/ai/effect"
 import { Anthropic, OpenAI } from "@opencode/ai/providers"
 import { compileRequest } from "@opencode/ai/route/client"
 import { Agent } from "@opencode/core/agent"

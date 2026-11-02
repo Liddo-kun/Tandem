@@ -1,6 +1,6 @@
 export * as ClaudeCheckpoint from "./checkpoint.js"
 
-import type { Message } from "@opencode/ai"
+import type { Message } from "@opencode/ai/effect"
 import type { Model } from "@opencode/schema/model"
 import { Schema } from "effect"
 import { SessionMessage } from "../../../session/message.js"

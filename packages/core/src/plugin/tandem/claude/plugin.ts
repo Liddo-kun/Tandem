@@ -2,7 +2,7 @@ export * as ClaudePlugin from "./plugin.js"
 
 import { define } from "@opencode/plugin/effect/plugin"
 import type { SessionHooks } from "@opencode/plugin/effect/session"
-import { Message, SystemPart } from "@opencode/ai"
+import { Message, SystemPart } from "@opencode/ai/effect"
 import { Effect } from "effect"
 import { TandemAuxiliary } from "@opencode/util/tandem-auxiliary"
 import { claudeVersion } from "@opencode/ai/protocols/utils/claude-model"

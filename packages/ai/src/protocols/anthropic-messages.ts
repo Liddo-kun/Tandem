@@ -84,6 +84,7 @@ const AnthropicCacheControl = Schema.Struct({
   ttl: Schema.optional(Schema.Literals(["5m", "1h"])),
 })
 const AnthropicServiceTier = knownString<"auto" | "standard_only">()
+const AnthropicSpeed = knownString<"fast" | "standard">()
 
 const AnthropicTextBlock = Schema.Struct({
   type: Schema.tag("text"),
@@ -363,6 +364,7 @@ const Options = Schema.Struct({
   effort: Schema.optional(Schema.String),
   service_tier: Schema.optional(AnthropicServiceTier),
   serviceTier: Schema.optional(AnthropicServiceTier),
+  speed: Schema.optional(AnthropicSpeed),
   metadata: Schema.optional(AnthropicMetadata),
   container: Schema.optional(AnthropicContainer),
   inference_geo: optionalNull(Schema.String),
@@ -407,6 +409,7 @@ const AnthropicBodyFields = {
   inference_geo: Schema.optional(Schema.NullOr(Schema.String)),
   metadata: Schema.optional(AnthropicMetadata),
   service_tier: Schema.optional(AnthropicServiceTier),
+  speed: Schema.optional(AnthropicSpeed),
 }
 export const AnthropicMessagesBody = Schema.Struct(AnthropicBodyFields)
 export type AnthropicMessagesBody = Schema.Schema.Type<typeof AnthropicMessagesBody>
@@ -1123,6 +1126,7 @@ const fromRequest = Effect.fn("AnthropicMessages.fromRequest")(function* (reques
     inference_geo: options.inference_geo ?? options.inferenceGeo ?? undefined,
     metadata: options.metadata,
     service_tier: options.service_tier ?? options.serviceTier,
+    speed: options.speed,
   }
   // UPSTREAM-DIVERGENCE: omit clear-thinking when thinking is off and retain compaction edits.
   const thinkingOn = body.thinking?.type === "enabled" || body.thinking?.type === "adaptive"
@@ -1655,7 +1659,7 @@ export const protocol = Protocol.make({
 })
 
 export const transport = <
-  Body extends Pick<AnthropicMessagesBody, "messages" | "context_management" | "thinking">,
+  Body extends Pick<AnthropicMessagesBody, "messages" | "context_management" | "thinking" | "speed">,
 >() => {
   const http = HttpTransport.httpJson<Body, string>({ framing })
   return {
@@ -1707,7 +1711,9 @@ export const transport = <
   }
 }
 
-function requiredBetaHeaders(body: Pick<AnthropicMessagesBody, "messages" | "context_management" | "thinking">) {
+function requiredBetaHeaders(
+  body: Pick<AnthropicMessagesBody, "messages" | "context_management" | "thinking" | "speed">,
+) {
   // Always request interleaved thinking. The API accepts the header on any
   // model and ignores it where unsupported, while manual-thinking models need
   // it for thinking between tool calls.
@@ -1723,6 +1729,9 @@ function requiredBetaHeaders(body: Pick<AnthropicMessagesBody, "messages" | "con
 
   if (body.messages.some((message) => message.role === "system" && message.output_config !== undefined))
     betas.push("mid-conversation-output-config-2026-07-01")
+
+  // Opus 5.5 accepts `speed` without this header; earlier fast-mode models reject `speed` without it.
+  if (body.speed !== undefined) betas.push("fast-mode-2026-02-01")
 
   const thinking = body.thinking
   if (thinking && !isThinkingOff(thinking) && thinking.block_binding) betas.push(THINKING_BINDING_BETA)

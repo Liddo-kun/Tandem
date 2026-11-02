@@ -1,6 +1,6 @@
 export * as ClaudeCompaction from "./compaction.js"
 
-import { AIError, isContextOverflowFailure, LLMRequest, Message } from "@opencode/ai"
+import { AIError, isContextOverflowFailure, LLMRequest, Message } from "@opencode/ai/effect"
 import type { StreamOptions } from "@opencode/ai/route"
 import type { SessionError } from "@opencode/schema/session-error"
 import { FSUtil } from "@opencode/util/fs-util"

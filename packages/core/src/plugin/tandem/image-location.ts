@@ -1,7 +1,7 @@
 // Tandem-owned (not in upstream): make user images available to filesystem-based tools.
 export * as ImageLocationPlugin from "./image-location.js"
 
-import { Message, type ContentPart } from "@opencode/ai"
+import { Message, type ContentPart } from "@opencode/ai/effect"
 import { define } from "@opencode/plugin/effect/plugin"
 import type { SessionRequest } from "@opencode/plugin/effect/session"
 import { FSUtil } from "@opencode/util/fs-util"

@@ -2,7 +2,7 @@ export * as BrowserFetchPlugin from "./plugin.js"
 
 import { define } from "@opencode/plugin/effect/plugin"
 import type { SessionHooks } from "@opencode/plugin/effect/session"
-import { SystemPart } from "@opencode/ai"
+import { SystemPart } from "@opencode/ai/effect"
 import { TandemAuxiliary } from "@opencode/util/tandem-auxiliary"
 import { Global } from "@opencode/util/global"
 import { Agent } from "@opencode/schema/agent"

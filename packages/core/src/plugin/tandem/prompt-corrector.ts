@@ -1,7 +1,7 @@
 export * as PromptCorrectorPlugin from "./prompt-corrector.js"
 
 import { define } from "@opencode/plugin/effect/plugin"
-import { Message } from "@opencode/ai"
+import { Message } from "@opencode/ai/effect"
 import type { SessionPrompt } from "@opencode/plugin/effect/session"
 import type { Session } from "@opencode/schema/session"
 import { TandemAuxiliary } from "@opencode/util/tandem-auxiliary"

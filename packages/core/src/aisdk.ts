@@ -29,7 +29,7 @@ import {
   type Media,
   type ToolDefinition,
   type UsageInput,
-} from "@opencode/ai"
+} from "@opencode/ai/effect"
 import { Auth, Endpoint, RequestExecutor, type AnyRoute, type HttpMiddleware } from "@opencode/ai/route"
 import { ProviderShared } from "@opencode/ai/protocols/shared"
 // UPSTREAM-DIVERGENCE: owned diagnostics follow custom-fetch/auth rewrites to their final fetch.
