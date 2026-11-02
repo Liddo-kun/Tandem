@@ -12,7 +12,7 @@ This file is the inventory of what Tandem v2 adds to, or changes in, official Op
 
 ## Current OpenCode divergence
 
-Current-state inventory against pinned OpenCode v2 base **`ddd9e103fe`** (`upstream/dev`), as of **2026-10-25**. Each entry names upstream-shared files Tandem edits (carrying `UPSTREAM-DIVERGENCE` markers unless noted as inventory-only) and the fork-owned files a sync must account for. Reference files and symbols, not line numbers.
+Current-state inventory against pinned OpenCode v2 base **`be315b1db8`** (`upstream/dev`), as of **2026-11-02**. Each entry names upstream-shared files Tandem edits (carrying `UPSTREAM-DIVERGENCE` markers unless noted as inventory-only) and the fork-owned files a sync must account for. Reference files and symbols, not line numbers.
 
 Fork-owned locations: `packages/android/`, `packages/core/src/plugin/tandem/`, `packages/ai/src/tandem/`, `packages/util/src/{brand,tandem-auxiliary}.ts`, `script/` Tandem scripts, `notes/`, and individually headed `Tandem-owned (not in upstream)` files inside upstream packages. The Claude auth plugin lives outside this repository, in `~/code/opencode-anthropic-auth-v2`.
 
@@ -149,7 +149,7 @@ Fork-owned locations: `packages/android/`, `packages/core/src/plugin/tandem/`, `
 
 ### Temporary Upstream Bug Fixes
 
-Fixes for bugs present in pristine upstream, marked `UPSTREAM-DIVERGENCE(temporary)`. Remove each with its markers when upstream ships an equivalent fix. None of those below was fixed upstream as of `ddd9e103fe` (2026-10-24).
+Fixes for bugs present in pristine upstream, marked `UPSTREAM-DIVERGENCE(temporary)`. Remove each with its markers when upstream ships an equivalent fix. None of those below was fixed upstream as of `be315b1db8` (2026-10-26).
 
 - **Deleted-session refresh race:** a background metadata read that is still pending when a session is deleted shows a false "Request failed / Session not found" error, or brings the deleted session's metadata back. Ordinary clients can hit this; Tandem's short-lived auxiliary sessions (Corrector, web reader) make it frequent. The client keeps a set of sessions deleted while it runs, ignores missing-session errors for those IDs from background refreshes, and drops them from late metadata/family results. Explicit reads still reject. Files: `packages/client/src/solid/data.ts`.
 - **Pending prompt stuck after a missed update:** the event stream does not replay events missed while it is down. A sent prompt whose admission or delivery update was missed stayed "Pending" with its move and delete buttons for good (they failed with "Request failed"), and the session looked busy; upstream's reload of the open session's messages and pending prompts on reconnect kept the row, because the prompt still counted as unacknowledged. A successful send now acknowledges the prompt too. Files: `packages/client/src/solid/data.ts`.

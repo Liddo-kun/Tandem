@@ -60,7 +60,8 @@ if (!settings || typeof settings !== "object" || Array.isArray(settings) ||
     Object.entries(settings).some(([key, value]) => !key.startsWith("TANDEM_") || typeof value !== "string")) {
   throw new Error(`Expected a JSON object of TANDEM_* string settings: ${environmentFile}`)
 }
-const serviceConfig = path.join(homes.config, "tandem/service.json")
+// Dev-channel builds read their own service-dev.json, not the released channels' shared service.json.
+const serviceConfig = path.join(homes.config, "tandem/service-dev.json")
 if (!(await Bun.file(serviceConfig).exists())) {
   await writeFile(serviceConfig, JSON.stringify({ hostname: "0.0.0.0", port: 4098, password }) + "\n", {
     flag: "wx",
