@@ -4,7 +4,11 @@ Dated user-visible changes and published releases of Tandem v2, and the source f
 
 ## Unreleased
 
-Baseline: OpenCode `upstream/dev` at `be315b1db8` (2026-10-26, `@opencode/cli` 2.1.4), synced on 2026-11-02; upstream promoted v2 to `dev` on 2026-10-10 and froze `v2`. Version `2.0.24-tandem-v2.2`, installed as the daily Tandem on Jon's tablet on 2026-10-07 (`2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
+Baseline: OpenCode `upstream/dev` at `be315b1db8` (2026-10-26, `@opencode/cli` 2.1.4), synced on 2026-11-02; upstream promoted v2 to `dev` on 2026-10-10 and froze `v2`. Version `2.1.4-tandem-v2.1`, installed as the daily Tandem (CLI and Android app) on Jon's tablet on 2026-11-03 (`2.1.4-tandem-v2.0` earlier; `2.0.24-tandem-v2.2` on 2026-10-07, `2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
+
+### 2026-11-03
+
+- **Changed - Shorter model button:** the composer's model button shows just the model (`Opus 5.5`), dropping the provider name (`Anthropic /`) that the upstream sync added. [Composer controls](logv2.md#composer-footer).
 
 ### 2026-11-02
 

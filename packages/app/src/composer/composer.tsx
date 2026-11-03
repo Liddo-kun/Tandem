@@ -69,8 +69,8 @@ export function Composer(props: {
             title={language.t("command.model.choose")}
             keybind={command.keybindParts("model.choose")}
             model={props.model.model.selection}
-            providerName={props.model.model.preview?.provider ?? props.model.model.providerName}
-            // UPSTREAM-DIVERGENCE: Tandem drops a leading "Claude " from the model button.
+            // UPSTREAM-DIVERGENCE: Tandem's model button shows the model only, without the provider name or a leading
+            // "Claude ".
             modelName={tandemModelLabel(modelName())}
             onClose={props.model.restoreFocus}
             onUnpaidClick={() => dialog.show(() => <DialogSelectModelUnpaid model={props.model.model.selection} />)}
