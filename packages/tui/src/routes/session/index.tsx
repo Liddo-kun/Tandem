@@ -1326,7 +1326,7 @@ export function Session(props: {
         try {
           const sessionData = session()
           if (!sessionData) return
-          const transcript = await client.api.session.export({ sessionID: sessionData.id })
+          const transcript = await client.api.experimental.session.export({ sessionID: sessionData.id })
           const content = formatSessionTranscript(transcript.info, transcript.messages, true)
           await clipboard.write(content)
           toast.show({ message: "Session transcript copied to clipboard!", variant: "success" })
@@ -1352,7 +1352,7 @@ export function Session(props: {
 
           if (options === null) return
 
-          const transcript = await client.api.session.export({
+          const transcript = await client.api.experimental.session.export({
             sessionID: sessionData.id,
             sanitize: options.format === "json" ? options.sanitize : undefined,
           })
@@ -2135,7 +2135,7 @@ function SessionNoticeMessageV2(props: { message: SessionMessageInfo }) {
     <Show
       when={completion()}
       fallback={
-        <InlineToolRow icon="◈" color={theme.text.muted} pending="Notice" complete={true}>
+        <InlineToolRow icon={source() === "goal" ? "◎" : "◈"} color={theme.text.muted} pending="Notice" complete={true}>
           {text()}
         </InlineToolRow>
       }

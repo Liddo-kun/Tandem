@@ -25,6 +25,12 @@ const Background = Schema.Struct({
       // UPSTREAM-DIVERGENCE: Tandem retains the result boundary across subagent steering and server recovery.
       promptID: Schema.optionalKey(SessionMessage.ID),
     }),
+    Schema.Struct({
+      kind: Schema.Literal("image"),
+      sessionID: SessionSchema.ID,
+      path: Schema.String,
+      model: Schema.String,
+    }),
   ]),
   status: Schema.Literals(["running", "completed", "error", "cancelled"]),
   output: Schema.optionalKey(Schema.String),

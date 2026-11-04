@@ -92,7 +92,7 @@ export function createSessionRevert(input: {
     // Like the TUI, stop at the first failure instead of waiting on work that was never interrupted.
     if (!(await request(() => server.api.session.interrupt({ sessionID })))) return
 
-    if (!(await request(() => server.api.session.wait({ sessionID })))) return
+    if (!(await request(() => server.api.experimental.session.wait({ sessionID })))) return
 
     // UPSTREAM-DIVERGENCE: ask first, previewing the files and offering to leave them alone, like Claude Code. The
     // agent is stopped before asking, so the preview includes the files its last step changed.

@@ -90,7 +90,8 @@ export const background = (tasks: ReadonlyArray<Job.Background>, sessionID: stri
     const recovery = task.recovery
     if (recovery.kind === "subagent") return recovery.parentSessionID === sessionID
       ? [`Background agent "${recovery.description}" (${recovery.childSessionID}) is still running. Do NOT spawn a duplicate. You will be notified when it completes. To change its course, send it a message with Agent, passing its sessionID.`] : []
-    if (recovery.sessionID !== sessionID) return []
+    // Claude Code restores only background shells and agents; image jobs have no counterpart there.
+    if (recovery.kind !== "shell" || recovery.sessionID !== sessionID) return []
     const command = (commands.get(recovery.shellID) ?? recovery.command.replace(PATH_LINE, "")).replace(/[\r\n]+/g, " ")
     return [`Background shell ${recovery.shellID} ("${command}") is still running (command, shown on one line: \`${command}\`). Do not start it again. You can read its output at ${outputFile(recovery.shellID)}.`]
   })
