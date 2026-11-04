@@ -3,15 +3,15 @@
 ## Environment
 
 - Tandem requires Bun 1.4.4: `/home/jon/.local/share/tandem-v2/toolchain/bun-1.4.4/bin`. Global Bun stays 1.3.14; put the pinned one first on PATH so build subprocesses inherit it.
-- Three servers run on this tablet (setup, logins, flags, app build and releases: `notes/tandem-setup.md`):
+- Two servers run on this tablet (setup, logins, flags, app build and releases: `notes/tandem-setup.md`):
 
-| | Daily Tandem | Development | Tandem v1 fallback |
-| --- | --- | --- | --- |
-| Port | 4097 | 4098 | 4095 (no password) |
-| Binary | `/usr/local/bin/tandem` | `~/.local/share/tandem-v2/development/bin/tandem` | `/usr/local/bin/tandem-v1` |
-| Start | `~/.local/bin/tandem-server` | `bun script/tandem-v2.ts serve` | `~/.local/bin/tandem-v1-server` |
-| Folders | standard `~/.config/tandem`, `~/.local/share/tandem`, … | `~/.local/share/tandem-v2/development/` | `~/.local/share/tandem-v1/` |
-| App | Tandem (`app.liddokun.tandem`) | Tandem Dev (`app.liddokun.tandem.v2`) | Tandem v1 (`ai.opencode.android.v1`) |
+| | Daily Tandem | Development |
+| --- | --- | --- |
+| Port | 4097 | 4098 |
+| Binary | `/usr/local/bin/tandem` | `~/.local/share/tandem-v2/development/bin/tandem` |
+| Start | `~/.local/bin/tandem-server` | `bun script/tandem-v2.ts serve` |
+| Folders | standard `~/.config/tandem`, `~/.local/share/tandem`, … | `~/.local/share/tandem-v2/development/` |
+| App | Tandem (`app.liddokun.tandem`) | Tandem Dev (`app.liddokun.tandem.v2`) |
 
 - An agent's shell inherits its server's environment. In a development-server session, `XDG_*` and `OPENCODE_DB` point at the development folders, so `tandem` commands there act on the development server. Never point a second server at a database that is in use, and never export `OPENCODE_DB` globally: v2 converts any v1 database it opens in place.
 - The daily and development servers are both named `tandem`: stop one by matching its port or path, never `pkill -x tandem`.

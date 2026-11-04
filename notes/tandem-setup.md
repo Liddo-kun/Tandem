@@ -1,6 +1,6 @@
 # Tandem setup on this tablet
 
-How the daily server, the v1 fallback and the development server are set up, how to sign in, and how
+How the daily server and the development server are set up, how to sign in, and how
 to build the app and publish releases. Day-to-day build commands are in `contextL.md`.
 
 ## Daily server
@@ -29,18 +29,12 @@ skills.
 
 Updates are manual: `tandem upgrade` points to <https://github.com/Liddo-kun/Tandem/releases>.
 
-## Tandem v1 fallback
+## Tandem v1
 
-`~/.local/bin/tandem-v1-server` runs `/usr/local/bin/tandem-v1 web --hostname 0.0.0.0 --port 4095`, no
-password, with the XDG folders pointed at `~/.local/share/tandem-v1/{config,data,cache,state}`,
-`OPENCODE_DB=opencode-dev.db` and its DeepSeek Corrector override. Its config folder links back to
-`~/.config/tandem/AGENTS.md` and every other `~/.config` entry, so tools such as `gh` work. App:
-**Tandem v1** (`ai.opencode.android.v1`). The old v1 APK, `~/.profile` and `~/.bashrc` are kept in
-`~/.local/share/tandem-v1/`.
-
-The old `~/code/Tandem` source checkout was removed on 2026-10-14; the installed v1 fallback, widget,
-app and data remain. `~/code/Tandem-v2` now has its own `.git` directory, preserving the `dev` branch
-and all other local branches. V1's 283 pending commits were pushed to `origin/dev` (`e4cff28994`).
+The old `~/code/Tandem` source checkout was removed on 2026-10-14, and the installed v1 fallback
+(`tandem-v1` on port 4095), its widget, the **Tandem v1** app and its data were removed on 2026-11-04.
+The daily database was converted from v1's at the 2026-10-05 switch-over. `~/code/Tandem-v2` now has
+its own `.git` directory, preserving the `dev` branch and all other local branches. V1's 283 pending commits were pushed to `origin/dev` (`e4cff28994`).
 Its source and local-only files, excluding rebuildable dependencies/build outputs, are archived in
 `~/.local/share/tandem-v2/backups/v1-source-2026-10-14/source-and-local-files.tar.gz`; that folder also
 records its uncommitted deletions and original Git metadata. The standalone `cdp-fetch` command now
@@ -82,8 +76,8 @@ development server run `bun script/tandem-v2.ts cli auth login ... --server http
 
 The Claude plugin is registered in the global config (daily `~/.config/tandem/opencode.jsonc`,
 which development links to) as
-`"plugins": ["file:///home/jon/code/opencode-anthropic-auth-v2"]` (v2 uses `plugins`, plural). Never
-register the v1 copy, `~/code/opencode-anthropic-auth`. Its dependency setup and the optional
+`"plugins": ["file:///home/jon/code/opencode-anthropic-auth-v2"]` (v2 uses `plugins`, plural). That
+checkout has its own Git database; the v1 plugin is on its `main` branch. Its dependency setup and the optional
 `ANTHROPIC_BASE_URL`/`ANTHROPIC_INSECURE` transport settings are in that repo's `V2-TRANSPORT.md`.
 
 ## Feature flags
