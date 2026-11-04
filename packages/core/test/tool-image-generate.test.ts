@@ -238,20 +238,23 @@ describe("image_generate", () => {
       const result = yield* run({ prompt: "make it blue", images: ["in.png"], path: "out.png" })
       const file = path.join(directory, "out.png")
       const stem = path.join(directory, "out")
-      expect(result.output).toEqual({ path: stem, model: "test/painter" })
+      const id = result.output.id
+      expect(id).toStartWith("image_")
+      expect(result.output).toEqual({ id, path: stem, model: "test/painter" })
       expect(result.content).toEqual([
         {
           type: "text",
           text: [
-            `Image request started in the background with test/painter. It will be saved as ${stem} with the extension of its real format (.png, .jpg, .webp or .gif); the notice gives the exact path.`,
+            `Image job ${id} started in the background with test/painter. It will be saved as ${stem} with the extension of its real format (.png, .jpg, .webp or .gif); the notice gives the exact path.`,
             "You will be notified automatically when it finishes or fails.",
             "DO NOT sleep, poll, check whether the file exists, or request the same image again while it runs.",
             "Work on other tasks, or briefly tell the user what you started and end your response.",
           ].join("\n"),
         },
       ])
+      // The notice carries the job ID from the start result, like shell notices.
       expect(yield* notice(result)).toBe(
-        `Image request finished. Saved image: ${file} (test/painter).\nUse the read tool on this path to view the image.`,
+        `<image id="${id}" state="completed">\nImage request finished. Saved image: ${file} (test/painter).\nUse the read tool on this path to view the image.\n</image>`,
       )
       expect((yield* Effect.promise(() => fs.readFile(file))).toString("base64")).toBe(PNG)
       expect(fixture.requests).toEqual([
@@ -288,7 +291,7 @@ describe("image_generate", () => {
       const result = yield* run({ prompt: "a cat" })
       expect(path.dirname(result.output.path)).toBe(path.join(global.tmp, "images", session.id))
       const saved = `${result.output.path}.jpg`
-      expect(yield* notice(result)).toBe(
+      expect(yield* notice(result)).toContain(
         `Image request finished. Saved image: ${saved} (test/painter).\nUse the read tool on this path to view the image.`,
       )
       expect(yield* Effect.promise(() => Bun.file(saved).exists())).toBe(true)
@@ -327,7 +330,7 @@ describe("image_generate", () => {
       })
       const result = yield* run({ prompt: "x", path: "out.png" })
       expect(yield* notice(result)).toBe(
-        `Image request failed for ${path.join(directory, "out")}: The prompt was rejected`,
+        `<image id="${result.output.id}" state="error">\nImage request failed for ${path.join(directory, "out")}: The prompt was rejected\n</image>`,
       )
       expect(yield* Effect.promise(() => Bun.file(path.join(directory, "out.png")).exists())).toBe(false)
     }),
@@ -343,7 +346,9 @@ describe("image_generate", () => {
       const id = String(result.metadata?.jobID)
       expect((yield* jobs.get(id))?.status).toBe("running")
       yield* jobs.cancel(id)
-      expect(yield* notice(result)).toBe(`Image request for ${path.join(directory, "out")} was cancelled.`)
+      expect(yield* notice(result)).toBe(
+        `<image id="${id}" state="cancelled">\nImage request for ${path.join(directory, "out")} was cancelled.\n</image>`,
+      )
       expect(yield* Effect.promise(() => Bun.file(path.join(directory, "out.png")).exists())).toBe(false)
     }),
   )

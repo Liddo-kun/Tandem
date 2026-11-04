@@ -13,6 +13,7 @@ import { ConfigEntryObserver } from "../../config/plugin/entry-observer.js"
 import { Environment } from "../../environment/index.js"
 import { FileAccess } from "../../file-access.js"
 import { Generate } from "../../generate.js"
+import { ImageNotice } from "../../image/notice.js"
 import { Job } from "../../job.js"
 import { Mime } from "../../mime.js"
 import { Model } from "../../model.js"
@@ -36,7 +37,7 @@ const EXTENSIONS: Record<string, string> = {
 
 export const description = [
   "Generates a new image, or edits existing ones.",
-  "Only call this when the user asks you to create or edit an image.",
+  "Only call this when the user asks you to create or edit an image. If you think an image would help but the user didn't ask for one, ask them first instead of generating it.",
   "Images you pass are used as the source to edit, or as references for style and subject.",
   "Each call makes one image. For several images, call it once per image.",
   "It runs in the background: the call starts a job and returns right away, and you are notified automatically when the image is saved, with its path. Never poll, sleep, or check for the file while you wait.",
@@ -65,6 +66,7 @@ export const Input = Schema.Struct({
 })
 
 export const Output = Schema.Struct({
+  id: Schema.String.annotate({ description: "The image job's ID, repeated in its completion notice" }),
   path: Schema.String.annotate({ description: "Where the image is saved, without its extension" }),
   model: Schema.String.annotate({ description: "providerID/modelID" }),
 })
@@ -198,22 +200,26 @@ export const Plugin = {
     })
 
     const notifyWhenDone = Effect.fn("ImageGenerateTool.notifyWhenDone")(
-      function* (sessionID: SessionSchema.ID, id: string, notificationID: SessionMessage.ID, file: string) {
-        const info = (yield* jobs.wait({ id })).info
+      function* (input: { sessionID: SessionSchema.ID; id: string; notificationID: SessionMessage.ID; file: string }) {
+        const info = (yield* jobs.wait({ id: input.id })).info
         if (!info || info.status === "running") return
         yield* sessions.synthetic({
-          id: notificationID,
-          sessionID,
+          id: input.notificationID,
+          sessionID: input.sessionID,
           description: "Image generation",
-          text:
-            info.status === "completed"
-              ? (info.output ?? "")
-              : info.status === "error"
-                ? (info.error ?? `Image request failed for ${file}.`)
-                : `Image request for ${file} was cancelled.`,
-          metadata: { source: name, jobID: id, state: info.status, path: file },
+          text: ImageNotice.text({
+            id: input.id,
+            state: info.status,
+            body:
+              info.status === "completed"
+                ? (info.output ?? "")
+                : info.status === "error"
+                  ? (info.error ?? `Image request failed for ${input.file}.`)
+                  : `Image request for ${input.file} was cancelled.`,
+          }),
+          metadata: { source: name, jobID: input.id, state: info.status, path: input.file },
         })
-        yield* jobs.completeBackground(notificationID)
+        yield* jobs.completeBackground(input.notificationID)
       },
       Effect.forkIn(scope, { startImmediately: true }),
     )
@@ -345,7 +351,7 @@ export const Plugin = {
               )
               const id = `image_${Identifier.create(false)}`
               const notificationID = SessionMessage.ID.create()
-              const job = yield* jobs.start({
+              yield* jobs.start({
                 id,
                 notificationID,
                 type: name,
@@ -354,17 +360,17 @@ export const Plugin = {
                 recovery: { kind: "image", sessionID: context.sessionID, path: stem, model: ref },
                 run,
               })
-              yield* jobs.background(job.id)
-              yield* notifyWhenDone(context.sessionID, job.id, notificationID, stem)
+              yield* jobs.background(id)
+              yield* notifyWhenDone({ sessionID: context.sessionID, id, notificationID, file: stem })
               return {
-                output: { path: stem, model: ref },
+                output: { id, path: stem, model: ref },
                 content: [
-                  `Image request started in the background with ${ref}. It will be saved as ${stem} with the extension of its real format (.png, .jpg, .webp or .gif); the notice gives the exact path.${resolved.note ?? ""}`,
+                  `Image job ${id} started in the background with ${ref}. It will be saved as ${stem} with the extension of its real format (.png, .jpg, .webp or .gif); the notice gives the exact path.${resolved.note ?? ""}`,
                   "You will be notified automatically when it finishes or fails.",
                   "DO NOT sleep, poll, check whether the file exists, or request the same image again while it runs.",
                   "Work on other tasks, or briefly tell the user what you started and end your response.",
                 ].join("\n"),
-                metadata: { path: stem, model: ref, jobID: job.id },
+                metadata: { path: stem, model: ref, jobID: id },
               }
             }).pipe(
               Effect.mapError((error) =>

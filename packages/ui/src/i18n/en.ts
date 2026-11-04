@@ -288,6 +288,7 @@ const source = {
   "ui.message.revertMessage": "Rewind to here",
   "ui.message.filesChanged.one": "{{count}} file changed",
   "ui.message.filesChanged.other": "{{count}} files changed",
+  "ui.message.moreActions": "More actions",
   "ui.message.moveToQueue": "Move to queue",
   "ui.message.pending": "Pending",
   "ui.message.voice": "Voice",
@@ -351,6 +352,8 @@ const source = {
   "ui.question.answer.none": "(no answer)",
   "ui.question.review.notAnswered": "(not answered)",
   "ui.question.multiHint": "Pick any",
+  "ui.question.singleHint": "Select one answer",
+  "ui.question.classic.multiHint": "Select all answers that apply",
   "ui.question.custom.placeholder": "Type your answer…",
   "ui.question.custom.answerPlaceholder": "Type your own answer…",
 } satisfies Record<string, string>
