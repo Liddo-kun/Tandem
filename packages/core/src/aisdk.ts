@@ -35,7 +35,7 @@ import { ProviderShared } from "@opencode/ai/protocols/shared"
 // UPSTREAM-DIVERGENCE: owned diagnostics follow custom-fetch/auth rewrites to their final fetch.
 import { RequestDumpFetch } from "./plugin/tandem/request-dump/sdk-fetch.js"
 import { isRecord } from "@opencode/ai/utils/record"
-import { Cause, Context, Effect, Layer, Option, Schema, Scope, Stream } from "effect"
+import { Cause, Context, Effect, Layer, Option, Schema, Scope, Stream, Struct } from "effect"
 import { makeParser } from "effect/encoding/Sse"
 import { HttpClientRequest, HttpClientResponse } from "effect/http"
 import { AsyncLocalStorage } from "node:async_hooks"
@@ -124,19 +124,16 @@ function wrapSSE(res: Response, ms: number, ctl: AbortController) {
 
 function prepareOptions(model: RuntimeInfo, pkg: string) {
   const projected = mapBodyToProviderOptions(model, pkg)
+  const settings = model.settings ?? {}
   const options: Record<string, unknown> = {
     name: model.canonical ?? model.providerID,
-    ...(model.settings ?? {}),
+    ...Provider.nativeSettings(settings),
     headers: model.headers,
     body: projected.body,
   }
 
-  const customFetch = options.fetch
-  const timeouts = Provider.timeouts(options)
-  delete options.headerTimeout
-  delete options.chunkTimeout
-  delete options.compaction
-  delete options.transport
+  const customFetch = settings.fetch
+  const timeouts = Provider.timeouts(settings)
   options.fetch = async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const opts = { ...(init ?? {}) }
     // A plain AbortSignal.timeout would keep running into the body stream, so the header limit uses
@@ -457,24 +454,16 @@ function providerOptionKey(packageName: string | undefined, providerID: Provider
   return providerID
 }
 
-function requestSettings(settings: Readonly<Record<string, unknown>> | undefined) {
+function requestSettings(settings: Provider.Settings | undefined) {
   if (settings === undefined) return undefined
-  const result = Object.fromEntries(
-    Object.entries(settings).filter(
-      ([key]) =>
-        ![
-          "apiKey",
-          "authToken",
-          "baseURL",
-          "chunkTimeout",
-          "compaction",
-          "fetch",
-          "headerTimeout",
-          "timeout",
-          "transport",
-        ].includes(key),
-    ),
-  )
+  // These configure the SDK provider when it is created, not each request.
+  const result = Struct.omit(Provider.nativeSettings(settings), [
+    "accessToken",
+    "apiKey",
+    "authToken",
+    "baseURL",
+    "fetch",
+  ])
   return Object.keys(result).length === 0 ? undefined : result
 }
 

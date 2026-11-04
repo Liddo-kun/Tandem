@@ -4,14 +4,16 @@ import { relative } from "path"
 import { Context, Effect, Layer, Option, Ref, Schema } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Bus } from "../bus.js"
+import { Database } from "../database/database.js"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Location } from "../location.js"
 import { SessionEvent } from "./event.js"
 import { MessageDecodeError } from "./error.js"
+import { SessionHistory } from "./history.js"
 import { SessionMessage } from "./message.js"
 import { SessionSchema } from "./schema.js"
-import { SessionStore } from "./store.js"
 // UPSTREAM-DIVERGENCE: resolve agent and additive instruction policy before Read-triggered injection.
+import { SessionStore } from "./store.js"
 import { Agent } from "../agent.js"
 import { PluginHooks } from "../plugin/hooks.js"
 
@@ -33,9 +35,10 @@ const layer = Layer.effect(
   Effect.gen(function* () {
     const bus = yield* Bus.Service
     const fs = yield* FSUtil.Service
-    const store = yield* SessionStore.Service
+    const db = (yield* Database.Service).db
     const location = yield* Location.Service
-    // UPSTREAM-DIVERGENCE: acquire the selected agent and instructions hook for injection policy.
+    // UPSTREAM-DIVERGENCE: acquire the session, selected agent and instructions hook for injection policy.
+    const store = yield* SessionStore.Service
     const agents = yield* Agent.Service
     const hooks = yield* PluginHooks.Service
     // Resolved once for the Location layer; the synthetic text and dedup ledger keep
@@ -72,7 +75,7 @@ const layer = Layer.effect(
       })
       if (claimed.length === 0) return
       yield* Effect.gen(function* () {
-        const alreadyInjected = yield* previouslyInjected(store, input.sessionID)
+        const alreadyInjected = yield* previouslyInjected(db, input.sessionID)
         const toInject = claimed.filter((path) => !alreadyInjected.has(path))
         if (toInject.length === 0) return
         const files = yield* Effect.forEach(
@@ -114,9 +117,9 @@ const layer = Layer.effect(
   }),
 )
 
-function previouslyInjected(store: SessionStore.Interface, sessionID: SessionSchema.ID) {
+function previouslyInjected(db: Database.Interface["db"], sessionID: SessionSchema.ID) {
   return Effect.gen(function* () {
-    const history = yield* store.context(sessionID)
+    const history = yield* SessionHistory.synthetics(db, sessionID)
     return new Set(
       history
         .filter((message): message is SessionMessage.Synthetic => message.type === "synthetic")
@@ -140,5 +143,5 @@ export const node = makeLocationNode({
   name: "session-instructions",
   layer,
   // UPSTREAM-DIVERGENCE: wire agent selection and instruction policy into Read injection.
-  deps: [Bus.node, FSUtil.node, Location.node, SessionStore.node, Agent.node, PluginHooks.node],
+  deps: [Bus.node, Database.node, FSUtil.node, Location.node, SessionStore.node, Agent.node, PluginHooks.node],
 })
