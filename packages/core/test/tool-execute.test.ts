@@ -23,7 +23,7 @@ test("execute describes invariant Code Mode behavior", () => {
   expect(createCodeMode(new Map()).description).toBe(
     [
       "Run JavaScript in a confined Code Mode runtime to script tool calls and HTTP requests and compose their results.",
-      "`fetch` is available for HTTP requests. Imports, direct filesystem access, and timers are unavailable; all other external access goes through `tools`.",
+      "`fetch` is available for HTTP requests. Imports, direct filesystem access, and timers are unavailable: there is no `setTimeout` or sleep. All other external access goes through `tools`.",
       // UPSTREAM-DIVERGENCE: matches Tandem's Code Mode description wording.
       'Within `{ code }`, `tools` exposes only the tools listed under the "# Code Mode" heading in your instructions (and any found with `search`, when that section says it is available). Your other tools cannot be called from inside `{ code }`.',
       'Call tools through `tools` using only exact paths and signatures from the catalog. Do not infer or normalize tool names; preserve bracket notation such as `tools.<namespace>["tool-name"](input)`.',
