@@ -2,8 +2,8 @@
 import { Show, createEffect, createMemo, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { SessionMessageAssistant } from "@opencode/client/promise"
-import { useExtensionAttachment } from "@/runtime/extension/attachment"
-import { useExtensionHost } from "@/runtime/extension/host"
+import { usePluginAttachment } from "@/runtime/plugin/attachment"
+import { usePluginHost } from "@/runtime/plugin/host"
 import { useLanguage } from "@/runtime/i18n/language"
 import "./tandem-composer.css"
 
@@ -29,8 +29,8 @@ type Usage = SessionMessageAssistant & { tokens: NonNullable<SessionMessageAssis
  */
 export function TandemContextButton() {
   const language = useLanguage()
-  const attachment = useExtensionAttachment()
-  const host = useExtensionHost()
+  const attachment = usePluginAttachment()
+  const host = usePluginHost()
   const session = () => attachment.current()
 
   // Each assistant message is one model request with its own usage.

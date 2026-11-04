@@ -117,7 +117,7 @@ const generalSchema = Persistence.struct({
   autoSave: Persistence.optional(Schema.Boolean),
   showFileTree: Persistence.optional(Schema.Boolean),
   showTurnNavigator: Persistence.optional(Schema.Boolean),
-  // Owned by the updater extension, which copies it out once; kept so settings rewrites cannot drop it first.
+  // Owned by the updater plugin, which copies it out once; kept so settings rewrites cannot drop it first.
   releaseNotes: Persistence.optional(Schema.Boolean),
   showNavigation: Persistence.optional(Schema.Boolean),
   showSearch: Persistence.optional(Schema.Boolean),
@@ -140,7 +140,7 @@ const generalSchema = Persistence.struct({
   // The "New model picker" design experiment, off until it ships.
   newModelPicker: Schema.Boolean,
   mobileTitlebarPosition: Schema.Literals(["top", "bottom"]),
-  // Owned by the review extension, which copies it out once; kept so settings rewrites cannot drop it first.
+  // Owned by the review plugin, which copies it out once; kept so settings rewrites cannot drop it first.
   mobileDiffWrap: Persistence.optional(Schema.Boolean),
   followUpBehavior: Schema.Literals(["queue", "steer"]),
   // UPSTREAM-DIVERGENCE: Persist the Corrector preference.
@@ -194,7 +194,7 @@ const soundsSchema = Persistence.struct({
 
 export const settingsSchema = Persistence.struct({
   general: generalSchema,
-  // Owned by the details extension, which copies it out once; kept so settings rewrites cannot drop it first.
+  // Owned by the details plugin, which copies it out once; kept so settings rewrites cannot drop it first.
   sessionSummary: Schema.optional(
     Persistence.struct({ projectExpanded: Schema.Boolean, serverExpanded: Schema.Boolean }),
   ),
