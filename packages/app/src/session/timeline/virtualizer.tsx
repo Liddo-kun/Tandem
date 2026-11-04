@@ -47,6 +47,10 @@ const endEpsilon = 0.5
 // Re-pinning still requires a downward arrival, so an upward nudge keeps unpinning.
 const pinEpsilon = 2
 
+// Chrome rounds scrollHeight and clientHeight to whole pixels but scrolls in zoomed ones, so under page zoom (down to
+// 25%) the furthest offset it reaches can sit up to 4px short of scrollHeight - clientHeight.
+const zoomSlack = 4
+
 const upwardKeys = new Set(["up", "page-up", "home"])
 
 const cache = new Map<
@@ -222,6 +226,8 @@ export function createTimelineVirtualizer(input: Input) {
     },
   )
   let scrollTop = 0
+  // A scroll arrived within the zoom slack of the end and may have reached it.
+  let endPending = false
   let reportOffset: ((offset: number, scrolling: boolean) => void) | undefined
   let reportRect: ((rect: { width: number; height: number }) => void) | undefined
   let batchingColdSizes = false
@@ -273,6 +279,11 @@ export function createTimelineVirtualizer(input: Input) {
             flushTouchAdjustment()
 
           if (!scrolling && touchStart === undefined) finishTouchScroll()
+
+          if (scrolling || touchStart !== undefined || !endPending) return
+          endPending = false
+
+          if (root && !input.pinned() && !rendering.anchor && atReachableEnd(root)) input.onPin()
         })
         settleColdBottom()
       }
@@ -406,8 +417,7 @@ export function createTimelineVirtualizer(input: Input) {
       const root = listRoot()
 
       // Reopening a settled scroll-to-end operation can fight subsequent keyboard scrolling.
-      if (root && Math.abs(root.scrollHeight - root.clientHeight - root.scrollTop) > endEpsilon)
-        virtualizer.scrollToEnd()
+      if (root && !atReachableEnd(root)) virtualizer.scrollToEnd()
     })
   }
 
@@ -645,19 +655,39 @@ export function createTimelineVirtualizer(input: Input) {
   let contentObserver: MutationObserver | undefined
   let viewportObserver: ResizeObserver | undefined
 
+  // Within the zoom slack only a write finds the end the browser reaches: one that does not move proves the view is
+  // already there, and one that does is undone before anything paints.
+  function atReachableEnd(root: HTMLDivElement) {
+    const top = root.scrollTop
+    const distance = root.scrollHeight - root.clientHeight - top
+
+    if (distance <= endEpsilon) return true
+
+    if (distance > zoomSlack) return false
+    root.scrollTop = root.scrollHeight
+
+    if (root.scrollTop === top) return true
+    root.scrollTop = top
+
+    return false
+  }
+
+  // Returns whether the view now rests at its end with that offset reported.
   const pinColdBottom = () => {
-    if (!active()) return
+    if (!active()) return false
     const root = listRoot()
 
-    if (!input.pinned() || !virtualContent || !root) return
+    if (!input.pinned() || !virtualContent || !root) return false
     // scrollToEnd computes its target from the DOM, not the new size cache.
     virtualContent.style.height = `${virtualizer.getTotalSize()}px`
 
-    if (Math.abs(root.scrollHeight - root.clientHeight - root.scrollTop) > endEpsilon) virtualizer.scrollToEnd()
+    if (!atReachableEnd(root)) virtualizer.scrollToEnd()
 
     // Report after core size adjustments finish so they cannot apply a delta
     // twice. This avoids waiting a frame for the native scroll event.
     if (virtualizer.scrollOffset !== root.scrollTop) reportOffset?.(root.scrollTop, false)
+
+    return true
   }
 
   const pendingMeasurements = () => {
@@ -689,12 +719,20 @@ export function createTimelineVirtualizer(input: Input) {
       })
 
       if (pendingSizes.size || pendingMeasurements()) return
-      pinColdBottom()
+      const pinned = input.pinned()
 
-      if (input.pinned() && Math.abs(root.scrollHeight - root.clientHeight - root.scrollTop) > 1) return
+      // A pinned view rests at the end pinColdBottom reaches. Under page zoom that end can be more than a pixel short
+      // of scrollHeight - clientHeight, and TanStack keeps the offset it wrote rather than the one reached. Waiting
+      // for either distance to close never ends: each pass reported the offset again, which queued the next pass as
+      // a microtask, and the renderer froze.
+      if (pinned && !pinColdBottom()) return
 
       // The scroll event must update the range before newly exposed rows can reveal.
-      if (root.scrollHeight > root.clientHeight && Math.abs((virtualizer.scrollOffset ?? 0) - root.scrollTop) > 1)
+      if (
+        !pinned &&
+        root.scrollHeight > root.clientHeight &&
+        Math.abs((virtualizer.scrollOffset ?? 0) - root.scrollTop) > 1
+      )
         return
 
       if (rendering.initialTail) {
@@ -871,9 +909,13 @@ export function createTimelineVirtualizer(input: Input) {
     const atEnd = maxScroll - scrollTop <= pinEpsilon
     const arrived = scrollTop > previousTop + endEpsilon || maxScroll < previousMaxScroll
 
+    if (scrollTop < previousTop) endPending = false
+
     // An anchor holds its tool even when reaching it lands at the end; only the user's own scroll lets it go.
     if (maxScroll <= 1 || (atEnd && arrived && !rendering.anchor)) input.onPin()
     else if ((pointerHeld || touchScrolling) && scrollTop < previousTop - endEpsilon) input.onUnpin()
+    // Probing the zoomed end now would cancel a scroll still in motion, so it waits for the scroll to settle.
+    else if (arrived && !rendering.anchor && maxScroll - scrollTop <= zoomSlack) endPending = true
     settleColdBottom()
     input.onScheduleScrollState(root)
     input.onHistoryScroll()
@@ -903,8 +945,8 @@ export function createTimelineVirtualizer(input: Input) {
           style={{
             position: "absolute",
             top: `${item().start - topOffset() - rendering.scrollAdjustment}px`,
-            left: "calc((100% - var(--panel-hold-width, 100%)) / 2)",
-            width: "var(--panel-hold-width, 100%)",
+            left: "0",
+            width: "100%",
             height: `${item().size}px`,
             overflow: "clip",
             "overflow-clip-margin": Predicate.isTagged(row(), "TurnGap") ? undefined : "0.5px",
@@ -1022,7 +1064,14 @@ export function createTimelineVirtualizer(input: Input) {
               visibility: coldBottomMount ? "hidden" : undefined,
             }}
           >
-            <div ref={rowLayer} class="absolute inset-0">
+            <div
+              ref={rowLayer}
+              class="absolute inset-y-0"
+              style={{
+                left: "calc((100% - var(--panel-hold-width, 100%)) / 2)",
+                width: "var(--panel-hold-width, 100%)",
+              }}
+            >
               <For each={virtualRowKeys()}>{(rowKey) => <VirtualRow rowKey={rowKey} />}</For>
             </div>
             <div
@@ -1075,7 +1124,11 @@ export function createTimelineVirtualizer(input: Input) {
     disclosure: {
       patchGroupKeys,
       value: (key: string) => toolOpen[key],
-      set: (key: string, open: boolean) => setToolOpen(key, open),
+      set: (key: string, open: boolean) => {
+        // Following the end would scroll an opened user message's top away; it stays where it was pressed.
+        if (open && key.startsWith("user-expanded:")) input.onUnpin()
+        setToolOpen(key, open)
+      },
     },
     revealPart,
     View,

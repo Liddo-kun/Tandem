@@ -31,6 +31,9 @@ export function SessionUserMessage(props: {
   historicalModel: SessionMessageAssistant["model"]
   actions?: SessionUserActions
   run?: UserRun
+  fold?: boolean
+  expanded?: boolean
+  onExpandedChange?: (expanded: boolean) => void
 }) {
   return (
     <CurrentUserMessageDisplay
@@ -44,6 +47,9 @@ export function SessionUserMessage(props: {
       model={props.historicalModel}
       actions={props.actions}
       run={props.run}
+      fold={props.fold}
+      expanded={props.expanded}
+      onExpandedChange={props.onExpandedChange}
     />
   )
 }
