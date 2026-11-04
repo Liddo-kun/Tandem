@@ -20,7 +20,7 @@
 
 ## Packages
 
-- Backend is split across `packages/core`, `server`, `protocol`, `schema`, `ai`, `plugin`, `client` and `cli`. Shared Solid app: `packages/app`; chat/tools: `packages/session-ui`; optional views: `packages/gui-extensions`; Android wrapper: `packages/android`.
+- Backend is split across `packages/core`, `server`, `protocol`, `schema`, `ai`, `plugin`, `client` and `cli`. Shared Solid app: `packages/app`; chat/tools: `packages/session-ui`; optional views: `packages/gui-plugins`; Android wrapper: `packages/android`.
 - Preserve upstream API, auth, CORS, event and generated-client contracts. Mobile platform extensions must be optional for other clients.
 - Port history and what was or wasn't tested: `notes/archive/`.
 
