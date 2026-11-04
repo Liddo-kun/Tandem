@@ -5,7 +5,6 @@ import type { SessionHooks } from "@opencode/plugin/effect/session"
 import { Message, SystemPart } from "@opencode/ai/effect"
 import { Effect } from "effect"
 import { TandemAuxiliary } from "@opencode/util/tandem-auxiliary"
-import { claudeVersion } from "@opencode/ai/protocols/utils/claude-model"
 import { Environment } from "../../../environment/index.js"
 import { FileAccess } from "../../../file-access.js"
 import { ClaudeCheckpoint } from "./checkpoint.js"
@@ -26,6 +25,15 @@ const anchorOf = (messages: ReadonlyArray<Message>) => {
   const part = messages[first].content[0]
   if (part?.type !== "text" || !part.text.startsWith(CHECKPOINT)) return first
   return messages[first + 1]?.role === "user" ? first + 1 : first
+}
+
+// Same parsing as @opencode/ai's internal claudeVersion, which its public API does not export.
+const claudeVersion = (id: string) => {
+  const match = /(?:^|[./])claude-(?<family>[a-z]+)-(?<major>\d+)(?:[.-](?<minor>\d{1,2}))?(?:$|[-:@])/.exec(
+    id.toLowerCase(),
+  )?.groups
+  if (!match) return undefined
+  return { family: match.family, major: Number(match.major), minor: Number(match.minor ?? 0) }
 }
 
 /** Claude models the Anthropic Messages protocol sends system messages to natively, mid-conversation. */

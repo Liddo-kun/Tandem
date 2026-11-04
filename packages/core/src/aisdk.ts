@@ -30,11 +30,10 @@ import {
   type ToolDefinition,
   type UsageInput,
 } from "@opencode/ai/effect"
-import { Auth, Endpoint, RequestExecutor, type AnyRoute, type HttpMiddleware } from "@opencode/ai/route"
-import { ProviderShared } from "@opencode/ai/protocols/shared"
+import { Auth, Endpoint, ProviderShared, RequestExecutor, type AnyRoute, type HttpMiddleware } from "@opencode/ai/route"
 // UPSTREAM-DIVERGENCE: owned diagnostics follow custom-fetch/auth rewrites to their final fetch.
 import { RequestDumpFetch } from "./plugin/tandem/request-dump/sdk-fetch.js"
-import { isRecord } from "@opencode/ai/utils/record"
+import { isRecord } from "@opencode/util/record"
 import { Cause, Context, Effect, Layer, Option, Schema, Scope, Stream, Struct } from "effect"
 import { makeParser } from "effect/encoding/Sse"
 import { HttpClientRequest, HttpClientResponse } from "effect/http"

@@ -1,7 +1,7 @@
 import { expect } from "bun:test"
 import { Message } from "@opencode/ai/effect"
 import { Anthropic, OpenAI } from "@opencode/ai/providers"
-import { compileRequest } from "@opencode/ai/route/client"
+import { compileRequest } from "@opencode/ai/testing"
 import { Agent } from "@opencode/core/agent"
 import { Config } from "@opencode/core/config"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
