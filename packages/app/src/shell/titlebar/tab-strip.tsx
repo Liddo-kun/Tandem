@@ -1,4 +1,5 @@
-import { createEffect, createMemo, createResource, For, onCleanup, Show } from "solid-js"
+import { createEffect, createMemo, createResource, For, onCleanup, onMount, Show } from "solid-js"
+import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { createStore } from "solid-js/store"
 import { DragDropProvider, PointerSensor } from "@dnd-kit/solid"
 import { isSortable, useSortable } from "@dnd-kit/solid/sortable"
@@ -229,6 +230,7 @@ function SessionTabEntry(props: {
       pending() ||
       !ctx ||
       props.active ||
+      ctx.data.session.missing(id) ||
       (!session() && !persisted()?.title) ||
       ctx.sdk.connection.status() !== "connected"
     )
@@ -394,8 +396,22 @@ export function TitlebarTabStrip(props: {
   const command = useCommand()
   const vertical = () => props.orientation === "vertical"
   let listRef!: HTMLDivElement
-  // UPSTREAM-DIVERGENCE: The horizontal strip's scroller, for revealing the current tab.
   let scrollRef!: HTMLDivElement
+  // Each vertical edge feathers by as much as there is left to scroll past it, so it appears and leaves without a jump.
+  const [fade, setFade] = createStore({ top: 0, bottom: 0 })
+
+  const measureFade = () =>
+    setFade({
+      top: Math.min(16, Math.round(scrollRef.scrollTop)),
+      bottom: Math.min(
+        16,
+        Math.max(0, Math.round(scrollRef.scrollHeight - scrollRef.clientHeight - scrollRef.scrollTop)),
+      ),
+    })
+
+  onMount(() => {
+    if (vertical()) createResizeObserver([scrollRef, listRef], measureFade)
+  })
   const [visibility, setVisibility] = createStore<Record<string, boolean>>({})
   const [unread, setUnread] = createStore<Record<string, boolean>>({})
   const visibleTabs = createMemo(() => props.tabs.filter((tab) => tab.type === "draft" || visibility[tabKey(tab)]))
@@ -418,12 +434,12 @@ export function TitlebarTabStrip(props: {
       )
 
       if (!slot) return
-      const fade = 24
+      const edge = 24
       const box = slot.getBoundingClientRect()
       const view = scrollRef.getBoundingClientRect()
 
-      if (box.left < view.left + fade) scrollRef.scrollLeft -= view.left + fade - box.left
-      else if (box.right > view.right - fade) scrollRef.scrollLeft += box.right - (view.right - fade)
+      if (box.left < view.left + edge) scrollRef.scrollLeft -= view.left + edge - box.left
+      else if (box.right > view.right - edge) scrollRef.scrollLeft += box.right - (view.right - edge)
     })
   })
 
@@ -518,6 +534,14 @@ export function TitlebarTabStrip(props: {
         classList={{
           "flex-row items-center gap-1.5 overflow-x-auto": !vertical(),
           "max-h-full flex-col overflow-y-auto overflow-x-hidden": vertical(),
+        }}
+        style={
+          vertical()
+            ? { "--vertical-tabs-fade-top": `${fade.top}px`, "--vertical-tabs-fade-bottom": `${fade.bottom}px` }
+            : undefined
+        }
+        onScroll={() => {
+          if (vertical()) measureFade()
         }}
       >
         <DragDropProvider

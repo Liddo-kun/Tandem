@@ -539,7 +539,7 @@ export function createPluginAttachment(apis: HostApis) {
         return live().data
       },
       get local() {
-        return ServerConnection.local(listed())
+        return servers.local(listed())
       },
       get builtin() {
         return ServerConnection.builtin(listed())
