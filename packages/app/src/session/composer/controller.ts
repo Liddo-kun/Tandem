@@ -82,7 +82,7 @@ export function createSessionComposerController(input: {
   // UPSTREAM-DIVERGENCE: child sessions use the same composer and drag/drop behavior as primary sessions.
   const editable = createMemo(() => !region.state.blocked())
   // Requests hide the view without disposing its draft or queue edit.
-  createEffect(on(editable, () => composer.onDragLeave()))
+  createEffect(on(editable, () => composer.clearDrag()))
 
   return {
     region,
