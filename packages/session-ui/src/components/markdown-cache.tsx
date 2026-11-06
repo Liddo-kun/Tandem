@@ -26,16 +26,16 @@ const pending = new Map<
 // A private instance keeps this hook set separate from other DOMPurify users.
 const purifier = typeof window !== "undefined" ? DOMPurify(window) : DOMPurify
 
-const config = {
-  USE_PROFILES: { html: true, mathMl: true },
-  SANITIZE_NAMED_PROPS: true,
-  FORBID_TAGS: ["style"],
-  FORBID_CONTENTS: ["style", "script"],
-  ADD_TAGS: ["svg", "path"],
-  ADD_ATTR: ["d", "viewBox", "preserveAspectRatio", "xmlns", "target"],
-}
-
 if (typeof window !== "undefined" && purifier.isSupported) {
+  // A config passed to sanitize() rebuilds every allow-list on each call; set once, every call reuses them.
+  purifier.setConfig({
+    USE_PROFILES: { html: true, mathMl: true },
+    SANITIZE_NAMED_PROPS: true,
+    FORBID_TAGS: ["style"],
+    FORBID_CONTENTS: ["style", "script"],
+    ADD_TAGS: ["svg", "path"],
+    ADD_ATTR: ["d", "viewBox", "preserveAspectRatio", "xmlns", "target"],
+  })
   // UPSTREAM-DIVERGENCE: Preserve explicitly approved native links without changing browser sanitization.
   purifier.addHook("uponSanitizeAttribute", (node, data) => {
     if (!(node instanceof HTMLAnchorElement) || data.attrName !== "href") return
@@ -92,7 +92,7 @@ export function allowMarkdownLinkProtocol(protocol: string, accepts: (href: stri
 export function sanitizeMarkdown(html: string) {
   if (!purifier.isSupported) return ""
 
-  return purifier.sanitize(html, config)
+  return purifier.sanitize(html)
 }
 
 export function getCachedMarkdown(key: string) {
