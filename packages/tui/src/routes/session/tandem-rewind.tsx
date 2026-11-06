@@ -177,7 +177,7 @@ export function useTandemRewindConfirm() {
 
   return async (sessionID: string, messageID: string) => {
     await client.api.session.interrupt({ sessionID })
-    await client.api.session.wait({ sessionID })
+    await client.api.experimental.session.wait({ sessionID })
     return new Promise<boolean | undefined>((resolve) =>
       dialog.replace(
         () => <DialogTandemRewind sessionID={sessionID} messageID={messageID} onSelect={resolve} />,

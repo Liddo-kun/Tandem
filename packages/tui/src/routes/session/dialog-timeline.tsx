@@ -6,13 +6,8 @@ import { DialogMessage } from "./dialog-message"
 // UPSTREAM-DIVERGENCE: Tandem marks prompts whose turn changed files.
 import { tandemFilesChanged, tandemTurnFileCounts } from "./tandem-rewind"
 import { useDialog } from "../../ui/dialog"
-import type { PromptInfo } from "../../prompt/history"
 
-export function DialogTimeline(props: {
-  sessionID: string
-  onMove: (messageID: string) => void
-  setPrompt?: (prompt: PromptInfo) => void
-}) {
+export function DialogTimeline(props: { sessionID: string; onMove: (messageID: string) => void }) {
   const data = useData()
   const dialog = useDialog()
 
@@ -34,9 +29,7 @@ export function DialogTimeline(props: {
           ? `${tandemFilesChanged(changed.get(message.id)!)} · ${Locale.time(message.time.created)}`
           : Locale.time(message.time.created),
         onSelect: (dialog) => {
-          dialog.replace(() => (
-            <DialogMessage messageID={message.id} sessionID={props.sessionID} setPrompt={props.setPrompt} />
-          ))
+          dialog.replace(() => <DialogMessage messageID={message.id} sessionID={props.sessionID} />)
         },
       })
     }
