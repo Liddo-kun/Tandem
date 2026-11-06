@@ -11,6 +11,13 @@
 - Use the root development launcher and explicit server URL. Follow `contextL.md` or `contextW.md`; do not use daily service discovery or assume port 4096.
 - `serve` embeds the locally built shared app. For frontend iteration, configure the Vite frontend to connect to the development backend.
 
+## Insecure Origins (HTTP LAN)
+
+The Web UI is served over plain HTTP on non-localhost LAN and Tailscale origins (`isSecureContext === false`). This rule applies across `app`, `ui`, `session-ui` and `gui-plugins` window code.
+
+- Never call `crypto.randomUUID()` directly in renderer or browser code; it is `[SecureContext]`-only and throws `TypeError: crypto.randomUUID is not a function` on plain HTTP origins. Always use `uuid()` from `@opencode/util/uuid`.
+- Guard any other `[SecureContext]`-only Web API (`crypto.subtle`, `navigator.clipboard`, `navigator.serviceWorker`) with a non-secure fallback.
+
 ## SolidJS
 
 - Always prefer `createStore` over multiple `createSignal` calls
