@@ -1,6 +1,6 @@
 export * as ClaudeCompaction from "./compaction.js"
 
-import { AIError, isContextOverflowFailure, LLMRequest, Message } from "@opencode/ai/effect"
+import { AIError, isContextOverflowFailure, type LLMRequest, Message } from "@opencode/ai/effect"
 import type { StreamOptions } from "@opencode/ai/route"
 import type { SessionError } from "@opencode/schema/session-error"
 import { FSUtil } from "@opencode/util/fs-util"
@@ -88,7 +88,7 @@ export const appendPrompt = (request: LLMRequest, text: string) => {
     if (tail?.type === "text") content[content.length - 1] = { ...tail, text: `${tail.text}\n` }
     messages[index] = { ...last, content: [...content, { type: "text", text }] }
   } else messages.splice(index + 1, 0, Message.user(text))
-  return LLMRequest.update(request, { messages, toolChoice: undefined })
+  return { ...request, messages, toolChoice: undefined }
 }
 
 /** 416:OPr: first matches only, including text surrounding the summary tags. */

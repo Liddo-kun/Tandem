@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { LanguageModel, LLMRequest, Message } from "@opencode/ai/effect"
+import { LanguageModel, type LLMRequest, Message } from "@opencode/ai/effect"
 import { OpenAIChat } from "@opencode/ai/protocols"
 import { Schema } from "effect"
 import { ClaudeCompaction } from "../src/plugin/tandem/claude/compaction.js"
@@ -23,12 +23,12 @@ test("Claude compaction groups by assistant response, keeping intervening user m
 
 test("summary prompt stays before trailing system messages and remains a separate text block", () => {
   const model = LanguageModel.make({ id: "claude-test", provider: "test", route: OpenAIChat.route })
-  const request = new LLMRequest({ model, system: [], tools: [], messages: [Message.user("typed"), Message.system("date")] })
+  const request: LLMRequest = { model, system: [], tools: [], messages: [Message.user("typed"), Message.system("date")] }
   const prompted = ClaudeCompaction.appendPrompt(request, "prompt")
   expect(prompted.messages.map((message) => message.role)).toEqual(["user", "system"])
   expect(prompted.messages[0].content).toEqual([{ type: "text", text: "typed\n" }, { type: "text", text: "prompt" }])
   expect(request.messages[0].content).toEqual([{ type: "text", text: "typed" }])
-  const toolRequest = LLMRequest.update(request, { messages: [Message.tool({ id: "call", name: "read", result: "output" }), Message.system("date")] })
+  const toolRequest: LLMRequest = { ...request, messages: [Message.tool({ id: "call", name: "read", result: "output" }), Message.system("date")] }
   const toolPrompted = ClaudeCompaction.appendPrompt(toolRequest, "prompt")
   expect(toolPrompted.messages.map((message) => message.role)).toEqual(["tool", "user", "system"])
   expect(toolPrompted.messages[1].content).toEqual([{ type: "text", text: "prompt" }])

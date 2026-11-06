@@ -1,6 +1,6 @@
 export * as ClaudePresentation from "./presentation.js"
 
-import { LanguageModel, LLMRequest, Message, ToolChoice, ToolDefinition, type LLMEvent, type ToolEntry, type ToolResultPart } from "@opencode/ai/effect"
+import { LanguageModel, type LLMRequest, Message, ToolChoice, ToolDefinition, type LLMEvent, type ToolEntry, type ToolResultPart } from "@opencode/ai/effect"
 import { Stream } from "effect"
 
 export const isClaude = (id: string) => id.toLowerCase().includes("claude")
@@ -119,10 +119,11 @@ export function request(input: LLMRequest, selectedClaude = isClaude(input.model
     ...route,
     streamPrepared: (...args) => route.streamPrepared(...args).pipe(Stream.map(inbound)),
   } })
-  return LLMRequest.update(input, {
+  return {
+    ...input,
     model, tools, messages,
     system: input.system.map((part) => ({ ...part, text: executeReferences(part.text) })),
     toolChoice: input.toolChoice?.name ? new ToolChoice({ ...input.toolChoice, name: outbound.get(input.toolChoice.name)?.name ?? input.toolChoice.name }) : input.toolChoice,
     providerOptions: { ...input.providerOptions, clearThinking: true },
-  })
+  }
 }
