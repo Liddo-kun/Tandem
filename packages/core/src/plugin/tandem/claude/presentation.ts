@@ -1,6 +1,6 @@
 export * as ClaudePresentation from "./presentation.js"
 
-import { LanguageModel, type LLMRequest, Message, ToolChoice, ToolDefinition, type LLMEvent, type ToolEntry, type ToolResultPart } from "@opencode/ai/effect"
+import { AssistantMessage, LanguageModel, type LLMRequest, ToolChoice, ToolMessage, ToolDefinition, type LLMEvent, type ToolEntry, type ToolResultPart } from "@opencode/ai/effect"
 import { Stream } from "effect"
 
 export const isClaude = (id: string) => id.toLowerCase().includes("claude")
@@ -95,15 +95,19 @@ export function request(input: LLMRequest, selectedClaude = isClaude(input.model
     })
   })
   const tools = definitions(input.tools)
-  const messages = input.messages.map((message) => new Message({ ...message, content: message.content.map((part) => {
+  const lower = <Part extends AssistantMessage["content"][number]>(part: Part): Part => {
     if ((part.type !== "tool-call" && part.type !== "tool-result") || part.providerExecuted || part.namespace) return part
     // Historical local tools may no longer be in today's catalog. Keep their call/result pair coherent.
     const mapping = outbound.get(part.name)
     const name = mapping?.name ?? nameFor(part.name)
-    return part.type === "tool-call"
+    return (part.type === "tool-call"
       ? { ...part, name, input: rename(part.input, mapping?.keys ?? keys[part.name] ?? {}) }
-      : name === "Bash" ? bashResult({ ...part, name }) : { ...part, name }
-  }) }))
+      : name === "Bash" ? bashResult({ ...part, name }) : { ...part, name }) as Part
+  }
+  const messages = input.messages.map((message) =>
+    message.role === "assistant" ? new AssistantMessage({ ...message, content: message.content.map(lower) })
+    : message.role === "tool" ? new ToolMessage({ ...message, content: message.content.map(lower) })
+    : message)
   const inbound = (event: LLMEvent): LLMEvent => {
     if (!event.type.startsWith("tool-") || !("name" in event) || ("providerExecuted" in event && event.providerExecuted) || ("namespace" in event && event.namespace)) return event
     const mapping = reverse.get(event.name)

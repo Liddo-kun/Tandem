@@ -11,7 +11,6 @@ import { HttpTransport } from "../route/transport/index.js"
 import {
   AIError,
   CacheTTL,
-  HttpOptions,
   type LLMRequest,
   LLMEvent,
   mergeJsonRecords,
@@ -844,7 +843,6 @@ const lowerMessages = Effect.fnUntraced(function* (request: LLMRequest, breakpoi
           content.push(yield* lowerMedia(part, request, breakpoints))
           continue
         }
-        return yield* ProviderShared.unsupportedContent("Anthropic Messages", "user", ["text", "media"])
       }
       if (content.length > 0) messages.push({ role: "user", content })
       continue
@@ -902,8 +900,6 @@ const lowerMessages = Effect.fnUntraced(function* (request: LLMRequest, breakpoi
 
     const content: AnthropicToolResultBlock[] = []
     for (const part of message.content) {
-      if (!ProviderShared.supportsContent(part, ["tool-result"]))
-        return yield* ProviderShared.unsupportedContent("Anthropic Messages", "tool", ["tool-result"])
       content.push({
         type: "tool_result",
         tool_use_id: scrubToolCallID(part.id),
@@ -1562,16 +1558,16 @@ export const transport = <
             return {
               ...input,
               body: { ...input.body, thinking: resolved.thinking, context_management: management },
-              request: { ...input.request, http: new HttpOptions({
+              request: { ...input.request, http: {
                 ...input.request.http,
                 body: { ...overlay, ...(management ? { context_management: management } : {}) },
-              }) },
+              } },
             }
           })
         : input
       const requiredBetas = requiredBetaHeaders(prepared.body)
       if (requiredBetas.length === 0) return yield* http.prepare(prepared)
-      const headers = Headers.fromInput(prepared.request.http?.headers)
+      const headers = Headers.fromInput(prepared.request.headers)
       const existingBetas = (headers["anthropic-beta"] ?? "")
         .split(",")
         .map((item) => item.trim())
@@ -1579,13 +1575,7 @@ export const transport = <
       const betas = new Set([...existingBetas, ...requiredBetas])
       return yield* http.prepare({
         ...prepared,
-        request: {
-          ...prepared.request,
-          http: new HttpOptions({
-            ...prepared.request.http,
-            headers: { ...headers, "anthropic-beta": [...betas].join(",") },
-          }),
-        },
+        request: { ...prepared.request, headers: { ...headers, "anthropic-beta": [...betas].join(",") } },
       })
     }),
   }

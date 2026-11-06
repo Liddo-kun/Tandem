@@ -1,7 +1,7 @@
 // Tandem-owned (not in upstream): make user images available to filesystem-based tools.
 export * as ImageLocationPlugin from "./image-location.js"
 
-import { Message, type ContentPart } from "@opencode/ai/effect"
+import { Message, type ContentPart, type UserMessage } from "@opencode/ai/effect"
 import { define } from "@opencode/plugin/effect/plugin"
 import type { SessionRequest } from "@opencode/plugin/effect/session"
 import { FSUtil } from "@opencode/util/fs-util"
@@ -128,7 +128,7 @@ export const Plugin = define({
           if (message.role !== "user") return message
           const saved = yield* originals(message, metadata(message))
           let image = 0
-          const content: ContentPart[] = []
+          const content: Array<UserMessage["content"][number]> = []
           for (const [index, part] of message.content.entries()) {
             content.push(part)
             if (part.type !== "media") continue

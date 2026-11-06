@@ -2,7 +2,7 @@ export * as ClaudePlugin from "./plugin.js"
 
 import { define } from "@opencode/plugin/effect/plugin"
 import type { SessionHooks } from "@opencode/plugin/effect/session"
-import { Message, SystemPart } from "@opencode/ai/effect"
+import { Message, SystemPart, UserMessage } from "@opencode/ai/effect"
 import { Effect } from "effect"
 import { TandemAuxiliary } from "@opencode/util/tandem-auxiliary"
 import { Environment } from "../../../environment/index.js"
@@ -67,7 +67,7 @@ const update = (messages: Message[], items: ReadonlyArray<string | undefined>, n
   }
   const previous = messages.at(-1)
   const content = texts.map(reminder)
-  if (previous?.role === "user") messages[messages.length - 1] = new Message({ ...previous, content: [...previous.content, ...content] })
+  if (previous?.role === "user") messages[messages.length - 1] = new UserMessage({ ...previous, content: [...previous.content, ...content] })
   else messages.push(Message.user(content))
 }
 
@@ -84,9 +84,10 @@ const checkpoint = (event: SessionHooks["context"], at: number, info: ClaudeChec
   // Only a user message right after the checkpoint: a turn that continued past a mid-turn /compact keeps the
   // automatic layout, even once the user types again.
   const next = rest.findIndex((message) => message.role !== "system")
-  const user = info.reason === "manual" && rest[next]?.role === "user" ? next : -1
+  const message = info.reason === "manual" ? rest[next] : undefined
+  const user = message?.role === "user" ? next : -1
   const messages = event.messages.slice(0, at)
-  if (user < 0) {
+  if (message?.role !== "user") {
     messages.push(Message.user([...(files === undefined ? [] : [reminder(files)]), Message.text(info.text)]))
     update(messages, [date], native)
     messages.push(...kept)
@@ -94,8 +95,7 @@ const checkpoint = (event: SessionHooks["context"], at: number, info: ClaudeChec
     messages.push(...rest)
   } else {
     messages.push(Message.user(info.text), ...kept, ...rest.slice(0, user))
-    const message = rest[user]
-    messages.push(new Message({ ...message, content: [...(files === undefined ? [] : [reminder(files)]), ...compactRecords.map(Message.text), ...message.content] }))
+    messages.push(new UserMessage({ ...message, content: [...(files === undefined ? [] : [reminder(files)]), ...compactRecords.map(Message.text), ...message.content] }))
     update(messages, [...info.restored, baseline, date], native)
     messages.push(...rest.slice(user + 1))
   }
@@ -156,7 +156,9 @@ export const Plugin = define({
           const system = native ? context : undefined
           const reminders = [files, system === undefined ? context : undefined].flatMap((text) => text === undefined ? [] : [reminder(text)])
           const message = event.messages[anchor]
-          event.messages.splice(anchor, 1, new Message({ ...message, content: [...reminders, ...message.content] }), ...(system === undefined ? [] : [Message.system(system)]))
+          // anchorOf only returns user messages.
+          if (message?.role === "user")
+            event.messages.splice(anchor, 1, new UserMessage({ ...message, content: [...reminders, ...message.content] }), ...(system === undefined ? [] : [Message.system(system)]))
         }
         event.system.splice(index, 1)
       }
