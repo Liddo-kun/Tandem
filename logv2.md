@@ -12,7 +12,7 @@ This file is the inventory of what Tandem v2 adds to, or changes in, official Op
 
 ## Current OpenCode divergence
 
-Current-state inventory against pinned OpenCode v2 base **`dc4775a64d`** (`upstream/dev`), as of **2026-11-06**. Each entry names upstream-shared files Tandem edits (carrying `UPSTREAM-DIVERGENCE` markers unless noted as inventory-only) and the fork-owned files a sync must account for. Reference files and symbols, not line numbers.
+Current-state inventory against pinned OpenCode v2 base **`aff43234c8`** (`upstream/dev`), as of **2026-11-07**. Each entry names upstream-shared files Tandem edits (carrying `UPSTREAM-DIVERGENCE` markers unless noted as inventory-only) and the fork-owned files a sync must account for. Reference files and symbols, not line numbers.
 
 Fork-owned locations: `packages/android/`, `packages/core/src/plugin/tandem/`, `packages/ai/src/tandem/`, `packages/util/src/{brand,tandem-auxiliary}.ts`, `script/` Tandem scripts, `notes/`, and individually headed `Tandem-owned (not in upstream)` files inside upstream packages. The Claude auth plugin lives outside this repository, in `~/code/opencode-anthropic-auth-v2`.
 
@@ -148,7 +148,7 @@ Fork-owned locations: `packages/android/`, `packages/core/src/plugin/tandem/`, `
 
 ### Temporary Upstream Bug Fixes
 
-Fixes for bugs present in pristine upstream, marked `UPSTREAM-DIVERGENCE(temporary)`. Remove each with its markers when upstream ships an equivalent fix. None of those below was fixed upstream as of `dc4775a64d` (2026-10-31).
+Fixes for bugs present in pristine upstream, marked `UPSTREAM-DIVERGENCE(temporary)`. Remove each with its markers when upstream ships an equivalent fix. None of those below was fixed upstream as of `aff43234c8` (2026-11-04).
 
 - **Pending prompt stuck after a missed update:** the event stream does not replay events missed while it is down. A sent prompt whose admission or delivery update was missed stayed "Pending" with its move and delete buttons for good (they failed with "Request failed"), and the session looked busy; upstream's reload of the open session's messages and pending prompts on reconnect kept the row, because the prompt still counted as unacknowledged. A successful send now acknowledges the prompt too. Files: `packages/client/src/solid/data.ts`.
 - **Reading position lost when switching away** ([anomalyco/opencode#42806](https://github.com/anomalyco/opencode/issues/42806)): upstream only remembers whether you were at the newest messages. Scrolled up, switching tabs and back jumped to the top of the loaded history, and switching sessions and back jumped to the newest messages. Each session now remembers the message at the top of the screen and returns to it. Sessions left at the newest messages still open there. Files: `packages/app/src/session/timeline/{virtualizer.tsx,interaction.ts,follow.ts}`.
