@@ -1,6 +1,7 @@
 export * as SessionCompaction from "./compaction.js"
 
 import {
+  ai,
   AIError,
   type ContentPart,
   InvalidProviderOutputError,
@@ -569,7 +570,7 @@ export const layer = Layer.effect(
         )
 
       const send = (request: LLMRequest) => {
-        if (LLMClient.canCompact(request, { mechanism: "trigger" })) {
+        if (ai.canCompact(request, { mechanism: "trigger" })) {
           return Effect.gen(function* () {
             const history = yield* SessionHistory.load(db, context.session.id, "local").pipe(Effect.orDie)
             const retained = recentUserMessages(history, context.model, keep)
@@ -577,7 +578,7 @@ export const layer = Layer.effect(
             return yield* toResult([...retained, Message.assistant(response.checkpoint)], response.usage)
           })
         }
-        if (LLMClient.canCompact(request)) {
+        if (ai.canCompact(request)) {
           return llm
             .compact(request, { mechanism: "endpoint", http: prepared.options.http })
             .pipe(Effect.flatMap((response) => toResult(response.replacement, response.usage)))
@@ -1143,9 +1144,8 @@ export const estimatePrompt = (context: SessionContext.Loaded): Estimate => {
  * to give up `RESERVE_MIN` keeps `RESERVE_SHARE`.
  */
 const calculateCeiling = (limit: SessionContext.Loaded["model"]["limit"], buffer: number | undefined) => {
-  // Unknown limits are reported as 0. An unknown input limit falls back to the context window; with no window at
-  // all, only a provider rejection can limit the request.
-  const window = limit.input || limit.context
+  // With no window at all, only a provider rejection can limit the request.
+  const window = inputWindow(limit)
   if (window <= 0) return Number.POSITIVE_INFINITY
   // A buffer that leaves no room, such as one set for a larger model, is ignored.
   if (buffer !== undefined && buffer < window) return window - buffer
@@ -1157,7 +1157,15 @@ const calculateCeiling = (limit: SessionContext.Loaded["model"]["limit"], buffer
  * cannot generate that much. Zero for an unknown window.
  */
 const summaryRoom = (limit: SessionContext.Loaded["model"]["limit"], output = RESERVE_MIN) =>
-  Math.max(0, (limit.input || limit.context) - Math.min(RESERVE_MIN, output))
+  Math.max(0, inputWindow(limit) - Math.min(RESERVE_MIN, output))
+
+/**
+ * The largest prompt the model takes, or 0 when unknown. Unknown limits are reported as 0, and an unknown input limit
+ * falls back to the context window. The context window also holds the reply, so an input limit above it, as some
+ * catalogs and config overrides report, cannot be used in full.
+ */
+const inputWindow = (limit: SessionContext.Loaded["model"]["limit"]) =>
+  limit.input && limit.context ? Math.min(limit.input, limit.context) : limit.input || limit.context
 
 /**
  * Another provider's count may describe a native window this model cannot replay. History then holds the original
