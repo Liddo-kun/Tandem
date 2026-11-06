@@ -74,6 +74,12 @@ function modelItems(data: ReturnType<typeof useData>, model: SessionMessageAssis
   return [{ label: name }, { label: model.variant[0]?.toUpperCase() + model.variant.slice(1), variant: true }]
 }
 
+function sameModel(a: SessionMessageAssistant["model"], b: SessionMessageAssistant["model"]) {
+  return (
+    a.providerID === b.providerID && a.id === b.id && (a.variant ?? "default") === (b.variant ?? "default")
+  )
+}
+
 function MetaItems(props: { items: MetaItem[]; slot: "user-message" | "text-part" }) {
   return (
     <For each={props.items}>
@@ -286,6 +292,8 @@ export function CurrentUserMessageDisplay(props: {
   text: string
   agent: string
   model: SessionMessageAssistant["model"]
+  /** The agent and model the previous prompt chose; a waiting steer names only what it changes. */
+  previousSelection?: { agent: string; model: SessionMessageAssistant["model"] }
   actions?: SessionUserActions
   comments?: SessionUserComment[]
   references?: SessionUserAttachmentReference[]
@@ -336,13 +344,31 @@ export function CurrentUserMessageDisplay(props: {
   // UPSTREAM-DIVERGENCE: phones only; the Y700 in portrait (692 CSS px) keeps the agent and model.
   const mobile = createMediaQuery("(width < 692px)")
 
-  const labels = createMemo<MetaItem[]>(() => {
+  const agentItems = createMemo<MetaItem[]>(() => {
     const agent = agentLabel(props.agent, data.agents)
 
-    return [...(agent ? [{ label: agent }] : []), ...modelItems(data, props.model)]
+    return agent ? [{ label: agent }] : []
   })
 
-  const metaLabels = createMemo(() => (mobile() ? [] : labels()))
+  // A waiting steer joins the running turn, so its agent and model only say something when it changes them.
+  const changedLabels = createMemo<MetaItem[]>(() => {
+    const previous = props.previousSelection
+
+    if (!previous) return [...agentItems(), ...modelItems(data, props.model)]
+
+    return [
+      ...(previous.agent === props.agent ? [] : agentItems()),
+      ...(sameModel(previous.model, props.model) ? [] : modelItems(data, props.model)),
+    ]
+  })
+
+  const metaLabels = createMemo(() => {
+    if (mobile()) return []
+
+    if (waiting()) return changedLabels()
+
+    return [...agentItems(), ...modelItems(data, props.model)]
+  })
 
   // UPSTREAM-DIVERGENCE: Tandem's per-prompt file-change count.
   const changedFiles = createMemo(() => props.actions?.changedFiles?.(props.message.id) ?? 0)
