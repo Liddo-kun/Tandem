@@ -8,10 +8,8 @@
 // advancing the tail after each tool result keeps recent conversation prefixes
 // reusable during long agent runs.
 //
-// UPSTREAM-DIVERGENCE: document Tandem's one-hour manual-hint normalization and breakpoint cap.
-// Manual `cache: CacheHint` placements count against the four-breakpoint budget;
-// auto only fills remaining slots. Tandem's supported one-hour routes normalize
-// manual TTLs and trim excess manual markers in provider invalidation order.
+// Manual `cache: CacheHint` placements on individual parts are preserved and
+// count against the four-breakpoint budget; auto only fills remaining slots.
 import { CacheHint, type CachePolicy, type CachePolicyObject, type CacheTTL } from "./schema/options.js"
 import { LLMRequest, Message, ToolDefinition, type ContentPart, type ToolEntry } from "./schema/messages.js"
 import { effortUpdate } from "./effort-updates.js"
@@ -190,30 +188,10 @@ const countHints = (request: LLMRequest) =>
   )
 
 export const applyCachePolicy = (request: LLMRequest): LLMRequest => {
-  const route = request.model.route.id
-  // UPSTREAM-DIVERGENCE: normalize supported routes to one-hour hints, wherever hints are lowered.
-  const hour = (RESPECTS_INLINE_HINTS.has(route) || request.model.compatibility?.cacheFormat !== undefined) &&
-    route !== "bedrock-converse" &&
-    (request.model.id.toLowerCase().includes("claude") ||
-      ["openrouter", "vercel-ai-gateway-messages", "alibaba-chat", "alibaba-messages"].includes(route))
-  if (hour) {
-    // Normalize manual hints too, in provider invalidation order. Gateway
-    // lowering does not have Anthropic's separate four-breakpoint limiter.
-    const budget = { remaining: BREAKPOINT_CAP }
-    const hint = (cache: CacheHint | undefined) => cache && budget.remaining-- > 0 ? makeHint("1h") : undefined
-    const tools = (items: ReadonlyArray<ToolEntry>): ReadonlyArray<ToolEntry> => items.map((tool) =>
-      tool.type === "namespace" ? { ...tool, tools: tools(tool.tools) } : tool.cache ? new ToolDefinition({ ...tool, cache: hint(tool.cache) }) : tool)
-    const normalizedTools = tools(request.tools)
-    const system = request.system.map((part) => ({ ...part, cache: hint(part.cache) }))
-    const messages = request.messages.map((message) => new Message({ ...message, content: message.content.map((part) =>
-      "cache" in part && part.cache ? { ...part, cache: hint(part.cache) } : part) }))
-    request = LLMRequest.update(request, { tools: normalizedTools, system, messages })
-  }
   const policy = selectPolicy(request)
   if (!policy.tools && !policy.system && !policy.messages) return request
 
-  // UPSTREAM-DIVERGENCE: automatic hints share the supported route's one-hour TTL.
-  const hint = makeHint(hour ? "1h" : requestTTL(request))
+  const hint = makeHint(requestTTL(request))
   const budget = { remaining: Math.max(0, BREAKPOINT_CAP - countHints(request)) }
   const tools = policy.tools ? markLastTool(request.tools, hint, budget) : request.tools
   const system = policy.system ? markSystemBoundaries(request.system, hint, budget) : request.system

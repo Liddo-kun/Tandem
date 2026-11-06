@@ -117,6 +117,15 @@ and extension points before porting the integration. Browser-backed webfetch rem
   needs a protocol field, client regeneration and a way to type the text in the TUI. Deferred by Jon
   on 2026-10-16, while Claude Code-style compaction for Claude models was being designed.
 
+## Cache lifetime setting
+
+- [ ] When the build without Tandem's one-hour cache code is installed to the daily setup, add
+  `"anthropic": { "settings": { "cache": { "ttl": "1h" } } }` under `providers` in
+  `~/.config/tandem/opencode.jsonc`, then replace development's copy of that file
+  (`~/.local/share/tandem-v2/development/config/tandem/opencode.jsonc`) with the link again. Older
+  daily builds don't know `cache` and would pass it to the provider package, so the daily file
+  can't have it before then.
+
 ## After the switch-over
 
 - [ ] Retire Tandem v1 when Jon no longer needs it: `~/.local/bin/tandem-v1-server`,

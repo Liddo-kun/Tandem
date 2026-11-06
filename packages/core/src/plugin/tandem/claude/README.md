@@ -9,8 +9,8 @@ Bare Corrector and browser-reader sessions are excluded. Authentication and
 transport remain owned by the external Anthropic auth plugin.
 
 The request also enables clear-thinking context
-management when thinking is active, and uses one-hour cache hints on supported
-Claude routes. Durable instruction values and chronological updates are unchanged.
+management when thinking is active. The cache lifetime is upstream's `cache.ttl`
+provider setting. Durable instruction values and chronological updates are unchanged.
 
 ## Configuration
 
@@ -41,7 +41,7 @@ the shims.
 - `anthropic.txt` is the bundled Claude base prompt for every Claude model. It follows Claude Code 2.1.291's Opus 5.5 prompt, without Claude Code-only sections.
 - `../bash-search/{plugin,shims}.ts` probes dependencies, filters tool snapshots, and supplies subprocess-local shims.
 - `packages/core/src/session/{context,model-request}.ts` applies presentation after model and plugin hooks and before transport.
-- `packages/ai/src/{cache-policy.ts,protocols/anthropic-messages.ts}` owns cache and context-management lowering.
+- `packages/ai/src/protocols/anthropic-messages.ts` owns context-management lowering.
 
 Only native local tools are renamed. Provider-hosted tools and namespaces pass
 through. Code Mode's internal tool paths and JavaScript stay canonical. Mappings are

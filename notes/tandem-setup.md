@@ -24,7 +24,8 @@ from `~/.profile`. The `tandem` CLI attaches to the running service. To connect 
 `opencode.jsonc` registers the Claude plugin, turns auto-compaction off, replaces the built-in
 `general`/`explore` helpers with model-pinned `general-sol` (GPT-6.1 Sol) and `general-astra` (GPT-6
 Astra), both denying todowrite and nested subagents, sets OpenAI's native compaction (also Tandem's
-built-in default), and denies the `firecrawl-crawl`, `firecrawl-map`, `router-admin` and `linux-cdp`
+built-in default), keeps Claude's prompt cache for one hour (`providers.anthropic.settings.cache.ttl`;
+for now only in development's own copy, see `notes/todo-after-v2.md`), and denies the `firecrawl-crawl`, `firecrawl-map`, `router-admin` and `linux-cdp`
 skills.
 
 Updates are manual: `tandem upgrade` points to <https://github.com/Liddo-kun/Tandem/releases>.

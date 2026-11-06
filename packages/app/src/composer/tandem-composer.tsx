@@ -12,12 +12,13 @@ export function tandemModelLabel(name: string) {
   return name.replace(/^Claude\s+/, "")
 }
 
-// One-hour cache routes from packages/ai/src/cache-policy.ts. Other models cache without a fixed lifetime,
-// so they show no countdown rather than a wrong one.
-function cacheTtlSeconds(model: { providerID: string; id: string }) {
-  const id = model.id.toLowerCase()
-  if (id.includes("claude")) return model.providerID === "amazon-bedrock" ? undefined : 3600
-  if (id.includes("qwen") && /^(alibaba|openrouter|vercel)/.test(model.providerID)) return 3600
+const DURATION_SECONDS = { ms: 0.001, s: 1, m: 60, h: 3600, d: 86400 } as const
+
+// The `cache.ttl` provider or model setting, such as "1h". Without one the provider's default lifetime applies,
+// which the server does not report, so those models show no countdown rather than a wrong one.
+function cacheTtlSeconds(ttl: string | undefined) {
+  const match = ttl?.match(/^(\d+)(ms|s|m|h|d)$/)
+  return match ? Number(match[1]) * DURATION_SECONDS[match[2] as keyof typeof DURATION_SECONDS] : undefined
 }
 
 type Usage = SessionMessageAssistant & { tokens: NonNullable<SessionMessageAssistant["tokens"]> }
@@ -75,8 +76,13 @@ export function TandemContextButton() {
   const [store, setStore] = createStore({ now: Date.now(), pulse: false })
 
   const ttl = createMemo(() => {
-    const message = last()
-    return message ? cacheTtlSeconds(message.model) : undefined
+    const current = session()
+    const model = last()?.model
+    if (!current || !model) return
+    const info = current.server.data.location.model
+      .list(current.location)
+      ?.find((item) => item.providerID === model.providerID && item.id === model.id)
+    return cacheTtlSeconds(info?.settings?.cache?.ttl)
   })
 
   // Anthropic refreshes the lifetime on every read, so the countdown restarts at each request's completion. It reads
