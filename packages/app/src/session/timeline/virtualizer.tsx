@@ -103,8 +103,6 @@ type Input = {
   bottomInset?: Accessor<number>
   setVisibleRef?: (element: HTMLDivElement | undefined) => void
   onScheduleScrollState: (element: HTMLDivElement) => void
-  onReadEnd?: () => void
-  onReadMarkPassed?: () => void
   onUserScroll: (target?: EventTarget | null) => void
   onHistoryScroll: () => void
   canRenderImmediately?: (
@@ -113,7 +111,7 @@ type Input = {
   ) => boolean
   setRevealMessage?: (fn: (id: string, partID?: string) => void) => void
   setRevealPart?: (fn: (target: string) => boolean) => void
-  setScrollToEnd?: (fn: (behavior?: ScrollBehavior, read?: boolean) => void) => void
+  setScrollToEnd?: (fn: (behavior?: ScrollBehavior) => void) => void
   /** Pages the timeline for keys pressed outside it, such as PageUp in the composer. */
   setPage?: (fn: (direction: 1 | -1) => void) => void
   /** A tool call the route asks this timeline to open on; `done` clears it once revealed. */
@@ -255,77 +253,6 @@ export function createTimelineVirtualizer(input: Input) {
   const touchDragEvent = { type: "touch.drag" as const, overflow: false }
   let reportOffset: ((offset: number, scrolling: boolean) => void) | undefined
   let reportRect: ((rect: { width: number; height: number }) => void) | undefined
-  let landedNewMessages: string | undefined
-  let readIntent = false
-
-  const newMessagesRow = createMemo(() => rows().find((row) => Predicate.isTagged(row, "NewMessages")))
-
-  const newMessagesKey = createMemo(() => {
-    const row = newMessagesRow()
-
-    return row && !row.read ? TimelineRow.key(row) : undefined
-  })
-
-  const releaseReadMark = () => {
-    const row = newMessagesRow()
-
-    const root = listRoot()
-
-    if (!active() || !row?.read || !root?.isConnected) return
-    const item = virtualizer.measurementsCache[rowKeys().indexOf(TimelineRow.key(row))]
-
-    // Keep a dismissed notice's height until it leaves the reading area.
-    if (
-      item &&
-      (item.end <= root.scrollTop + virtualizer.options.scrollPaddingStart ||
-        item.start >= root.scrollTop + root.clientHeight - bottomInset())
-    )
-      input.onReadMarkPassed?.()
-  }
-
-  const readEnd = () => {
-    const root = listRoot()
-
-    if (!active() || untrack(coldHidden) || !root || (newMessagesKey() && !readIntent) || !atReachableEnd(root)) return
-    input.onReadEnd?.()
-    releaseReadMark()
-  }
-
-  const landNewMessages = () => {
-    const key = newMessagesKey()
-
-    const root = listRoot()
-
-    const state = input.follow.peek()
-
-    // A queued return to the end reads the notice once it gets there.
-    if (untrack(coldHidden) || !key || key === landedNewMessages || !root?.isConnected || state.type === "returning")
-      return false
-
-    if (
-      state.type === "detached" ||
-      (state.type === "anchored" && state.anchor.partID) ||
-      location.hash ||
-      input.reveal?.target()
-    ) {
-      landedNewMessages = key
-
-      return false
-    }
-
-    // A list that does not overflow already shows the reply; wait for its measured height.
-    if (virtualContent) virtualContent.style.height = `${virtualizer.getTotalSize()}px`
-
-    if (root.scrollHeight - root.clientHeight <= MIN_OVERFLOW) return false
-    landedNewMessages = key
-    readIntent = false
-    prepareNavigation()
-    input.follow.dispatch({ type: "anchor", anchor: { key } })
-    virtualizer.scrollToIndex(rowKeys().indexOf(key), { align: "start" })
-
-    return true
-  }
-
   const [headerHeight, setHeaderHeight] = createSignal(48)
 
   const virtualizer = createVirtualizer<HTMLDivElement, HTMLDivElement>({
@@ -380,9 +307,6 @@ export function createTimelineVirtualizer(input: Input) {
           )
         })
         dispatchCold(CHECK_REQUESTED)
-
-        if (!scrolling) readEnd()
-        releaseReadMark()
       }
 
       return observeElementOffsetReconnectAware(instance, reportOffset, () => {
@@ -510,16 +434,11 @@ export function createTimelineVirtualizer(input: Input) {
       if (untrack(coldHidden)) pinColdBottom()
       dispatchCold(CHECK_REQUESTED)
 
-      if (untrack(coldHidden)) return
-
-      landNewMessages()
-
-      if (!input.follow.following()) return
+      if (untrack(coldHidden) || !input.follow.following()) return
       const root = listRoot()
 
       // Reopening a settled scroll-to-end operation can fight subsequent keyboard scrolling.
       if (root && !atReachableEnd(root)) virtualizer.scrollToEnd()
-      readEnd()
     })
   }
 
@@ -601,11 +520,7 @@ export function createTimelineVirtualizer(input: Input) {
 
     if (!anchor || !root) return
 
-    const element = virtualContent?.querySelector<HTMLElement>(
-      anchor.partID
-        ? `[data-timeline-part-id="${CSS.escape(anchor.partID)}"]`
-        : `[data-timeline-key="${CSS.escape(anchor.key)}"]`,
-    )
+    const element = virtualContent?.querySelector<HTMLElement>(`[data-timeline-part-id="${CSS.escape(anchor.partID)}"]`)
 
     if (!element || !active()) return input.follow.dispatch({ type: "release" })
 
@@ -616,9 +531,7 @@ export function createTimelineVirtualizer(input: Input) {
         root.scrollTop +
           element.getBoundingClientRect().top -
           root.getBoundingClientRect().top -
-          (anchor.partID
-            ? parseFloat(getComputedStyle(element).scrollMarginTop)
-            : virtualizer.options.scrollPaddingStart),
+          parseFloat(getComputedStyle(element).scrollMarginTop),
       ),
     )
 
@@ -679,12 +592,7 @@ export function createTimelineVirtualizer(input: Input) {
   }
 
   createEffect(() => {
-    if (!active()) {
-      landedNewMessages = undefined
-
-      return
-    }
-
+    if (!active()) return
     const root = listRoot()
 
     if (root) input.setScrollRef(root)
@@ -699,15 +607,12 @@ export function createTimelineVirtualizer(input: Input) {
       const target = input.reveal?.target()
 
       if (target && revealPart(target)) input.reveal?.done()
-      else if (!landNewMessages()) {
-        if (input.follow.following()) virtualizer.scrollToEnd()
-        // UPSTREAM-DIVERGENCE(temporary): otherwise return to the remembered reading position.
-        else restoreReading()
-      }
+      else if (input.follow.following()) virtualizer.scrollToEnd()
+      // UPSTREAM-DIVERGENCE(temporary): otherwise return to the remembered reading position.
+      else restoreReading()
 
       reportOffset?.(root.scrollTop, false)
       dispatchCold(CHECK_REQUESTED)
-      readEnd()
     })
     input.setRevealPart?.(revealPart)
     input.setRevealMessage?.((id, partID) => {
@@ -729,20 +634,10 @@ export function createTimelineVirtualizer(input: Input) {
       prepareNavigation()
       virtualizer.scrollToIndex(index, { align: partIndex >= 0 ? "center" : "start" })
     })
-    input.setScrollToEnd?.((behavior, read) => {
+    input.setScrollToEnd?.((behavior) => {
       const root = listRoot()
 
       if (!active() || !root?.isConnected) return
-
-      if (read) readIntent = true
-
-      // Composer measurement also requests the end. It must not override an unread arrival.
-      if (newMessagesKey() && !readIntent && !location.hash && !input.reveal?.target()) {
-        landNewMessages()
-
-        return
-      }
-
       flushTouchAdjustment()
       input.follow.dispatch({ type: "follow" })
 
@@ -750,7 +645,6 @@ export function createTimelineVirtualizer(input: Input) {
       if (behavior === "smooth")
         virtualizer.scrollToOffset(Math.max(root.scrollTop, root.scrollHeight - root.clientHeight * 2))
       virtualizer.scrollToEnd({ behavior })
-      readEnd()
     })
     input.setPage?.((direction) => {
       const root = listRoot()
@@ -759,29 +653,10 @@ export function createTimelineVirtualizer(input: Input) {
       prepareNavigation()
       input.onUserScroll(root)
       dispatchIntent(direction < 0)
-      readIntent = true
       // Like the timeline's own PageUp: 80% of a page, measured above the composer that covers its bottom. The scroll
       // event then pins at the end or loads older history near the top, as a wheel scroll does.
       virtualizer.scrollToOffset(root.scrollTop + direction * (visibleArea()?.clientHeight || root.clientHeight) * 0.8)
     })
-  })
-
-  createEffect(() => {
-    const key = newMessagesKey()
-
-    const anchor = input.follow.anchor()
-
-    // A held notice moves to the newest unread mark, or lets go once it is read. Every cached view reads the selected
-    // session's follow state, so only the active one may change it.
-    if (active() && anchor && !anchor.partID && anchor.key !== key)
-      input.follow.dispatch(key ? { type: "anchor", anchor: { key } } : { type: "release" })
-
-    if (active())
-      queueMicrotask(() => {
-        if (!active()) return
-        landNewMessages()
-        releaseReadMark()
-      })
   })
 
   createEffect(
@@ -918,13 +793,6 @@ export function createTimelineVirtualizer(input: Input) {
       return
     }
 
-    if (effect.type === "reveal") {
-      landNewMessages()
-      readEnd()
-
-      return
-    }
-
     clearTimeout(revealTimer)
     contentObserver?.disconnect()
     viewportObserver?.disconnect()
@@ -1008,17 +876,12 @@ export function createTimelineVirtualizer(input: Input) {
   }
 
   const handleListWheel = (event: WheelEvent) => {
-    readIntent = true
-
     if (!active()) return
     input.onUserScroll(event.target)
     dispatchIntent(event.deltaY < 0)
-
-    if (event.deltaY > 0) readEnd()
   }
 
   const handleListTouchStart = (event: TouchEvent) => {
-    readIntent = true
     clearTouchTarget()
 
     if (!active()) return
@@ -1081,8 +944,6 @@ export function createTimelineVirtualizer(input: Input) {
   // Not the secondary button: it opens a context menu that can swallow its release. The middle button stays, as its
   // drag autoscrolls on Windows and Linux.
   const handleListPointerDown = (event: PointerEvent) => {
-    readIntent = true
-
     if (!active() || event.button === 2) return
     input.onUserScroll(event.target)
     input.follow.dispatch(pointerDownEvent)
@@ -1117,7 +978,6 @@ export function createTimelineVirtualizer(input: Input) {
     if (!isScrollKeyTarget(event.target, key)) return
 
     if (scrollKeyOwner(event.currentTarget, event.target, key) !== event.currentTarget) return
-    readIntent = true
     input.onUserScroll(event.currentTarget)
     dispatchIntent(upwardKeys.has(key))
   }

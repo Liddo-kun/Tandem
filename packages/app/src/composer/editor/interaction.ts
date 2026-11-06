@@ -321,6 +321,12 @@ export function createComposerEditor(input: {
       return
     }
 
+    if (command.type === "draft.removeTextBefore") {
+      draft.removeTextBefore(command.value)
+
+      return
+    }
+
     if (command.type === "mention.add") {
       if (command.item.mention) draft.addMention(command.item.mention, command.range)
 

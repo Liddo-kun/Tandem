@@ -77,7 +77,6 @@ type MessageTimelineProps = {
   /** Hands the header's empty gap to the pane's window drag area. */
   registerHeaderGap?: (gap: HTMLElement) => () => void
   active?: boolean
-  caughtUp: boolean
   session: TimelineSessionSource
   view: MountedSession
   screen: SessionScreen
@@ -98,19 +97,14 @@ type MessageTimelineProps = {
   anchor: (id: string) => string
   setRevealMessage?: (fn: (id: string, partID?: string) => void) => void
   setRevealPart?: (fn: (target: string) => boolean) => void
-  setScrollToEnd?: (fn: (behavior?: ScrollBehavior, read?: boolean) => void) => void
+  setScrollToEnd?: (fn: (behavior?: ScrollBehavior) => void) => void
   setPage?: (fn: (direction: 1 | -1) => void) => void
   reveal?: { target: () => string | undefined; done: () => void }
   search?: JSX.Element
 }
 
 export function MessageTimeline(props: MessageTimelineProps) {
-  const controller = createTimelineController({
-    session: props.session,
-    active: () => props.active !== false,
-    caughtUp: () => props.caughtUp,
-  })
-
+  const controller = createTimelineController({ session: props.session, active: () => props.active !== false })
   const tail = props.follow.following() ? controller.data.projection.rows().at(-1) : undefined
 
   if (tail?._tag === "AssistantPart" && tail.group.type === "part") {
@@ -197,8 +191,6 @@ function MessageTimelineView(
     projection,
     showHeader,
     follow: props.follow,
-    onReadEnd: props.data.newMessages.read,
-    onReadMarkPassed: props.data.newMessages.release,
     scroll: () => props.scroll,
     onResumeScroll: props.onResumeScroll,
     setScrollRef: props.setScrollRef,
@@ -212,7 +204,6 @@ function MessageTimelineView(
       if (
         Predicate.isTagged(row, "TurnGap") ||
         Predicate.isTagged(row, "TurnDivider") ||
-        Predicate.isTagged(row, "NewMessages") ||
         Predicate.isTagged(row, "CompactionQueued") ||
         Predicate.isTagged(row, "Activity")
       )
