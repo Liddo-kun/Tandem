@@ -106,7 +106,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
   const [overflow, setOverflow] = createStore({ start: false, end: false })
   const [historyLayout, setHistoryLayout] = createStore<{ height?: number }>({})
   // Phones and tablets, whatever their width: a narrow desktop window keeps the desktop composer.
-  const touch = createMediaQuery("(hover: none) and (pointer: coarse)")
+  const coarse = createMediaQuery("(hover: none) and (pointer: coarse)")
+  // UPSTREAM-DIVERGENCE: the Android app keeps the composer's own buttons instead of upstream's touch dock, and its
+  // native editing already makes Return add a line.
+  const touch = () => !view.nativeEditing && coarse()
   // The shell's slot at the bottom of the screen; without one (a story), the touch bar stays under the composer.
   const [dock, setDock] = createSignal<HTMLElement>()
 
