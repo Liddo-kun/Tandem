@@ -4,7 +4,7 @@ Dated user-visible changes and published releases of Tandem v2, and the source f
 
 ## Unreleased
 
-Baseline: OpenCode `upstream/dev` at `dc4775a64d` (2026-10-31, `@opencode/cli` 2.2.5), synced on 2026-11-06; upstream promoted v2 to `dev` on 2026-10-10 and froze `v2`. Version `2.1.4-tandem-v2.2`, installed as the daily Tandem (CLI and Android app) on Jon's tablet on 2026-11-03 (`2.1.4-tandem-v2.1` earlier that day, `2.1.4-tandem-v2.0` before; `2.0.24-tandem-v2.2` on 2026-10-07, `2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
+Baseline: OpenCode `upstream/dev` at `dc4775a64d` (2026-10-31, `@opencode/cli` 2.2.5), synced on 2026-11-06; upstream promoted v2 to `dev` on 2026-10-10 and froze `v2`. Version `2.2.5-tandem-v2.0`, installed as the daily Tandem (CLI and Android app) on Jon's tablet on 2026-11-06 (`2.1.4-tandem-v2.2` on 2026-11-03, `2.1.4-tandem-v2.1` earlier that day, `2.1.4-tandem-v2.0` before; `2.0.24-tandem-v2.2` on 2026-10-07, `2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
 
 ### 2026-11-06
 
