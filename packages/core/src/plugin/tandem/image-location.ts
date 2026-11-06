@@ -11,6 +11,7 @@ import { createHash } from "node:crypto"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { Mime } from "../../mime.js"
+import { TandemMessageMetadata } from "./message-metadata.js"
 
 const extensions: Record<string, string> = {
   "image/png": "png",
@@ -99,13 +100,16 @@ export const Plugin = define({
       }).pipe(Effect.catch((error) => Effect.logWarning("Unable to save original image attachments", error))),
     )
 
-    const originals = Effect.fn("ImageLocationPlugin.originals")(function* (message: Message) {
-      const value = message.metadata?.tandemImageLocations
+    const isImage = (part: ContentPart) => {
+      const inline = part.type === "media" ? part.media.inline() : undefined
+      return inline !== undefined && extensions[inline.mime] !== undefined
+    }
+    const messageMetadata = TandemMessageMetadata.make(ctx)
+
+    const originals = Effect.fn("ImageLocationPlugin.originals")(function* (message: Message, metadata: Record<string, unknown> | undefined) {
+      const value = metadata?.tandemImageLocations
       if (!Array.isArray(value) || !value.every((item) => typeof (item as Partial<Saved> | null)?.path === "string")) return []
-      const images = message.content.filter((part) => {
-        const inline = part.type === "media" ? part.media.inline() : undefined
-        return inline !== undefined && extensions[inline.mime] !== undefined
-      })
+      const images = message.content.filter(isImage)
       // Deduplicated or converted attachments break the pairing; fall back to the normalized images.
       if (images.length !== value.length) return []
       return yield* Effect.forEach(value as Saved[], (saved) =>
@@ -114,10 +118,15 @@ export const Plugin = define({
     })
 
     const hook = Effect.fn("ImageLocationPlugin.context")(function* (event: SessionRequest) {
+      const metadata = yield* messageMetadata(
+        event.sessionID,
+        event.messages,
+        (message) => message.role === "user" && message.content.some(isImage),
+      )
       event.messages = yield* Effect.forEach(event.messages, (message) =>
         Effect.gen(function* () {
           if (message.role !== "user") return message
-          const saved = yield* originals(message)
+          const saved = yield* originals(message, metadata(message))
           let image = 0
           const content: ContentPart[] = []
           for (const [index, part] of message.content.entries()) {

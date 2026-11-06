@@ -11,6 +11,7 @@ import { ClaudeCheckpoint } from "./checkpoint.js"
 import { ClaudeInstructions } from "./instructions.js"
 import { ClaudePresentation } from "./presentation.js"
 import { ClaudeWorkdir } from "./workdir.js"
+import { TandemMessageMetadata } from "../message-metadata.js"
 import PROMPT from "./anthropic.txt" with { type: "text" }
 
 const CHECKPOINT = "<conversation-checkpoint>"
@@ -25,6 +26,12 @@ const anchorOf = (messages: ReadonlyArray<Message>) => {
   const part = messages[first].content[0]
   if (part?.type !== "text" || !part.text.startsWith(CHECKPOINT)) return first
   return messages[first + 1]?.role === "user" ? first + 1 : first
+}
+
+/** A compaction rendered as a checkpoint message, whose session metadata may hold a Claude checkpoint. */
+const isCheckpoint = (message: Message) => {
+  const part = message.content[0]
+  return message.role === "user" && part?.type === "text" && part.text.startsWith(CHECKPOINT)
 }
 
 // Same parsing as @opencode/ai's internal claudeVersion, which its public API does not export.
@@ -100,6 +107,7 @@ export const Plugin = define({
   id: "tandem.claude",
   effect: Effect.fn("ClaudePlugin.Plugin")(function* (ctx) {
     const workdir = yield* ClaudeWorkdir.make(ctx)
+    const messageMetadata = TandemMessageMetadata.make(ctx)
     const environment = yield* Environment.Service
     yield* ctx.tool.hook("execute.after", (event) => Effect.gen(function* () {
       if (event.status !== "completed" || !["read", "edit", "write", "patch"].includes(event.tool)) return
@@ -135,13 +143,14 @@ export const Plugin = define({
       // not a positional guess. Chronological frozen updates remain in place.
       const index = event.system.findIndex((part) => part.metadata?.["tandem.instruction-baseline"] === true)
       const initial = event.system[index]
-      const marked = event.messages.findIndex((message) => ClaudeCheckpoint.read(message.metadata) !== undefined)
+      const metadata = yield* messageMetadata(event.sessionID, event.messages, isCheckpoint)
+      const marked = event.messages.findIndex((message) => ClaudeCheckpoint.read(metadata(message)) !== undefined)
       const anchor = anchorOf(event.messages)
       if (initial && (marked >= 0 || anchor !== undefined)) {
         // As in Claude Code: instruction files as the anchor's own reminder, the rest as a system message after it.
         const { files, context } = ClaudeInstructions.split(bash ? ClaudeWorkdir.environment(initial.text) : initial.text)
         const native = event.model.providerID === "anthropic" && nativeSystem(id)
-        const info = marked < 0 ? undefined : ClaudeCheckpoint.read(event.messages[marked].metadata)
+        const info = marked < 0 ? undefined : ClaudeCheckpoint.read(metadata(event.messages[marked]))
         if (info) checkpoint(event, marked, info, files, context, native)
         else if (anchor !== undefined) {
           const system = native ? context : undefined
