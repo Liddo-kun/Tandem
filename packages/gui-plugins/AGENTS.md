@@ -70,6 +70,7 @@ An instance lives from `setup` until it is disabled, reloaded, removed, or its w
 
 - `bun run lint` bans importing `createEffect`, `createRenderEffect` and `createComputed` in `packages/gui-plugins/src` (the SDK in `packages/plugin/src/gui/` wraps them). Run side work per provider generation or value with `createKeyed(source, fn, { otherwise })`, fetch with `createLatest`, and keep per-visit state with `createVisitState`.
 - Use `createKeyed` only to synchronize with something outside Solid (the DOM, a third-party widget, an embed, an Ipc subscription, a chunk preload). Derive values with `createMemo` or plain functions, put user-action logic in the handler, and reset state by keying the subtree (`<Show keyed>`) or with `createVisitState`, never in an effect. A source that builds an object is a new key on every read; pass `equals`.
+- Lifecycles follow the State Machines section of `packages/app/AGENTS.md`; keep the machine state in the plugin's store, not in module state. Precedents: `src/terminal/machine.ts`, `src/wsl/machine.ts`, `src/updater/machine.ts`.
 
 ## Performance
 

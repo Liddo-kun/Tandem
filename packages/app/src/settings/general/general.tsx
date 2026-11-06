@@ -265,8 +265,8 @@ export const SettingsGeneral: Component = () => {
   const GeneralSection = () => (
     <div class="settings-section">
       <h3 class="settings-section-title">{language.t("settings.general.section.general")}</h3>
-      <InterfaceModeSetting />
       <SettingsList>
+        <InterfaceModeSetting />
         <LanguageSetting />
         {/* UPSTREAM-DIVERGENCE: Android page zoom control with the native 80–150% range and 2% steps. */}
         <Show when={platform.platform === "android"}>

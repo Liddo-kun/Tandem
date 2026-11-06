@@ -5,6 +5,10 @@
 - Never change existing English text or keys unless the task asks for a copy change; when migrating copy to i18n, keep it byte-for-byte.
 - Render count-sensitive copy through `i18n.plural(baseKey, count, params)`. Never pass `.zero`, `.one`, `.two`, `.few`, `.many`, or `.other` variants to `i18n.t(...)`; `pluralForm(...)` is reserved for components that animate individual grammatical forms.
 
+## State
+
+- Lifecycles follow the State Machines section of `packages/app/AGENTS.md`: one union, a pure `transition`, buttons and panels derived from selectors, and every action settling its attempt whether the host call returns, rejects or throws. Precedent: `src/message/action-machine.ts`.
+
 ## Typography
 
 - Use `--line-height-compact` (`16px`) for `13px` transcript, tool, notice, and truncation text. Use `--line-height-base` (`20px`) for body text.

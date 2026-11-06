@@ -6,6 +6,10 @@
 - Render count-sensitive copy through `plural(baseKey, count, params)`. Never pass `.zero`, `.one`, `.two`, `.few`, `.many`, or `.other` variants to `t(...)`; `pluralForm(...)` is reserved for components that animate individual grammatical forms.
 - Use `tDynamic(...)` when runtime-generated English source copy has keyed non-English alternatives. Do not branch on the active locale in feature code.
 
+## State
+
+- Lifecycles in shared components follow the State Machines section of `packages/app/AGENTS.md`. A component that accepts a controlled value keeps one source of truth with an explicit `controlled | uncontrolled` mode in its machine, and keeps its public props API compatible. Precedent: `src/hooks/list-machine.ts`.
+
 ## Typography
 
 - Use the shared typography metrics instead of copying solid line heights from design exports: `--line-height-tight` is `12px`, `--line-height-compact` is `16px`, and `--line-height-base` is `20px`.
