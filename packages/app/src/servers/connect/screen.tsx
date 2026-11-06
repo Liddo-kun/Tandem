@@ -51,15 +51,15 @@ export function ConnectServerScreen(props: { url?: string } = {}) {
     if (!props.url || props.url === pairing.url) return pairing
     const http = { url: props.url, password: pairing.password }
 
-    return (await check(http)).healthy ? http : pairing
+    return (await check(http)).type === "healthy" ? http : pairing
   }
 
   const connect = async (http: ServerConnection.HttpBase) => {
     const result = await check(http)
 
-    if (!result.healthy) {
+    if (result.type !== "healthy") {
       // UPSTREAM-DIVERGENCE: Distinguish reachable credential-required servers from offline servers.
-      setState("error", result.unauthorized ? language.t("server.connect.credentialsRequired") : connectionError(http.url))
+      setState("error", result.type === "unauthorized" ? language.t("server.connect.credentialsRequired") : connectionError(http.url))
 
       return
     }
