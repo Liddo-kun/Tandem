@@ -9,6 +9,7 @@ Baseline: OpenCode `upstream/dev` at `f74b1416a8` (2026-10-29, `@opencode/cli` 2
 ### 2026-11-05
 
 - **Changed - Claude's one-hour cache is a setting:** Tandem's code that forced one-hour prompt caching on Claude and the other supported routes was removed in favor of upstream's `cache.ttl` setting, which Jon's config sets to `1h` for Anthropic. Other providers keep their default lifetime unless configured. The context button's cache countdown now follows that setting and shows only for models that have one. [Divergence inventory](logv2.md).
+- **Removed - Tandem's fix for following new messages on fractional-pixel screens:** upstream now resumes following when a scroll settles within 4px of the end. On the Y700 (pixel ratio 2.75), flings to the bottom stopped 0.636px short and the chat followed new output again; scrolling up still stops it. [Divergence inventory](logv2.md).
 
 ### 2026-11-04
 

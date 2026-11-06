@@ -42,10 +42,6 @@ const pendingMarkdown = '[data-component="markdown"]:not([data-markdown-ready])'
 // Distance from the bottom that counts as "at the end". Deliberately tight: a collapse clamps
 // exactly to the end, while a one-pixel nudge upward is a deliberate move away from it.
 const endEpsilon = 0.5
-// UPSTREAM-DIVERGENCE(temporary): at fractional pixel ratios (2.75 on the Y700) the scroller cannot land
-// within 0.5px of the end; a fling to the bottom stopped 0.636px short and never resumed following.
-// Re-pinning still requires a downward arrival, so an upward nudge keeps unpinning.
-const pinEpsilon = 2
 
 // Chrome rounds scrollHeight and clientHeight to whole pixels but scrolls in zoomed ones, so under page zoom (down to
 // 25%) the furthest offset it reaches can sit up to 4px short of scrollHeight - clientHeight.
@@ -911,7 +907,7 @@ export function createTimelineVirtualizer(input: Input) {
     const previousMaxScroll = maxScroll
     scrollTop = root.scrollTop
     maxScroll = root.scrollHeight - root.clientHeight
-    const atEnd = maxScroll - scrollTop <= pinEpsilon
+    const atEnd = maxScroll - scrollTop <= endEpsilon
     const arrived = scrollTop > previousTop + endEpsilon || maxScroll < previousMaxScroll
 
     if (scrollTop < previousTop) endPending = false
