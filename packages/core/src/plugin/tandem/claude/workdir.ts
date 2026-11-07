@@ -12,13 +12,13 @@ import { ShellTool } from "../../../tool/plugin/shell.js"
 import { ClaudePresentation } from "./presentation.js"
 
 /**
- * Claude Code 2.1.291's lean Bash description, without its permission-prompt, profile, Monitor and sandbox notes, and
- * with `head` and `tail` allowed.
+ * Claude Code 2.1.291's lean Bash description, without its permission-prompt, profile, Monitor and sandbox notes, with
+ * `head` and `tail` allowed, and saying a `cd` stays in effect instead of preferring absolute paths.
  */
 const description = (dedicatedSearch: boolean) => [
   "Executes a bash command and returns its output.",
   "",
-  "- Working directory persists between calls, but prefer absolute paths. Shell state (env vars, functions) does not persist.",
+  "- The working directory persists between calls: a `cd` stays in effect for later commands, so don't repeat it. Env vars and shell functions do not persist.",
   // Like Claude Code with embedded search, find and grep are left out when Bash search replaces Glob and Grep.
   "- IMPORTANT: Avoid using this tool to run " +
     (dedicatedSearch ? "`find`, `grep`, " : "") +

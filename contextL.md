@@ -2,7 +2,7 @@
 
 ## Environment
 
-- Tandem requires Bun 1.4.4: `/home/jon/.local/share/tandem-v2/toolchain/bun-1.4.4/bin`. Global Bun stays 1.3.14; put the pinned one first on PATH so build subprocesses inherit it.
+- Tandem requires Bun 1.4.4: `/home/jon/.local/share/tandem-v2/toolchain/bun-1.4.4/bin`. The global `~/.bun/bin/bun` is a link to it, so plain `bun` is already the pinned version; repoint the link when the pin changes.
 - Two servers run on this tablet (setup, logins, flags, app build and releases: `notes/tandem-setup.md`):
 
 | | Daily Tandem | Development |
