@@ -1,10 +1,19 @@
 import { TextField as Kobalte } from "@kobalte/core/text-field"
-import { createSignal, Show, splitProps } from "solid-js"
+import { createSignal, onCleanup, Show, splitProps, untrack } from "solid-js"
 import type { ComponentProps } from "solid-js"
 import { useI18n } from "../context/i18n"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Icon } from "@opencode/ui/icon"
 import { Tooltip } from "@opencode/ui/tooltip"
+import {
+  INITIAL_TEXT_FIELD_COPY_STATE,
+  selectTextFieldCopied,
+  selectTextFieldCopyIcon,
+  selectTextFieldCopyLabelKey,
+  transitionTextFieldCopy,
+  type TextFieldCopyEffect,
+  type TextFieldCopyEvent,
+} from "./text-field-machine"
 // UPSTREAM-DIVERGENCE: Shared navigator-first clipboard fallback for text-field copy controls.
 import { writeClipboardText } from "./clipboard"
 
@@ -58,35 +67,48 @@ export function TextField(props: TextFieldProps) {
     "multiline",
   ])
 
-  const [copied, setCopied] = createSignal(false)
+  const [copyState, setCopyState] = createSignal(INITIAL_TEXT_FIELD_COPY_STATE)
+  let timer: ReturnType<typeof setTimeout> | undefined
 
-  const label = () => {
-    if (copied()) return i18n.t("ui.textField.copied")
+  const dispatch = (event: TextFieldCopyEvent) => {
+    const next = transitionTextFieldCopy(untrack(copyState), event)
 
-    if (local.copyKind === "link") return i18n.t("ui.textField.copyLink")
-
-    return i18n.t("ui.textField.copyToClipboard")
+    if (next.state !== untrack(copyState)) setCopyState(next.state)
+    next.effects.forEach(run)
   }
 
-  const icon = () => {
-    if (copied()) return "check"
+  const run = (effect: TextFieldCopyEffect) => {
+    if (effect.type === "timer.clear") {
+      clearTimeout(timer)
+      timer = undefined
 
-    if (local.copyKind === "link") return "link"
+      return
+    }
 
-    return "copy"
+    if (effect.type === "reset.schedule") {
+      timer = setTimeout(() => dispatch({ type: "reset.elapsed", attempt: effect.attempt }), effect.delayMs)
+
+      return
+    }
+
+    timer = setTimeout(() => dispatch({ type: "copy.timed-out", attempt: effect.attempt }), effect.timeoutMs)
+    void writeClipboard(effect.value).then(
+      (written) => dispatch({ type: written ? "copy.succeeded" : "copy.failed", attempt: effect.attempt }),
+      () => dispatch({ type: "copy.failed", attempt: effect.attempt }),
+    )
   }
 
-  async function handleCopy() {
-    const value = local.value ?? local.defaultValue ?? ""
-    // UPSTREAM-DIVERGENCE: Delegate text-field copying to the navigator-first clipboard fallback.
-    if (!(await writeClipboardText(value).then(() => true, () => false))) return
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+  onCleanup(() => dispatch({ type: "disposed" }))
 
-  function handleClick() {
-    if (local.copyable) void handleCopy()
-  }
+  const copied = () => selectTextFieldCopied(copyState())
+  const label = () => i18n.t(selectTextFieldCopyLabelKey(copyState(), local.copyKind))
+
+  const requestCopy = () =>
+    dispatch({
+      type: "copy.requested",
+      value: local.value ?? local.defaultValue ?? "",
+      enabled: !!local.copyable && !local.disabled,
+    })
 
   return (
     <Kobalte
@@ -97,7 +119,7 @@ export function TextField(props: TextFieldProps) {
       value={local.value}
       onChange={local.onChange}
       onKeyDown={local.onKeyDown}
-      onClick={handleClick}
+      onClick={requestCopy}
       required={local.required}
       disabled={local.disabled}
       readOnly={local.readOnly}
@@ -121,14 +143,19 @@ export function TextField(props: TextFieldProps) {
             value={label()}
             placement="top"
             gutter={4}
-            forceOpen={copied() ? true : undefined}
+            forceOpen={copied() || undefined}
             skipDelayDuration={0}
           >
             <IconButton
               type="button"
-              icon={<Icon name={icon()} />}
+              icon={<Icon name={selectTextFieldCopyIcon(copyState(), local.copyKind)} />}
               variant="ghost"
-              onClick={handleCopy}
+              disabled={local.disabled}
+              onClick={(event) => {
+                // The field itself copies on click too; one click is one copy.
+                event.stopPropagation()
+                requestCopy()
+              }}
               tabIndex={-1}
               data-slot="input-copy-button"
               aria-label={label()}
@@ -141,5 +168,14 @@ export function TextField(props: TextFieldProps) {
       </Show>
       <Kobalte.ErrorMessage data-slot="input-error">{local.error}</Kobalte.ErrorMessage>
     </Kobalte>
+  )
+}
+
+// UPSTREAM-DIVERGENCE: Delegate text-field copying to the navigator-first clipboard fallback, which keeps its textarea
+// inside an open dialog's focus boundary and restores the selection.
+async function writeClipboard(text: string) {
+  return writeClipboardText(text).then(
+    () => true,
+    () => false,
   )
 }
