@@ -14,7 +14,7 @@ import { setCursorPosition } from "@/composer/editor/dom"
 import { promptLength } from "@/composer/prompt-parts"
 import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
-import { useData } from "@/runtime/server/current"
+import { useData, useServer } from "@/runtime/server/current"
 import { useServerSDK } from "@/runtime/server/client"
 import { showToast } from "@/shell/notifications/toast"
 import { errorMessage } from "@/shell/layout/helpers"
@@ -301,8 +301,12 @@ export function createActiveSessionRegion(input: {
     showToast({ title: language.t("common.requestFailed") })
   }
 
+  const handoffs = useServer().ctx.handoff
+
   const pendingSteer: TimelinePendingActions = {
-    status: (sessionID, messageID) => data.session.pending.status(sessionID, messageID),
+    // A prompt held for its Location's agents and models shows as sending until it has a server row.
+    status: (sessionID, messageID) =>
+      handoffs.held(sessionID, messageID) ? "sending" : data.session.pending.status(sessionID, messageID),
     queue: ({ sessionID, messageID }) =>
       server.api.session.inbox
         .update({ sessionID, inboxID: messageID, delivery: "queue" })
@@ -394,11 +398,7 @@ export function createActiveSessionRegion(input: {
 
         if (source.length) prompt.capture().quoteSource.add(contextItemKey(item), source)
 
-        if (anchor) {
-          prompt.capture().quoteSource.pend(contextItemKey(item))
-
-          return prompt.capture().quoteComment.set(contextItemKey(item), anchor)
-        }
+        if (anchor) return prompt.capture().quoteComment.set(contextItemKey(item), anchor)
 
         focusPrompt()
       },

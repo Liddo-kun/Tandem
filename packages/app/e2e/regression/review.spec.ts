@@ -151,6 +151,38 @@ test("a rejected Git init releases its session's button without showing an error
   await expect(init).toBeEnabled()
 })
 
+test("a created Git repository whose project refresh fails still refreshes the session without an error", async ({
+  page,
+}) => {
+  await openSession(page, {
+    name: "ReviewInitRefresh",
+    project: { vcs: undefined },
+    onVcsInit: () => undefined,
+    sessions: [{ id: "ses_init_refresh", title: "Initialize Refresh" }],
+    seed: {
+      panes: { ses_init_refresh: { review: true } },
+      storage: reviewTabs("C:/OpenCode/ReviewInitRefresh", "ses_init_refresh"),
+    },
+  })
+  const panel = page.locator("#review-panel")
+  const init = panel.getByRole("button", { name: "Create Git repository", exact: true })
+  await expect(init).toBeEnabled()
+
+  // The repository is created; the project list refresh after it fails.
+  await page.route(/\/api\/project(\?|$)/, (route) =>
+    route.fulfill({ status: 500, headers: { "access-control-allow-origin": "*" }, json: {} }),
+  )
+  const created = page.waitForResponse((item) => new URL(item.url()).pathname === "/api/vcs/init")
+  const project = page.waitForResponse((item) => new URL(item.url()).pathname === "/api/project")
+  const session = page.waitForResponse((item) => new URL(item.url()).pathname === "/api/session/ses_init_refresh")
+  await init.click()
+  expect((await created).status()).toBe(204)
+  expect((await project).status()).toBe(500)
+  expect((await session).status()).toBe(200)
+  await expect(panel.getByRole("button", { name: "Creating Git repository…", exact: true })).toHaveCount(0)
+  await expect(page.getByText("Request failed", { exact: true })).toHaveCount(0)
+})
+
 test("opens file picker launchers when randomUUID is unavailable on insecure HTTP origins", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(globalThis, "isSecureContext", { configurable: true, value: false })
@@ -1897,6 +1929,58 @@ test("a failed diff request offers a retry instead of a clean working tree", asy
   await failure.getByRole("button", { name: "Try again", exact: true }).click()
   await expect(panel.locator('[data-slot="session-review-v2-file-name"]')).toHaveText("alpha.ts")
   await expect(failure).toHaveCount(0)
+})
+
+// An untracked folder whose listing failed used to look empty, and opening it again never asked the server again.
+test("an untracked folder that cannot load says so, and loads once it is opened again", async ({ page }) => {
+  const workspace = await openSession(page, {
+    name: "ReviewFolderFailure",
+    vcsDiff: (input) =>
+      input.directory.endsWith("/untracked")
+        ? [fileDiff("untracked/notes.ts", { status: "added" })]
+        : [fileDiff("src/alpha.ts"), fileDiff("untracked/", { status: "added" })],
+  })
+
+  const listing = { failing: true, failures: 0 }
+
+  await page.route(/\/api\/vcs\/diff\?/, (route) => {
+    const directory = new URL(route.request().url()).searchParams.get("location[directory]")
+
+    if (!listing.failing || directory !== `${workspace.directory}/untracked`) return route.fallback()
+    listing.failures += 1
+
+    return route.fulfill({ status: 500, headers: { "access-control-allow-origin": "*" }, json: {} })
+  })
+  const panel = page.locator("#review-panel")
+  const folder = panel.getByRole("treeitem", { name: "untracked" })
+  const notes = panel.getByRole("treeitem", { name: "notes.ts" })
+
+  await page.getByRole("button", { name: "Toggle review", exact: true }).click()
+  await openReviewLauncher(panel)
+  await expect(panel.getByRole("treeitem", { name: "alpha.ts" })).toBeVisible()
+  // Retries back off over 1, 2 and 4 seconds; the installed clock follows real time until a fast-forward skips it.
+  await page.clock.install()
+  await folder.click()
+  await expect(folder).toHaveAttribute("aria-expanded", "true")
+
+  for (const failures of [1, 2, 3]) {
+    await expect.poll(() => listing.failures).toBe(failures)
+    await page.clock.fastForward(1_000 * 2 ** (failures - 1))
+  }
+
+  await expect.poll(() => listing.failures).toBe(4)
+  await expect(folder).toContainText("Couldn't load changes")
+  await expect(notes).toHaveCount(0)
+
+  listing.failing = false
+  await folder.click()
+  await expect(folder).toHaveAttribute("aria-expanded", "false")
+  await expect(folder).not.toContainText("Couldn't load changes")
+  await folder.click()
+  await expect(folder).toHaveAttribute("aria-expanded", "true")
+  await expect(notes).toBeVisible()
+  await expect(folder).toContainText("1")
+  expect(listing.failures).toBe(4)
 })
 
 test("a chosen mode the session stops offering shows as Git, and comes back when it is offered again", async ({

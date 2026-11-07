@@ -90,8 +90,10 @@ export interface MockServerConfig {
   branches?: (input: { directory: string; search?: string; limit?: number }) => string[] | Promise<string[]>
   // Initializes the mock project's VCS; without a handler this mutation answers 501.
   onVcsInit?: (input: { directory: string; provider?: string }) => void
-  vcsDiff?: unknown[] | ((input: { mode?: string }) => unknown[])
+  // `directory` is the requested `location[directory]`, such as an untracked folder the review opened.
+  vcsDiff?: unknown[] | ((input: { mode?: string; directory: string }) => unknown[])
   beforeMessagesResponse?: (input: { sessionID: string; before?: string }) => Promise<void>
+  beforeAgentsResponse?: () => Promise<void>
   onMessages?: (input: { sessionID: string; before?: string; phase: "start" | "end" }) => void
   message?: (sessionID: string, messageID: string) => SessionMessageInfo | undefined
   onMessage?: (input: { sessionID: string; messageID: string }) => void
@@ -776,20 +778,23 @@ function mockHandlers(
           }),
         config: () => Effect.succeed(configEntries),
         reference: () => Effect.succeed({ location: location(config), data: [] }),
+        // `beforeAgentsResponse` holds the Location's agent list, as a cold Location does while its plugins activate.
         agent: (ctx) =>
-          Effect.succeed({
-            location: location(config, requestDirectory(config, ctx.request)),
-            data: [
-              {
-                id: "build",
-                name: "Build",
-                mode: "primary",
-                hidden: false,
-                request: { settings: {}, headers: {}, body: {} },
-                permissions: [],
-              },
-            ],
-          }),
+          Effect.promise(async () => config.beforeAgentsResponse?.()).pipe(
+            Effect.as({
+              location: location(config, requestDirectory(config, ctx.request)),
+              data: [
+                {
+                  id: "build",
+                  name: "Build",
+                  mode: "primary",
+                  hidden: false,
+                  request: { settings: {}, headers: {}, body: {} },
+                  permissions: [],
+                },
+              ],
+            }),
+          ),
         provider: () =>
           Effect.succeed({ location: location(config), data: currentProviders(resolve(config.provider)) }),
         model: () => Effect.succeed({ location: location(config), data: currentModels(resolve(config.provider)) }),
@@ -998,7 +1003,7 @@ function mockHandlers(
           Effect.sync(() => ({
             location: location(config),
             data: Predicate.isFunction(config.vcsDiff)
-              ? config.vcsDiff({ mode: ctx.query.mode })
+              ? config.vcsDiff({ mode: ctx.query.mode, directory: requestDirectory(config, ctx.request) })
               : (config.vcsDiff ?? []),
           })),
         fsList: (ctx) =>

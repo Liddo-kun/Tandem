@@ -368,17 +368,8 @@ export const ComposerStore = Persistence.struct({
   mode: Persistence.optional(Schema.Literals(["normal", "shell"])),
   // UPSTREAM-DIVERGENCE: Persist draft Corrector snapshots.
   correctorDisabled: Persistence.optional(Schema.Boolean),
-  retry: Persistence.optional(
-    Schema.Struct({
-      id: SessionMessage.ID,
-      agent: Schema.String,
-      providerID: Schema.String,
-      modelID: Schema.String,
-      variant: Persistence.optional(Schema.String),
-      // UPSTREAM-DIVERGENCE: Retries retain their original Corrector snapshot.
-      correctorDisabled: Persistence.optional(Schema.Boolean),
-    }),
-  ),
+  // A retry stored before it carried its payload's fingerprint cannot prove its payload, so it reads as none.
+  retry: Persistence.optional(Schema.Struct({ id: SessionMessage.ID, fingerprint: Schema.NonEmptyString })),
   context: Persistence.struct({ items: Persistence.array(ContextEntry) }),
   quoteSources: Persistence.optional(Persistence.record(Schema.UndefinedOr(TimelineQuoteSource))),
 })
