@@ -20,6 +20,7 @@ import { authorizedRequest, unauthorizedResponse } from "./middleware/authorizat
 // UPSTREAM-DIVERGENCE: Tandem's parallel gzip for large responses.
 import { parallelGzipLarge } from "./middleware/tandem-parallel-gzip"
 import { withoutParentSpan } from "./request-tracing"
+import { RequestSite } from "./request-site"
 import { createRoutes } from "./routes"
 import { ServerInfo } from "./server-info"
 import { Status } from "./service-status"
@@ -74,6 +75,7 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
   yield* bound.http
     .serve(
       (transform ? transform(app) : app).pipe(
+        RequestSite.middleware(options),
         HttpMiddleware.compression(),
         // UPSTREAM-DIVERGENCE: large bodies are gzipped on several threads; applied after it so its handler runs first.
         parallelGzipLarge,
