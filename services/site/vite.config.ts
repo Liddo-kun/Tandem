@@ -5,6 +5,7 @@ import { fromPathname } from "./src/lib/language"
 import variants from "./src/component/site/css-variants.json"
 import { docs } from "./src/docs/vite"
 import { i18nSlices } from "./script/i18n-plugin"
+import { foldSettingsForProduction } from "./script/fold-settings"
 
 // Nitro's dev server drops any page the app renders with a 404 status and falls through to a bare
 // "Cannot GET". In development only, serve the not-found page's preview (/dev/404, which follows
@@ -118,6 +119,8 @@ function cssVariantsForProduction(): PluginOption {
 
 export default defineConfig({
   plugins: [
+    // Before Solid compiles JSX, in both the server and browser builds (script/fold-settings.ts).
+    foldSettingsForProduction(),
     solidStart({
       middleware: "./src/middleware.ts",
     }) as PluginOption,
@@ -161,6 +164,12 @@ export default defineConfig({
     minify: false,
     // The stylesheets the pages load are minified even though the Worker's code is not.
     cssMinify: true,
+    // Browsers with native light-dark() (and CSS nesting). For older targets the minifier lowers
+    // light-dark() to --lightningcss-light/--lightningcss-dark variables set only where a rule
+    // declares color-scheme, so the site's tokens freeze at the theme of the element that defines
+    // them: a forced-dark card or band (color-scheme: dark) kept the page's light tokens in
+    // production, though the dev server (no lowering) showed it right.
+    cssTarget: ["chrome123", "edge123", "firefox120", "safari17.5"],
   },
   environments: {
     // The browser bundles are minified; the Worker keeps readable code for its stack traces.
