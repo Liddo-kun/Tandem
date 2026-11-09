@@ -56,7 +56,7 @@ function bashResult(part: ToolResultPart): ToolResultPart {
       : []
   const note = texts.length > 1 && RESET.test(texts.at(-1)!) ? texts.pop() : undefined
   const [output, notice] = texts
-  const exit = notice === undefined ? undefined : /^Exited with code (\d+)$/.exec(notice)?.[1]
+  const exit = notice === undefined ? undefined : /^Exit code: (\d+)$/.exec(notice)?.[1]
   if (output === undefined || texts.length > 2 || (notice !== undefined && exit === undefined)) return part
   const text = output === "(no output)" ? "" : output.trimEnd()
   const value = (exit !== undefined ? [`Exit code ${exit}`, text].filter(Boolean).join("\n") : text || "(Bash completed with no output)")
