@@ -4,7 +4,7 @@ Dated user-visible changes and published releases of Tandem v2, and the source f
 
 ## Unreleased
 
-Baseline: OpenCode `upstream/dev` at `a17fab50a1` (2026-11-09, `@opencode/cli` 2.2.5), synced on 2026-11-10; upstream promoted v2 to `dev` on 2026-10-10 and froze `v2`. Version `2.2.5-tandem-v2.2`, installed as the daily Tandem (CLI and Android app) on Jon's tablet on 2026-11-07 (`2.2.5-tandem-v2.1` earlier that day, unrecorded; `2.2.5-tandem-v2.0` on 2026-11-06; `2.1.4-tandem-v2.2` on 2026-11-03, `2.1.4-tandem-v2.1` earlier that day, `2.1.4-tandem-v2.0` before; `2.0.24-tandem-v2.2` on 2026-10-07, `2.0.24-tandem-v2.1`, `2.0.24-tandem-v2.0` and `2.0.22-tandem-v2.1` to `v2.3` earlier that day, `2.0.22-tandem-v2.0` on 2026-10-05); no v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
+Baseline: OpenCode `upstream/dev` at `a17fab50a1` (2026-11-09, `@opencode/cli` 2.2.5), synced on 2026-11-10; upstream promoted v2 to `dev` on 2026-10-10 and froze `v2`. No v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
 
 ### 2026-11-10
 
@@ -160,6 +160,6 @@ Current summary as of **2026-10-05**.
 
 ## Keeping this file and publishing releases
 
-1. **With each change:** add a dated Unreleased entry (Added, Changed, Fixed or Removed) describing the user-visible result, including platform/opt-in limits and a commit reference when available.
+1. **With each change:** add a dated Unreleased entry (Added, Changed, Fixed or Removed) describing the user-visible result, including platform/opt-in limits and a commit reference when available. Do not record what is installed on Jon's devices, or when.
 2. **Prepare a release:** review the Git range since the previous v2 Tandem tag against Unreleased entries. Separate Tandem changes from the upstream-baseline note and describe only artifacts actually built.
 3. **Record and publish:** move included entries under `## <tag> — YYYY-MM-DD` above Published releases, recording the target commit, upstream baseline and GitHub URL, and leave a fresh Unreleased section. Publish only when requested: `gh release create <tag> --repo Liddo-kun/Tandem --target <commit> --notes-file <file>`. Always pass `--repo`, because this checkout also has the OpenCode remote.
