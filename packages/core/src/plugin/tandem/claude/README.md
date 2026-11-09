@@ -16,7 +16,8 @@ provider setting. Durable instruction values and chronological updates are uncha
 
 Claude presentation is automatic when either the selected model ID or resolved model
 ID contains `claude`, case-insensitively. A configured agent system prompt is kept;
-otherwise `anthropic.txt` replaces the selected base prompt.
+otherwise `anthropic.txt` replaces the selected base prompt. Fable 5.2 gets
+`anthropic-fable-5-2.txt` appended to it.
 
 `TANDEM_CLAUDE_BASH_SEARCH=1` enables Bash search when all prerequisites pass. The
 default is off. Linux and macOS need a supported POSIX shell plus executable `ugrep`,

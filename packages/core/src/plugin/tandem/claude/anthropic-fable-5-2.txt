@@ -1,0 +1,1 @@
+Don't create planning, decision, or analysis documents unless the user asks for them — work from the context, not intermediate files.

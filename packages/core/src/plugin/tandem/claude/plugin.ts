@@ -13,6 +13,7 @@ import { ClaudePresentation } from "./presentation.js"
 import { ClaudeWorkdir } from "./workdir.js"
 import { TandemMessageMetadata } from "../message-metadata.js"
 import PROMPT from "./anthropic.txt" with { type: "text" }
+import PROMPT_FABLE_5_2 from "./anthropic-fable-5-2.txt" with { type: "text" }
 
 const CHECKPOINT = "<conversation-checkpoint>"
 
@@ -48,6 +49,13 @@ const nativeSystem = (id: string) => {
   const version = claudeVersion(id)
   if (version === undefined) return false
   return version.family === "opus" && version.major === 4 ? version.minor >= 8 : version.major >= 5
+}
+
+/** The base prompt, plus Fable 5.2's own additions. */
+const basePrompt = (id: string) => {
+  const version = claudeVersion(id)
+  if (version?.family === "fable" && version.major === 5 && version.minor === 2) return `${PROMPT.trimEnd()}\n\n${PROMPT_FABLE_5_2}`
+  return PROMPT
 }
 
 const reminder = (text: string) => Message.text(`<system-reminder>\n${text}\n</system-reminder>`)
@@ -138,7 +146,7 @@ export const Plugin = define({
       if (id === undefined) return
       const bash = workdir.present(event, primary)
       const agent = (yield* ctx.agent.get({ agentID: event.agent }).pipe(Effect.orDie)).data
-      if (!agent.system && event.system[0]) event.system[0] = SystemPart.make(PROMPT)
+      if (!agent.system && event.system[0]) event.system[0] = SystemPart.make(basePrompt(id))
       // Identity and configured hooks insert/reorder blocks, so use the assembly marker,
       // not a positional guess. Chronological frozen updates remain in place.
       const index = event.system.findIndex((part) => part.metadata?.["tandem.instruction-baseline"] === true)
