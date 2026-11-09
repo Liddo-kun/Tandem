@@ -64,6 +64,7 @@ export interface Interface {
   ) => Effect.Effect<SetSessionConfigOptionResponse, ACPError.Failure>
   readonly setSessionMode: (input: SetSessionModeRequest) => Effect.Effect<SetSessionModeResponse, ACPError.Failure>
   readonly prompt: (input: PromptRequest, signal: AbortSignal) => Effect.Effect<PromptResponse, ACPError.Failure>
+  readonly steer: (input: ACPTurn.SteeringRequest) => Effect.Effect<ACPTurn.SteeringResponse, ACPError.Failure>
   readonly cancel: (input: CancelNotification) => Effect.Effect<void>
 }
 
@@ -143,6 +144,7 @@ export function make(input: {
           _meta: { [ACPCapabilities.ChildSessionUpdates]: true },
         },
         authMethods: [authMethod],
+        _meta: { steering: { supported: true } },
         // UPSTREAM-DIVERGENCE: Tandem branding.
         agentInfo: { name: Brand.product, version: OPENCODE_VERSION },
       }
@@ -261,6 +263,7 @@ export function make(input: {
         unprompted.delete(params.sessionId)
         return input.turn.prompt(params, signal)
       }),
+    steer: input.turn.steer,
     cancel: input.turn.cancel,
   }
 }
