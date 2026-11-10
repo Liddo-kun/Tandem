@@ -8,7 +8,18 @@ import { Loader } from "@opencode/ui/loader"
 import { TextField } from "@opencode/ui/text-field"
 import { DialogBody, DialogHeader, DialogTitle, DialogTitleGroup, Dialog } from "@opencode/ui/dialog"
 import { TextInput } from "@opencode/ui/text-input"
-import { type Component, createMemo, createUniqueId, For, type JSX, Match, onMount, Show, Switch } from "solid-js"
+import {
+  type Component,
+  createMemo,
+  createSignal,
+  createUniqueId,
+  For,
+  type JSX,
+  Match,
+  onMount,
+  Show,
+  Switch,
+} from "solid-js"
 import { createStore } from "solid-js/store"
 import { useParams } from "@solidjs/router"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -942,6 +953,8 @@ function ProviderSteps(props: { provider: string; controller: ProviderDialogCont
 
   function AccountsView(input: { body: Extract<ProviderDialogBody, { kind: "accounts" }> }) {
     const action = () => input.body.action
+    // UPSTREAM-DIVERGENCE(temporary): Remove waits for the options menu to close; see onCloseAutoFocus.
+    const [removeAfterClose, setRemoveAfterClose] = createSignal<string>()
 
     const marked = (type: "confirming" | "renaming", id: string) => {
       const current = action()
@@ -1041,7 +1054,18 @@ function ProviderSteps(props: { provider: string; controller: ProviderDialogCont
                         }}
                       >
                         <Menu.Content
-                          onCloseAutoFocus={(event) => action().type === "renaming" && event.preventDefault()}
+                          onCloseAutoFocus={(event) => {
+                            // UPSTREAM-DIVERGENCE(temporary): Ask to confirm the removal once the menu has closed.
+                            // The prompt replaces this row and its menu; on touch, the tap's trailing click
+                            // otherwise lands on whatever was under the menu item.
+                            if (removeAfterClose() === account.id) {
+                              event.preventDefault()
+                              setRemoveAfterClose(undefined)
+                              props.controller.dispatch({ type: "account.remove.prompted", accountID: account.id })
+                              return
+                            }
+                            if (action().type === "renaming") event.preventDefault()
+                          }}
                         >
                           <Menu.Item
                             onSelect={() =>
@@ -1050,11 +1074,7 @@ function ProviderSteps(props: { provider: string; controller: ProviderDialogCont
                           >
                             {language.t("common.rename")}
                           </Menu.Item>
-                          <Menu.Item
-                            onSelect={() =>
-                              props.controller.dispatch({ type: "account.remove.prompted", accountID: account.id })
-                            }
-                          >
+                          <Menu.Item onSelect={() => setRemoveAfterClose(account.id)}>
                             {language.t("dialog.provider.accounts.remove")}
                           </Menu.Item>
                         </Menu.Content>
