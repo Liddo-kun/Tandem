@@ -1,5 +1,6 @@
 import type { SessionMessageAssistant, SessionMessageAssistantTool } from "@opencode/client/promise"
 import { Option, Schema } from "effect"
+import { partialShellCommand } from "../tools/tandem-partial-command"
 
 const decodeInput = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)))
 
@@ -8,7 +9,14 @@ const empty = {}
 export function currentToolInput(tool: SessionMessageAssistantTool): Record<string, unknown> {
   if (tool.state.status !== "streaming") return tool.state.input
 
-  return Option.getOrElse(decodeInput(tool.state.input), () => empty)
+  const raw = tool.state.input
+
+  return Option.getOrElse(decodeInput(raw), () => {
+    // UPSTREAM-DIVERGENCE: show a shell command while the model is still writing it.
+    const command = tool.name === "shell" ? partialShellCommand(raw) : undefined
+
+    return command ? { command } : empty
+  })
 }
 
 export function currentToolMetadata(tool: SessionMessageAssistantTool): Record<string, unknown> {
