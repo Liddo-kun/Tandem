@@ -22,6 +22,8 @@ export const loadedSkills = (messages: ReadonlyArray<SessionMessage.Info>) => me
 export const skillsNote = (names: ReadonlyArray<string>) =>
   `The following skills were loaded EARLIER in this session, before the conversation was compacted: ${names.join(", ")}. Their instructions were lost in compaction. If one is still relevant to the current work, load it again with the Skill tool. Do NOT re-execute their one-time setup actions (e.g., scheduling, creating files).`
 
+const RESTORED_READ = "Called the Read tool with the following input: "
+
 /** CC's compact read falls back to a reference, not token-cut contents, at its token cap. */
 export const restoredFile = (path: string, content: string) => {
   if (content.includes("\0")) return undefined
@@ -33,7 +35,7 @@ export const restoredFile = (path: string, content: string) => {
     type: "text-page", content: lines.join("\n"), offset: 1, mime: "text/plain",
     truncated: all.length > lines.length, next: all.length > lines.length ? lines.length + 1 : undefined,
   })
-  return `Called the Read tool with the following input: ${JSON.stringify({ file_path: path })}\nResult of calling the Read tool:\n${output}`
+  return `${RESTORED_READ}${JSON.stringify({ file_path: path })}\nResult of calling the Read tool:\n${output}`
 }
 
 export const restore = Effect.fn("ClaudeCompaction.restore")(function* (input: {
@@ -61,6 +63,8 @@ export const restore = Effect.fn("ClaudeCompaction.restore")(function* (input: {
   const candidates = [...files].map(([path, mtime]) => ({ path, mtime })).sort((a, b) => b.mtime - a.mtime)
   const selected = candidates.filter((file) => basename(file.path) !== "AGENTS.md" && !input.excluded.has(file.path) && !keptReads.has(file.path)).slice(0, 5)
   const restored: string[] = []
+  // Files restored with their contents, not as a note that they were too large to include.
+  const contents: string[] = []
   let total = 0
   for (const file of selected) {
     const content = yield* input.fs.readFileString(file.path).pipe(Effect.orElseSucceed(() => undefined))
@@ -68,11 +72,12 @@ export const restore = Effect.fn("ClaudeCompaction.restore")(function* (input: {
     const text = restoredFile(file.path, content)
     if (text === undefined || total + Token.estimate(text) > 50_000) continue
     restored.push(text)
+    if (text.startsWith(RESTORED_READ)) contents.push(file.path)
     total += Token.estimate(text)
   }
   const keptSkills = new Set(loadedSkills(input.kept))
   const skills = [...new Set([...loadedSkills(history).reverse(), ...(input.previous?.skills ?? [])])].filter((name) => !keptSkills.has(name))
-  return { files: candidates, skills, restored }
+  return { files: candidates, skills, restored, contents }
 })
 
 const record = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)

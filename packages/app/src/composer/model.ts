@@ -32,6 +32,8 @@ import { isCommentItem } from "./state"
 import type { PromptHistoryComment } from "./history/entry"
 import { createComposerHistory } from "./history/store"
 import { createComposerSubmit } from "./submit"
+// UPSTREAM-DIVERGENCE: Tandem's dialog that asks how to send once the prompt cache no longer holds a large context.
+import { useTandemColdSend } from "./tandem-cold-send"
 import { composerSubmitView } from "./machine"
 import { useAttachmentDestination } from "./attachments/destination"
 import { parseClientSlashCommand } from "./client-slash-command"
@@ -298,6 +300,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
 
   const variants = createMemo(() => ["default", ...adapter.controls().model.selection.variant.list()])
 
+  const coldSend = useTandemColdSend(adapter) // UPSTREAM-DIVERGENCE: see the import.
   const submission = createComposerSubmit({
     adapter,
     mode,
@@ -573,6 +576,8 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
             return
           }
 
+          // UPSTREAM-DIVERGENCE: on an expired prompt cache, ask how to send before a large context goes out in full.
+          if (coldSend(() => void submission.submit(new Event("submit"), submitOptions))) return
           void submission.submit(new Event("submit"), submitOptions)
         },
         onStop: () => void submission.stop(),

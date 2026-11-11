@@ -40,7 +40,7 @@ const environment = (text: string, current: Schema.Json, previous?: Schema.Json)
 }
 
 /** Claude Code's opening line for instruction files. `split` relies on it to find where they start. */
-const FILES = "Codebase and user instructions are shown below. Be sure to adhere to these instructions. IMPORTANT: These instructions OVERRIDE any default behavior and you MUST follow them exactly as written."
+export const FILES = "Codebase and user instructions are shown below. Be sure to adhere to these instructions. IMPORTANT: These instructions OVERRIDE any default behavior and you MUST follow them exactly as written."
 
 /**
  * The global AGENTS.md as discovery stores it: resolved, under the Global service's config folder. Resolved once

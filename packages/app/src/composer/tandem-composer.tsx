@@ -5,6 +5,7 @@ import type { SessionMessageAssistant } from "@opencode/client/promise"
 import { usePluginAttachment } from "@/runtime/plugin/attachment"
 import { usePluginHost } from "@/runtime/plugin/host"
 import { useLanguage } from "@/runtime/i18n/language"
+import { showToast } from "@/shell/notifications/toast"
 import "./tandem-composer.css"
 
 /** `Claude Opus 4.8` reads `Opus 4.8` in the composer's model button. */
@@ -14,12 +15,48 @@ export function tandemModelLabel(name: string) {
 
 const DURATION_SECONDS = { ms: 0.001, s: 1, m: 60, h: 3600, d: 86400 } as const
 
-// The `cache.ttl` provider or model setting, such as "1h". Without one the provider's default lifetime applies,
-// which the server does not report, so those models show no countdown rather than a wrong one.
-function cacheTtlSeconds(ttl: string | undefined) {
-  const match = ttl?.match(/^(\d+)(ms|s|m|h|d)$/)
-  return match ? Number(match[1]) * DURATION_SECONDS[match[2] as keyof typeof DURATION_SECONDS] : undefined
+/** Anthropic's prompt cache lifetime when no `cache.ttl` is set. The server's Claude plugin assumes the same. */
+const CLAUDE_CACHE_SECONDS = 300
+
+/**
+ * How long a model's prompt cache lives after its last read: its `cache.ttl` provider or model setting, such as "1h",
+ * or Anthropic's default for a Claude model without one. The default of other models is not reported by the server,
+ * so they show no countdown rather than a wrong one.
+ */
+export function cacheTtlSeconds(
+  model: { id: string },
+  info: { modelID?: string; settings?: { cache?: { ttl?: string } } } | undefined,
+) {
+  const match = info?.settings?.cache?.ttl?.match(/^(\d+)(ms|s|m|h|d)$/)
+  if (match) return Number(match[1]) * DURATION_SECONDS[match[2] as keyof typeof DURATION_SECONDS]
+
+  return /claude/i.test(model.id) || /claude/i.test(info?.modelID ?? "") ? CLAUDE_CACHE_SECONDS : undefined
 }
+
+/**
+ * When the server's Claude plugin last read `assistantID`'s prompt cache again: shortly before a large idle session's
+ * cache expires it asks for the compaction summary, which keeps the cache alive for another lifetime and is held for
+ * the next compaction. Undefined when there is none, or it is for another response.
+ */
+export function tandemHeld(metadata: Readonly<Record<string, unknown>> | undefined, assistantID: string) {
+  const value = metadata?.tandemHeld
+  if (!value || typeof value !== "object" || !("assistantID" in value) || value.assistantID !== assistantID) return
+  if (!("at" in value) || typeof value.at !== "number") return
+
+  return { at: value.at }
+}
+
+/** What the server's Claude plugin reports went wrong with an idle compaction or a trim, until the next turn ends. */
+export function tandemHeldFailed(metadata: Readonly<Record<string, unknown>> | undefined) {
+  const value = metadata?.tandemHeldFailed
+  if (!value || typeof value !== "object" || !("at" in value) || !("message" in value)) return
+  if (typeof value.at !== "number" || typeof value.message !== "string") return
+
+  return { at: value.at, message: value.message }
+}
+
+/** Reports already shown, so a report is not shown again each time its session is. */
+const reported = new Set<string>()
 
 type Usage = SessionMessageAssistant & { tokens: NonNullable<SessionMessageAssistant["tokens"]> }
 
@@ -82,10 +119,11 @@ export function TandemContextButton() {
     const info = current.server.data.location.model
       .list(current.location)
       ?.find((item) => item.providerID === model.providerID && item.id === model.id)
-    return cacheTtlSeconds(info?.settings?.cache?.ttl)
+    return cacheTtlSeconds(model, info)
   })
 
-  // Anthropic refreshes the lifetime on every read, so the countdown restarts at each request's completion. It reads
+  // Anthropic refreshes the lifetime on every read, so the countdown restarts at each request's completion, and at the
+  // server's request shortly before a large idle session's cache expires. It reads
   // the clock, so it stays right across app suspends; the timer only runs while a countdown shows.
   createEffect(() => {
     if (!ttl()) return
@@ -95,9 +133,12 @@ export function TandemContextButton() {
 
   const countdown = createMemo(() => {
     const seconds = ttl()
-    const completed = last()?.time.completed
-    if (!seconds || !completed) return undefined
-    return Math.max(0, Math.floor((seconds * 1000 - (store.now - completed)) / 60_000))
+    const current = session()
+    const message = last()
+    const completed = message?.time.completed
+    if (!seconds || !completed || !current) return undefined
+    const held = tandemHeld(current.server.data.session.get(current.id)?.metadata, message.id)
+    return Math.max(0, Math.floor((seconds * 1000 - (store.now - Math.max(completed, held?.at ?? 0))) / 60_000))
   })
 
   // Pulse only for a request that finishes while its session is shown: switching sessions adopts the latest request
@@ -120,6 +161,19 @@ export function TandemContextButton() {
     timer = setTimeout(() => setStore("pulse", false), 1700)
   })
   onCleanup(() => clearTimeout(timer))
+
+  // A report usually arrives while nobody is looking, so it stays until dismissed. Every open tab reports its own
+  // session, so the toast names it.
+  createEffect(() => {
+    const current = session()
+    if (!current?.id) return
+    const info = current.server.data.session.get(current.id)
+    const failure = tandemHeldFailed(info?.metadata)
+    const key = `${current.id}:${failure?.at}`
+    if (!failure || reported.has(key)) return
+    reported.add(key)
+    showToast({ variant: "error", title: info?.title, description: failure.message, persistent: true })
+  })
 
   const open = () => {
     const current = session()
@@ -147,7 +201,9 @@ export function TandemContextButton() {
             </span>
             <Show when={countdown() !== undefined}>
               <span class="ms-2 text-v2-text-text-faint">
-                {language.t("prompt.context.ttl", { minutes: countdown()! })}
+                {countdown() === 0
+                  ? language.t("prompt.context.expired")
+                  : language.t("prompt.context.ttl", { minutes: countdown()! })}
               </span>
             </Show>
           </span>

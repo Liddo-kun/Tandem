@@ -947,6 +947,9 @@ export const layer = Layer.effect(
       return { status: "completed" }
     })
 
+    // UPSTREAM-DIVERGENCE: the Claude plugin's summary before a prompt cache expires goes out on this request path.
+    ClaudeCompaction.register({ ...claudeServices, requests, bus, db, stream, budget: (context) => selectModel(context, state.get().buffer, true).pipe(Effect.map((model) => model.cap)) })
+
     return Service.of({
       transform: state.transform,
       reload: state.reload,
