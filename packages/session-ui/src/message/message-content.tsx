@@ -90,6 +90,8 @@ import {
   type PacedTextEvent,
 } from "./paced-text-machine"
 import { createCopyFeedback, writeClipboard } from "../components/copy"
+// UPSTREAM-DIVERGENCE: Tandem keeps a prompt's actions as buttons in its meta line.
+import { TandemUserActions } from "./tandem-user-actions"
 
 type MetaItem = { label: string; variant?: boolean }
 
@@ -736,6 +738,20 @@ export function CurrentUserMessageDisplay(props: {
             </Show>
           </span>
           <Show when={!props.text}>{renderMenu()}</Show>
+          {/* UPSTREAM-DIVERGENCE: Tandem keeps a prompt's actions as buttons here; CSS hides the chevron menu. */}
+          <Show when={!sending()}>
+            <TandemUserActions
+              sent={waiting() ? undefined : sent()}
+              created={props.message.time.created}
+              separated={metaLabels().length > 0 || changedFiles() > 0}
+              pending={pending() && !!props.actions?.pending}
+              revert={!!props.actions?.revert}
+              latest={props.latest}
+              disabled={actionView().disabled}
+              text={copyText()}
+              request={request}
+            />
+          </Show>
         </div>
       </Show>
     </div>

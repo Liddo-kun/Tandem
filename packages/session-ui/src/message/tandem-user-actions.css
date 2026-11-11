@@ -1,0 +1,24 @@
+/* Tandem shows a prompt's actions as buttons in its meta line (tandem-user-actions.tsx). Unlayered, so it overrides
+   message-part.css. The chevron menu stays only on the bubbles of a run that fold their meta line away. */
+[data-component="user-message"]:not([data-run-folded]) {
+  [data-slot="user-message-menu"] {
+    display: none;
+  }
+
+  /* Without hover the chevron reserves room on the bubble's first line. */
+  [data-slot="user-message-text"]:has(> [data-slot="user-message-menu"])::before {
+    content: none;
+  }
+}
+
+[data-slot="tandem-user-actions"] {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The time follows the labels at their own 4px spacing rather than the footer's 8px gap. */
+[data-slot="user-message-copy-wrapper"] > [data-slot="user-message-meta-tail"] {
+  margin-inline-start: -4px;
+}
