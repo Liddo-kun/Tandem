@@ -14,6 +14,7 @@ import { ClaudeCold } from "./cold.js"
 import { ClaudeHeld } from "./held.js"
 import { ClaudeInstructions } from "./instructions.js"
 import { ClaudePresentation } from "./presentation.js"
+import { ClaudeUpdates } from "./updates.js"
 import { ClaudeWorkdir } from "./workdir.js"
 import { TandemMessageMetadata } from "../message-metadata.js"
 import { TandemPrune } from "../prune.js"
@@ -159,7 +160,7 @@ export const Plugin = define({
       const id = (yield* ctx.model.list().pipe(Effect.orDie)).data.find((model) => model.providerID === event.model.providerID && model.id === event.model.id)?.modelID ?? event.model.id
       if (!ClaudePresentation.isClaude(event.model.id) && !ClaudePresentation.isClaude(id)) return undefined
       const session = yield* ctx.session.get({ sessionID: event.sessionID }).pipe(Effect.orDie)
-      return TandemAuxiliary.isBareContext(session.metadata) ? undefined : { id, trimBefore: session.metadata?.[TRIM_BEFORE] }
+      return TandemAuxiliary.isBareContext(session.metadata) ? undefined : { id, trimBefore: session.metadata?.[TRIM_BEFORE], session }
     })
     /** Puts something that went wrong where clients show it: the session's metadata, until its next turn ends. */
     const report = (sessionID: SessionHooks["prompt"]["sessionID"], message: string) => Effect.gen(function* () {
@@ -266,6 +267,18 @@ export const Plugin = define({
             event.messages.splice(anchor, 1, new UserMessage({ ...message, content: [...reminders, ...message.content] }), ...(system === undefined ? [] : [Message.system(system)]))
         }
         event.system.splice(index, 1)
+      }
+      // Anthropic's reminder after a long silent tool run, in sessions the user watches (see `ClaudeUpdates`).
+      if (shown.session.parentID === undefined && ClaudeUpdates.applies(claudeVersion(id), event.model.providerID === "anthropic" && nativeSystem(id))) {
+        const recorded = ClaudeUpdates.recorded(shown.session.metadata)
+        const next = primary ? ClaudeUpdates.due(event.messages, recorded) : undefined
+        // Sent only once recorded, so that every later request places it again.
+        if (next !== undefined) yield* Effect.gen(function* () {
+          const current = yield* ctx.session.get({ sessionID: event.sessionID })
+          yield* ctx.session.update({ sessionID: event.sessionID, metadata: { ...current.metadata, [ClaudeUpdates.KEY]: [...recorded, next] } })
+          recorded.add(next)
+        }).pipe(Effect.catchCause((cause) => Effect.logWarning("Unable to record an update reminder", { sessionID: event.sessionID, cause })))
+        ClaudeUpdates.place(event.messages, recorded)
       }
       const skill = event.tools.skill
       if (skill) {
