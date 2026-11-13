@@ -8,9 +8,8 @@ import { setNewIcons } from "@opencode/ui/icon"
 import { timelinePresets, type TimelineCategory, type TimelineDetail } from "@opencode/session-ui/timeline/detail"
 import { persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
-import { ScopedKey, type ServerScope } from "@/runtime/server/scope"
-// UPSTREAM-DIVERGENCE: Sync persisted Android zoom with the native wrapper.
 import { usePlatform } from "@/runtime/platform/platform"
+import { ScopedKey, type ServerScope } from "@/runtime/server/scope"
 
 export type Settings = typeof settingsSchema.Type
 
@@ -23,6 +22,8 @@ export type FollowUpBehavior = Settings["general"]["followUpBehavior"]
 export type BackgroundActivity = Settings["general"]["backgroundActivity"]
 
 export type TimelineWidth = Settings["general"]["timelineWidth"]
+
+export type SidebarOrganize = Settings["general"]["sidebarOrganize"]
 
 export type TabLayout = Settings["appearance"]["tabLayout"]
 
@@ -141,7 +142,7 @@ const generalSchema = Persistence.struct({
   foldUserMessages: Schema.Boolean,
   // The redesigned keyboard-first question dock, off until it ships.
   newQuestionUI: Schema.Boolean,
-  sidebarOrganize: Schema.Literals(["projects", "list"]),
+  sidebarOrganize: Schema.Literals(["projects", "list", "customize", "recent"]),
   mobileTitlebarPosition: Schema.Literals(["top", "bottom"]),
   // Owned by the review plugin, which copies it out once; kept so settings rewrites cannot drop it first.
   mobileDiffWrap: Persistence.optional(Schema.Boolean),
@@ -356,6 +357,11 @@ function withFallback<T>(read: () => T | undefined, fallback: T) {
   return createMemo(() => read() ?? fallback)
 }
 
+/** Only local/dev desktop builds offer the Recent side-tab organization. */
+export function recentSessionsAvailable(platform: "web" | "desktop", channel: ImportMetaEnv["VITE_OPENCODE_CHANNEL"]) {
+  return platform === "desktop" && (channel === "local" || channel === "dev")
+}
+
 export const { use: useSettings, provider: SettingsProvider } = createSimpleContext({
   name: "Settings",
   gate: false,
@@ -379,6 +385,11 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
       window.addEventListener("opencode:hardware-zoom", hardwareZoom)
       onCleanup(() => window.removeEventListener("opencode:hardware-zoom", hardwareZoom))
     }
+
+    // UPSTREAM-DIVERGENCE: Android, like web, has no Recent sidebar.
+    const sidebarOrganizeOptions: SidebarOrganize[] = recentSessionsAvailable(platform.platform === "android" ? "web" : platform.platform, import.meta.env.VITE_OPENCODE_CHANNEL)
+      ? ["list", "projects", "customize", "recent"]
+      : ["list", "projects", "customize"]
 
     const showCustomAgents = withFallback(
       () => store.general?.showCustomAgents,
@@ -472,8 +483,13 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         setNewQuestionUI(value: boolean) {
           setStore("general", "newQuestionUI", value)
         },
-        sidebarOrganize: withFallback(() => store.general?.sidebarOrganize, defaultSettings.general.sidebarOrganize),
-        setSidebarOrganize(value: "projects" | "list") {
+        sidebarOrganizeOptions,
+        sidebarOrganize: createMemo(() => {
+          const value = store.general?.sidebarOrganize
+
+          return sidebarOrganizeOptions.includes(value) ? value : defaultSettings.general.sidebarOrganize
+        }),
+        setSidebarOrganize(value: SidebarOrganize) {
           setStore("general", "sidebarOrganize", value)
         },
         mobileTitlebarPosition: withFallback(

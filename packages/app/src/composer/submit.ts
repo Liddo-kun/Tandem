@@ -764,6 +764,7 @@ async function sendCommand(
     skills: request.skills,
     delivery: value.delivery,
   })
+  session.data.session.acceptSend(session.id)
 }
 
 async function applySelection(
@@ -864,6 +865,7 @@ async function sendPrompt(
   }
 
   await session.data.session.prompt(admission).catch(() => session.data.session.prompt(admission))
+  session.data.session.acceptSend(session.id)
 }
 
 async function buildSubmissionRequest(session: ComposerSession, value: ComposerSubmission) {
