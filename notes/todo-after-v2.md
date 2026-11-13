@@ -117,6 +117,14 @@ and extension points before porting the integration. Browser-backed webfetch rem
   needs a protocol field, client regeneration and a way to type the text in the TUI. Deferred by Jon
   on 2026-10-16, while Claude Code-style compaction for Claude models was being designed.
 
+## Message metadata in request hooks
+
+- [ ] Upstream now passes each stored message's metadata to plugin request hooks (`SessionRequestMessage.metadata`,
+  `2f886a2a5e`, merged 2026-11-13). Tandem's `packages/core/src/plugin/tandem/message-metadata.ts` exists because
+  that was missing: it loads the session context through the plugin API and caches metadata by message ID for image
+  locations and the Claude compaction checkpoint. Check whether its callers can read `message.metadata` directly and
+  the helper can go.
+
 ## After the switch-over
 
 - [ ] Retire Tandem v1 when Jon no longer needs it: `~/.local/bin/tandem-v1-server`,
