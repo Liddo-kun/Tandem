@@ -167,7 +167,6 @@ export const toolMetadata = Schema.decodeUnknownSync(
     command: optional(Schema.String),
     shellID: optional(Schema.String),
     status: optional(Schema.String),
-    background: optional(Schema.Boolean),
     interrupted: optional(Schema.Boolean),
     notice: optional(Schema.String),
     count: optional(Schema.Finite),
@@ -1795,18 +1794,12 @@ ToolRegistry.register({
 
     // UPSTREAM-DIVERGENCE: use the child's identity for every call and distinguish follow-ups.
     const followUp = () => typeof props.input.sessionID === "string" && !!props.input.sessionID
-    const subtitle = createMemo(() => {
-      const value =
+    const subtitle = createMemo(
+      () =>
         data.store.session.find((session) => session.id === childSessionId())?.title ||
         childSessionId() ||
-        input().description
-
-      if (!value) return value
-
-      if (view().background) return `${value} (background)`
-
-      return value
-    })
+        input().description,
+    )
 
     const href = createMemo(() => sessionLink(childSessionId(), data.sessionHref))
     const clickable = createMemo(() => !!(childSessionId() && (data.navigateToSession || href())))

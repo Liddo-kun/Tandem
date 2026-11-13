@@ -1,5 +1,7 @@
 # Direct subagent chat
 
+> **Changed 2026-11-13 (upstream sync).** Upstream now reports to the parent each time a child goes idle, including after direct chat, and Jon chose to adopt that. The composer note now reads “Replies here are also reported to the main session.” The direct-steering section, the `tandemSubagentPrompt` marker and `tandem-subagent-{steering,completion}.ts` were removed. The Behavior, Ownership and Verification sections below describe the earlier implementation.
+
 Tandem enhancement requested by Jon on 2026-10-10.
 
 ## Behavior

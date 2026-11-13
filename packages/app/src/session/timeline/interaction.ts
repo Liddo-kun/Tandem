@@ -68,8 +68,6 @@ export function createSessionTimelineInteraction(session: SessionModel, visible:
   // The active timeline's navigation, registered by its virtualizer.
   let revealMessage = (_id: string, _partID?: string) => {}
 
-  let revealPart = (_target: string) => false
-
   let scrollToEnd = (_behavior?: ScrollBehavior) => {}
 
   let page = (_direction: 1 | -1) => {}
@@ -443,11 +441,6 @@ export function createSessionTimelineInteraction(session: SessionModel, visible:
         cursor.dispatch(SCROLL_MOVED_EVENT)
         revealMessage(id, partID)
       },
-      revealPart: (target: string) => {
-        cursor.dispatch(SCROLL_MOVED_EVENT)
-
-        return revealPart(target)
-      },
       resume,
       setActiveMessage,
     },
@@ -477,9 +470,6 @@ export function createSessionTimelineInteraction(session: SessionModel, visible:
       },
       setRevealMessage: (reveal: (id: string, partID?: string) => void) => {
         revealMessage = reveal
-      },
-      setRevealPart: (reveal: (target: string) => boolean) => {
-        revealPart = reveal
       },
       // The tool call the route opened the session on, attempted once per history entry.
       reveal: {

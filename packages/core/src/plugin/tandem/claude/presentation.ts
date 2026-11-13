@@ -16,7 +16,7 @@ const keys: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   edit: { path: "file_path", filePath: "file_path", oldString: "old_string", newString: "new_string", replaceAll: "replace_all" },
   grep: { include: "glob" }, skill: { id: "skill", name: "skill" },
   shell: { background: "run_in_background" }, bash: { background: "run_in_background" },
-  subagent: { agent: "subagent_type", background: "run_in_background" }, task: { agent: "subagent_type", background: "run_in_background" },
+  subagent: { agent: "subagent_type" }, task: { agent: "subagent_type" },
 }
 const nameFor = (name: string) => names[name] ?? name.charAt(0).toUpperCase() + name.slice(1)
 const record = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)

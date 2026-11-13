@@ -1,5 +1,7 @@
 # Subagent final answer omitted after an in-flight follow-up
 
+> **Removed 2026-11-13.** Upstream (`609ee05a23`, `66e2fb94b1`) now always runs subagents in the background and reports to the parent each time a child goes idle, with the last reply of that work period. Jon chose to adopt that fully: Tandem's collector, the `promptID` boundary and the first-prompt reminder are gone. Kept as a record of the investigation.
+
 Investigated 2026-10-09 using a consistent SQLite backup of the daily server's
 actual session records. The resulting implementation is a **Tandem feature/enhancement**, as requested by Jon, rather than a temporary upstream fix. No low-level tests were added or run.
 

@@ -1,5 +1,4 @@
 import { Schema } from "effect"
-import { SessionMessage } from "../session/message.js"
 import { SessionSchema } from "../session/schema.js"
 
 export const RecoverySchema = Schema.Union([
@@ -15,8 +14,6 @@ export const RecoverySchema = Schema.Union([
     childSessionID: SessionSchema.ID,
     agent: Schema.String,
     description: Schema.String,
-    // UPSTREAM-DIVERGENCE: Tandem retains the result boundary across subagent steering and server recovery.
-    promptID: Schema.optionalKey(SessionMessage.ID),
   }),
   Schema.Struct({
     kind: Schema.Literal("image"),

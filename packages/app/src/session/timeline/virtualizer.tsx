@@ -124,7 +124,6 @@ type Input = {
     disclosure: Readonly<Record<string, boolean | undefined>>,
   ) => boolean
   setRevealMessage?: (fn: (id: string, partID?: string) => void) => void
-  setRevealPart?: (fn: (target: string) => boolean) => void
   setScrollToEnd?: (fn: (behavior?: ScrollBehavior) => void) => void
   /** Pages the timeline for keys pressed outside it, such as PageUp in the composer. */
   setPage?: (fn: (direction: 1 | -1) => void) => void
@@ -674,7 +673,6 @@ export function createTimelineVirtualizer(input: Input) {
       reportOffset?.(root.scrollTop, false)
       dispatchCold(CHECK_REQUESTED)
     })
-    input.setRevealPart?.(revealPart)
     input.setRevealMessage?.((id, partID) => {
       if (!active()) return
 
@@ -1274,7 +1272,6 @@ export function createTimelineVirtualizer(input: Input) {
     if (active()) {
       input.setScrollRef(undefined)
       input.setRevealMessage?.(() => {})
-      input.setRevealPart?.(() => false)
       input.setScrollToEnd?.(() => {})
       input.setPage?.(() => {})
     }

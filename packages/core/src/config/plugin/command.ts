@@ -80,17 +80,10 @@ export const Plugin = define({
                     agent: selected.id,
                     model: model ?? selected.info?.model ?? parent.model,
                   })
-                  // UPSTREAM-DIVERGENCE: command subagents use Tandem's durable output boundary too.
-                  const prompted = yield* sessions.prompt({
+                  yield* sessions.prompt({
                     ...input.prompt,
                     sessionID: child.id,
-                    // UPSTREAM-DIVERGENCE: mark command-spawned prompts as parent delegation.
-                    metadata: { tandemSubagentPrompt: true },
-                    text: [
-                      // UPSTREAM-DIVERGENCE: expand upstream's first-prompt intro into Tandem's delivery reminder.
-                      "<system-reminder>\nYou are a subagent spawned by another session. At idle, the main agent receives your completed final answers in order, but not commentary or tool output. Include all needed findings in your final answer.\n</system-reminder>",
-                      text,
-                    ].join("\n"),
+                    text: ["You are a subagent spawned by another session.", text].join("\n"),
                     resume: false,
                   })
                   const recovery = {
@@ -99,11 +92,8 @@ export const Plugin = define({
                     childSessionID: child.id,
                     agent: selected.id,
                     description: command.description ?? name,
-                    // UPSTREAM-DIVERGENCE: retain the admitted prompt for Tandem's output collection.
-                    promptID: prompted.id,
                   }
                   yield* subagents.start(recovery)
-                  yield* subagents.background(recovery)
                   return
                 }
                 if (agent !== undefined) {

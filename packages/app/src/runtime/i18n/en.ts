@@ -355,7 +355,7 @@ export const dict = {
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
   // UPSTREAM-DIVERGENCE: explain local-only chat after a delegated job ends; the back link follows that sentence.
-  "session.child.chatNotice": "Replies after the delegated task ends are not sent to the main session.",
+  "session.child.chatNotice": "Replies here are also reported to the main session.",
   "session.child.backToParent": "Back to main session.",
   "session.child.status.running": "Running",
   "session.child.status.succeeded": "Done",
@@ -709,8 +709,6 @@ export const dict = {
   "session.timeline.status.waitingApproval": "Waiting for approval",
   "session.timeline.status.waitingAnswer": "Waiting for your answer",
   "session.timeline.status.waitingShell": "Waiting for shell",
-  "session.timeline.status.waitingAgent": "Waiting for subagent",
-  "session.timeline.status.waitingAgents": "Waiting for subagents",
   "session.timeline.status.working": "Working",
   "session.running.stop.subagent": "Interrupt subagent",
   "session.running.stop.shell": "Kill shell command",
