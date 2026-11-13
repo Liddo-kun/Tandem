@@ -12,12 +12,11 @@ import {
   type Accessor,
 } from "solid-js"
 import { createStore, produce, type Store } from "solid-js/store"
-// UPSTREAM-DIVERGENCE: Shared navigator-first clipboard fallback for plugins.
-import { writeClipboardText } from "@opencode/ui/clipboard"
 import type { Schema } from "effect"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { useTheme } from "@opencode/ui/theme/context"
 import { toaster } from "@opencode/ui/toast"
+import { writeClipboard } from "@opencode/session-ui/copy"
 import { base64Encode } from "@opencode/util/encode"
 import { uuid } from "@opencode/util/uuid"
 import {
@@ -296,8 +295,11 @@ export function createHostApis() {
       },
     }),
     system: () => ({
-      // UPSTREAM-DIVERGENCE: Delegate extension copying to the navigator-first clipboard fallback.
-      copy: (text) => writeClipboardText(text, platform.writeClipboardText),
+      async copy(text) {
+        if (platform.writeClipboardText) return platform.writeClipboardText(text)
+
+        if (!(await writeClipboard(text))) throw new Error(language.t("common.requestFailed"))
+      },
       async save(file) {
         if (platform.saveFile) return platform.saveFile({ defaultPath: file.name }, file.content)
         const url = URL.createObjectURL(new Blob([file.content], { type: "application/octet-stream" }))

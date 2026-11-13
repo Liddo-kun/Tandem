@@ -28,6 +28,7 @@ import { Menu } from "@opencode/ui/menu"
 import { MenuScroll } from "@opencode/ui/menu-scroll"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { AttachmentCard } from "@opencode/session-ui/attachment-card"
+import { useMarkdown } from "@opencode/session-ui/context/markdown"
 import { ProgressCircle } from "@opencode/ui/progress-circle"
 import type { Upload } from "../attachments/uploads"
 import { CommentCard, commentCardTarget, quoteTooltip } from "@opencode/session-ui/comment-card"
@@ -104,6 +105,7 @@ export type ComposerEditorProps = {
 
 export function ComposerEditor(props: ComposerEditorProps) {
   const i18n = useI18n()
+  const markdown = useMarkdown()
   const state = props.controller.state
   const view = props.controller.view
   const suggestionsID = createUniqueId()
@@ -424,6 +426,16 @@ export function ComposerEditor(props: ComposerEditorProps) {
               style={{
                 "unicode-bidi": mode() === "normal" ? "plaintext" : undefined,
                 "text-align": "start",
+              }}
+              onContextMenu={(event) => {
+                const target = event.target instanceof Element ? event.target : undefined
+                const mention = target?.closest<HTMLElement>('[data-mention="session"]')
+                const part = mention ? mentionParts.get(mention) : undefined
+                const menu = markdown?.sessionMenu
+
+                if (part?.type !== "session" || !menu) return
+                event.preventDefault()
+                menu({ sessionID: part.id, x: event.clientX, y: event.clientY })
               }}
               onInput={(event) => {
                 // UPSTREAM-DIVERGENCE(temporary): Restore Android mention gaps; they are not text.
