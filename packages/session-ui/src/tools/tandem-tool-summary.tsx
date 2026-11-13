@@ -8,7 +8,7 @@ import { getFilename } from "@opencode/util/path"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { TextShimmer } from "@opencode/ui/text-shimmer"
 import type { ApplyPatchFile } from "../components/apply-patch-file"
-import { currentToolMetadata, executeToolCalls, shellResultFailed } from "../message/current-tool-state"
+import { currentToolMetadata, executeToolCalls } from "../message/current-tool-state"
 
 type ToolState = { name: string; status?: string; metadata: Record<string, unknown> }
 
@@ -17,8 +17,13 @@ function failed(tool: ToolState) {
     tool.status === "error" ||
     (tool.name === "execute" &&
       (tool.metadata.error === true || executeToolCalls(tool.metadata).some((call) => call.status === "error"))) ||
-    (tool.name === "shell" && tool.status === "completed" && shellResultFailed(tool.metadata))
+    (tool.name === "shell" && tool.status === "completed" && shellFailed(tool.metadata))
   )
+}
+
+// Upstream's `shellResultFailed` rule, for renderer metadata that is not typed as JSON.
+function shellFailed(metadata: ToolState["metadata"]) {
+  return metadata.timeout === true || (typeof metadata.exit === "number" && metadata.exit !== 0)
 }
 
 /** Running while any tool is pending, then failed if any failed, else succeeded. */
