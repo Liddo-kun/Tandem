@@ -148,7 +148,7 @@ const load = (id: Session.ID) =>
   Effect.gen(function* () {
     const contexts = yield* SessionContext.Service
     const selected = yield* contexts.select(id)
-    const resolvedModel = yield* contexts.resolveModel(selected.session)
+    const resolvedModel = yield* contexts.resolveModel(selected.session, { kind: "compaction", agent: selected.agent.id })
     const history = yield* SessionHistory.preview((yield* Database.Service).db, id, selected.instructions, resolvedModel.ref)
     return { session: selected.session, agent: selected.agent, tools: selected.tools, model: resolvedModel, initial: history.initial, messages: history.messages }
   })

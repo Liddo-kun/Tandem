@@ -224,7 +224,7 @@ const warm = Effect.fnUntraced(function* (input: Common & { context: SessionCont
 const coldContext = Effect.fnUntraced(function* (input: Common, context: SessionContext.Loaded) {
   const agent = yield* input.agents.get(Agent.ID.make("compaction"))
   const ref = agent?.model ?? { providerID: context.model.ref.providerID, id: Model.ID.make(ClaudeCold.MODEL) }
-  const model = yield* input.models.resolve({ ...context.session, model: ref }, input.catalog.available).pipe(Effect.orElseSucceed(() => undefined))
+  const model = yield* input.models.resolve({ ...context.session, model: ref }, input.catalog.available, { kind: "compaction", agent: agent?.id ?? Agent.ID.make("compaction") }).pipe(Effect.orElseSucceed(() => undefined))
   return model ? { ...context, model } : context
 })
 
@@ -336,7 +336,7 @@ export const register = (input: Omit<Common, "stream"> & {
 }) => ClaudeHeld.register(input.location, (sessionID, assistantID, expires) => Effect.gen(function* () {
   // As the runner loads it for `/compact`.
   const selected = yield* input.contexts.select(SessionSchema.ID.make(sessionID))
-  const model = yield* input.contexts.resolveModel(selected.session)
+  const model = yield* input.contexts.resolveModel(selected.session, { kind: "compaction", agent: selected.agent.id })
   const history = yield* SessionHistory.preview(input.db, selected.session.id, selected.instructions, model.ref)
   const context: SessionContext.Loaded = { session: selected.session, agent: selected.agent, tools: selected.tools, model, initial: history.initial, messages: history.messages }
   if (!applies(context) || ClaudeHeld.lastResponse(context.messages)?.id !== assistantID) return undefined

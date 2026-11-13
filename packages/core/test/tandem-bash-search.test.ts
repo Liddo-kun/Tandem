@@ -115,7 +115,7 @@ run(
                         selected.instructions,
                         Object.fromEntries(observed.map((entry) => [entry.key, entry.value])),
                       )
-                      const model = yield* context.resolveModel(session)
+                      const model = yield* context.resolveModel(session, { kind: "primary", agent: selected.agent.id })
                       const prepared = yield* context.request.primary({
                         session,
                         agent: selected.agent.id,
