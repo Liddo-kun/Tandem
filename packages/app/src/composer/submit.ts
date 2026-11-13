@@ -57,6 +57,7 @@ type ComposerSubmitInput = {
   resetHistory: () => void
   closePopover: () => void
   delivery?: (alternate: boolean) => ComposerDelivery
+  queueFirst?: (inboxID: string) => void
   clientCommand?: (text: string) => (() => void | Promise<void>) | undefined
   notify: {
     missingSelection: () => void
@@ -95,7 +96,7 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
     }
 
     if (effect.type === "submit.retry")
-      return dispatch({ type: "submit", snapshot: snapshot(input, effect.alternate), done: effect.done })
+      return dispatch({ type: "submit", snapshot: snapshot(input, effect.alternate, effect.first), done: effect.done })
 
     if (effect.type === "hold.show") {
       input.adapter.beforeSubmit?.()
@@ -267,11 +268,15 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
 
   return {
     state,
-    submit(event: globalThis.Event, options?: { alternate?: boolean }) {
+    submit(event: globalThis.Event, options?: { alternate?: boolean; first?: boolean }) {
       event.preventDefault()
 
       return new Promise<void>((resolve) =>
-        dispatch({ type: "submit", snapshot: snapshot(input, options?.alternate ?? false), done: () => resolve() }),
+        dispatch({
+          type: "submit",
+          snapshot: snapshot(input, options?.alternate ?? false, options?.first),
+          done: () => resolve(),
+        }),
       )
     },
     submitQuote(key: string, comment: string) {
@@ -306,11 +311,13 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
   }
 }
 
-function snapshot(input: ComposerSubmitInput, alternate: boolean): SubmitSnapshot {
+function snapshot(input: ComposerSubmitInput, alternate: boolean, first = false): SubmitSnapshot {
   const target = input.adapter.state
   const prompt = clonePrompt(target.current())
   const text = submissionText(prompt)
   const mode = input.mode()
+
+  const queueFirst = first && mode === "normal" && input.adapter.kind === "active-session" && input.adapter.working()
 
   const context = target.context.items().map((item) => {
     if (item.type === "note") return { ...item, live: item.live ? { ...item.live } : undefined }
@@ -337,7 +344,8 @@ function snapshot(input: ComposerSubmitInput, alternate: boolean): SubmitSnapsho
     text,
     mode,
     alternate,
-    delivery: input.delivery?.(alternate) ?? "steer",
+    delivery: queueFirst ? "queue" : (input.delivery?.(alternate) ?? "steer"),
+    first: queueFirst,
     selection: currentSelection(input),
     loading: input.adapter.controls().model.loading,
     retry: target.retry.current(),
@@ -588,6 +596,8 @@ function dispatchPrompt(input: ComposerSubmitInput, session: ComposerSession, va
         const admitted = result.ok || failSubmission(input, session, "prompt", result.error, restore, value.id)
 
         if (!admitted) return false
+
+        if (value.first) input.queueFirst?.(value.id)
 
         // Move blocking work only once the steer is admitted, so the next step can read it from the inbox.
         void background?.move()
