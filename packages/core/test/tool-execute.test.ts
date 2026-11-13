@@ -74,6 +74,7 @@ test("execute describes invariant Code Mode behavior", () => {
   expect(createCodeMode(new Map()).description).toBe(
     [
       "Run JavaScript in a confined Code Mode runtime to script tool calls and HTTP requests and compose their results.",
+      "Write plain JavaScript and send it exactly as written: no code fence, and no JSON or other wrapper around it.",
       "`fetch` is available for HTTP requests. Imports, direct filesystem access, and timers are unavailable: there is no `setTimeout` or sleep. All other external access goes through `tools`.",
       // UPSTREAM-DIVERGENCE: matches Tandem's Code Mode description wording.
       'Within `{ code }`, `tools` exposes only the tools listed under the "# Code Mode" heading in your instructions (and any found with `search`, when that section says it is available). Your other tools cannot be called from inside `{ code }`.',
@@ -330,7 +331,7 @@ describe.each([
         { tool: "slack.admin.create", status: "completed" },
       ],
     })
-    expect(result.content).toEqual([{ type: "text", text: '[\n  "admin",\n  "created"\n]' }])
+    expect(result.content).toEqual([{ type: "text", text: '["admin","created"]' }])
   })
 
   test("executions share the prepared runtime of an inventory while keeping per-call state", async () => {

@@ -209,6 +209,7 @@ export interface SessionIdle {
 export interface SessionHooks {
   // UPSTREAM-DIVERGENCE: expose the approved instructions policy hook on the Effect plugin API.
   readonly instructions: SessionInstructions
+  readonly fork: { readonly sessionID: Session.ID }
   readonly prompt: SessionPrompt
   readonly context: SessionContext
   readonly compaction: SessionCompaction

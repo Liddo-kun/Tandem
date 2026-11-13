@@ -19,6 +19,7 @@ import { useRoute, useRouteData } from "../../context/route"
 import { createStore } from "solid-js/store"
 import { useData } from "../../context/data"
 import { SplitBorder } from "../../ui/border"
+import { useSessionLinks } from "../../ui/session-link"
 import { useTuiPaths, useTuiTerminalEnvironment } from "../../context/runtime"
 import { Spinner, SPINNER_FRAMES } from "../../component/spinner"
 import { PatchDiff } from "../../component/patch-diff"
@@ -2228,6 +2229,7 @@ function CompactionMessage(props: { message: Extract<SessionMessageInfo, { type:
       <Show when={content()}>
         <box paddingTop={1} paddingLeft={3}>
           <markdown
+            ref={useSessionLinks()}
             syntaxStyle={syntax()}
             renderNode={plugins.markdown()}
             streaming={true}

@@ -75,6 +75,7 @@ export type Inventory = {
 // Invariant model-facing guidance; the changing tool catalog is delivered through Instructions.
 const description = [
   "Run JavaScript in a confined Code Mode runtime to script tool calls and HTTP requests and compose their results.",
+  "Write plain JavaScript and send it exactly as written: no code fence, and no JSON or other wrapper around it.",
   "`fetch` is available for HTTP requests. Imports, direct filesystem access, and timers are unavailable: there is no `setTimeout` or sleep. All other external access goes through `tools`.",
   // UPSTREAM-DIVERGENCE: say where the catalog is, tie `search` to it, and state plainly that regular tools are unavailable.
   'Within `{ code }`, `tools` exposes only the tools listed under the "# Code Mode" heading in your instructions (and any found with `search`, when that section says it is available). Your other tools cannot be called from inside `{ code }`.',
@@ -445,9 +446,10 @@ function formatResult(result: CodeMode.Result) {
   return [output, warnings, logs].filter((part) => part !== undefined && part !== "").join("\n\n")
 }
 
+// Compact JSON: indentation adds tokens on every later step without helping the model. Clients pretty-print it.
 function formatValue(value: CodeMode.DataValue) {
   if (typeof value === "string") return value
-  return JSON.stringify(value, null, 2) ?? String(value)
+  return JSON.stringify(value) ?? String(value)
 }
 
 function outputFiles(content: ReadonlyArray<Content>): Array<typeof ExecuteFile.Type> {

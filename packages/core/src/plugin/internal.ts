@@ -80,6 +80,7 @@ import { EditTool } from "../tool/plugin/edit.js"
 import { GlobTool } from "../tool/plugin/glob.js"
 import { GrepTool } from "../tool/plugin/grep.js"
 import { ImageGenerateTool } from "../tool/plugin/image-generate.js"
+import { McpEventTools } from "../tool/plugin/mcp-events.js"
 import { McpResourceTools } from "../tool/plugin/mcp-resource.js"
 import { OpenCodeTools } from "../tool/plugin/opencode.js"
 import { QuestionTool } from "../tool/plugin/question.js"
@@ -101,6 +102,7 @@ import { AgentPlugin } from "./agent.js"
 import BrowserPlugin from "@opencode/plugin-browser"
 import { CommandPlugin } from "./command.js"
 import { IdentityPlugin } from "./identity.js"
+import { ForkNoticePlugin } from "./fork-notice.js"
 import { PlanPlugin } from "./plan.js"
 import { GoalPlugin } from "./goal.js"
 import { ModelsDevPlugin } from "./models-dev.js"
@@ -265,6 +267,7 @@ const pre = [
   // UPSTREAM-DIVERGENCE: install auxiliary defaults and Corrector before normal prompt handling.
   TandemAuxiliaryPlugin.Defaults,
   PromptCorrectorPlugin.Plugin,
+  ForkNoticePlugin.Plugin,
   PlanPlugin.Plugin,
   CommandPlugin.Plugin,
   GoalPlugin.Plugin,
@@ -286,6 +289,7 @@ const pre = [
   ImageGenerateTool.Plugin,
   OpenCodeTools.Plugin,
   SessionStartPlugin.Plugin, // UPSTREAM-DIVERGENCE: after OpenCodeTools declares the opencode namespace.
+  McpEventTools.Plugin,
   McpResourceTools.Plugin,
   QuestionTool.Plugin,
   ReadTool.Plugin,
