@@ -1031,6 +1031,23 @@ const program = Effect.gen(function* () {
 
 The hosted result is represented as a provider-executed tool call and a tool result whose content carries the generated image as a file. Gemini image-capable models instead emit a first-class `media` `LLMEvent` for inline image output (`response.message` then carries a `media` part). Retaining `response.message` preserves the generated image for continuation on both routes.
 
+### Image jobs
+
+`ai.image.generate` and `ai.image.stream` poll a queued image route for you. To manage the job yourself, use the same
+calls as video: `start` submits it and returns `{ id }` at once, the provider's job ID as a string you can store and
+read back from another process, and `status`, `result` and `cancel` take the model and that `id`. `status` is one read;
+`result` fails with an `InvalidRequest` reason while the job is still running; `cancel` fails with an
+`UnsupportedOperation` reason when the provider has no cancel endpoint. No shipped image route is queued yet, so on
+every image model today all four fail with an `UnsupportedOperation` reason before sending anything.
+
+```ts
+const program = Effect.gen(function* () {
+  const job = yield* ai.image.start({ model, prompt: "A lighthouse" })
+  const status = yield* ai.image.status(model, job.id) // { status, progress? }
+  if (status.status === "completed") return yield* ai.image.result(model, job.id)
+})
+```
+
 ## Video generation
 
 Video generation is a job: `start` submits it and returns at once, and the caller decides when to read its `status`,
@@ -1072,6 +1089,10 @@ The shared fields are `prompt`, `start`, `end`, `references`, `duration`, `aspec
 everything else is provider-specific and goes under `providerOptions`, typed from the selected model. A request only
 fails before sending when its protocol has no way to express it, such as a reference video on xAI. Values the provider
 may reject, like an unsupported duration or too many references, go to the provider, and its error comes back typed.
+
+`start` and `end` are images. They take a URL, data URL, base64 string or bytes, or an asset built with
+`Media.image(...)`, which rejects assets known to be video, audio or documents; URLs and provider file references
+whose type isn't stated are sent and checked by the provider. `references` take any kind.
 
 `status` is one read; `result` fails with an `InvalidRequest` reason when the job hasn't finished, and with the
 provider's reason (and terminal document on `reason.body`) when it failed, was cancelled or expired. Moderation
@@ -1147,7 +1168,7 @@ Everything below is exported from `@opencode/ai/effect` unless noted.
 - **`Message.user(...)` / `Message.assistant(...)` / `Message.tool(...)`** — message constructors from the canonical schema model.
 - **`LanguageModel.make(...)` / `ToolCallPart.make(...)` / `ToolResultPart.make(...)` / `ToolDefinition.make(...)`** — model and tool-related constructors from the canonical schema model.
 - **`LLMEvent.is.*`** — typed guards (`is.textDelta`, `is.toolCall`, `is.finish`, …) for filtering streams.
-- **`ai.image.request` / `generate` / `stream` / `start` / `resume`** — images over inline, streaming (partial previews), and queued routes through a provider-neutral request and response model.
+- **`ai.image.request` / `generate` / `stream` / `start` / `status` / `result` / `cancel`** — images over inline, streaming (partial previews), and queued routes through a provider-neutral request and response model. `start`, `status`, `result` and `cancel` address a queued job by the provider's job ID, like video; see [Image jobs](#image-jobs).
 - **`ImageClient`** — Effect service and layer for image execution, parallel to `LLMClient`.
 - **`ai.video.request` / `start` / `status` / `result` / `cancel`** — video generation as a job addressed by the provider's job ID; see [Video generation](#video-generation). `VideoClient` is its Effect service and layer.
 - **`Media`** — the shared asset type (`Media.Asset`, `Media.Source`) and constructors used by messages, tool results, and media requests.
