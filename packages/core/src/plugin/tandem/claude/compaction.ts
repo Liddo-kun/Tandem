@@ -193,7 +193,10 @@ const warm = Effect.fnUntraced(function* (input: Common & { context: SessionCont
   const context = input.context
   const policy = yield* SessionRunnerRetry.policy(context.session.id)
   for (let count = input.groups.length - 1; count >= 1; count--) {
-    const older = input.groups.slice(0, count).flat()
+    // Model switches in the held-back groups follow the summarized ones: an effort switch then still goes out as the
+    // per-turn effort message, and the request-wide effort, part of the cached prefix, stays the one cached.
+    const switches = input.groups.slice(count).flat().filter((message) => message.type === "model-switched")
+    const older = [...input.groups.slice(0, count).flat(), ...switches]
     const base = SessionModelRequest.baseTranscript({ agent: context.agent.info, model: context.model, tools: context.tools, initial: context.initial, messages: older })
     const prepared = yield* input.requests.compaction({ session: context.session, agent: context.agent.id, model: context.model, tools: context.tools, system: base.system, messages: base.messages, inputTokens: { measured: input.budget, estimated: 0 } })
     const request = appendPrompt(prepared.request, prompt(input.transcript))

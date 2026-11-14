@@ -1,6 +1,6 @@
 export * as ClaudeCold from "./cold.js"
 
-import { type LLMRequest, Message, SystemPart } from "@opencode/ai/effect"
+import { ai, type LLMRequest, Message, ReasoningEfforts, SystemPart } from "@opencode/ai/effect"
 import { DateTime } from "effect"
 import { resolve } from "path"
 import type { SessionContext } from "../../../session/context.js"
@@ -38,17 +38,33 @@ export const lastRequest = (context: Pick<SessionContext.Loaded, "messages">) =>
   return message?.type === "assistant" ? message : undefined
 }
 
+const EFFORTS = new Set<string>(ReasoningEfforts)
+const effortVariant = (variant: string | undefined) => variant === undefined || variant === "default" || EFFORTS.has(variant)
+
+/**
+ * Whether switching between these variants of the session's model keeps the prompt cache. Core sends a switch between
+ * effort variants as a per-turn effort message where the route accepts one (Claude Opus 5 and later, Claude 5.1 and
+ * later), leaving the cached prefix as it was; elsewhere the request-wide effort changes, and with it the cache.
+ */
+const keepsCache = (context: Pick<SessionContext.Loaded, "model">, from: string | undefined) => {
+  if (!effortVariant(from) || !effortVariant(context.model.ref.variant)) return false
+  const model = context.model.model
+  const probe = ai.request({ model, messages: [], providerOptions: model.options?.providerOptions })
+  return model.route.supportsEffortUpdates?.(probe) ?? false
+}
+
 /**
  * Whether the prompt cache no longer holds this conversation: its last request is older than the cache lifetime, or
- * went to another model or variant. A request made shortly before expiry (see `ClaudeHeld`) read the cache again,
- * so the lifetime then counts from it. A conversation with no measured request has nothing that says how long ago
- * it was sent, so it counts as warm.
+ * went to another model, or to another variant whose switch changes the cached prefix (see `keepsCache`). A request
+ * made shortly before expiry (see `ClaudeHeld`) read the cache again, so the lifetime then counts from it. A
+ * conversation with no measured request has nothing that says how long ago it was sent, so it counts as warm.
  */
 export const expired = (context: Pick<SessionContext.Loaded, "messages" | "model" | "session">, now: number) => {
   const last = lastRequest(context)
   if (!last) return false
   const model = context.model.ref
-  if (last.model.providerID !== model.providerID || last.model.id !== model.id || last.model.variant !== model.variant) return true
+  if (last.model.providerID !== model.providerID || last.model.id !== model.id) return true
+  if (last.model.variant !== model.variant && !keepsCache(context, last.model.variant)) return true
   const mark = ClaudeHeld.read(context.session.metadata)
   const read = Math.max(DateTime.toEpochMillis(last.time.created), mark?.assistantID === last.id ? mark.at : 0)
   return now - read > cacheLifetime(context.model.cache?.ttl)
