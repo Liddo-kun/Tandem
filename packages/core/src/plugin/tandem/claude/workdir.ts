@@ -24,12 +24,12 @@ const description = (dedicatedSearch: boolean) => [
     (dedicatedSearch ? "`find`, `grep`, " : "") +
     "`cat`, `sed`, `awk`, or `echo` commands, unless explicitly instructed or after you have verified that a dedicated tool cannot accomplish your task. Instead, use the appropriate dedicated tool as this will provide a much better experience for the user.",
   "- Command output is displayed to you, not reliably to the user.",
-  `- \`timeout\` is in milliseconds: default ${ShellTool.DEFAULT_TIMEOUT_MS} for a foreground command; 0 disables it.`,
+  `- \`timeout\` is in milliseconds (default ${ShellTool.DEFAULT_TIMEOUT_MS}). A foreground command still running when it expires moves to the background and re-invokes you when it exits; a background command is stopped.`,
   "- `run_in_background` runs the command detached: it keeps running across turns and re-invokes you when it exits. No `&` needed.",
 ].join("\n")
 const INPUT: Readonly<Record<string, string>> = {
   command: "The command to execute",
-  timeout: `Optional timeout in milliseconds (default ${ShellTool.DEFAULT_TIMEOUT_MS} for a foreground command; 0 disables it)`,
+  timeout: `Optional timeout in milliseconds (default ${ShellTool.DEFAULT_TIMEOUT_MS}). When it expires, a foreground command moves to the background and a background command is stopped.`,
   background: "Set to true to run this command in the background.",
 }
 

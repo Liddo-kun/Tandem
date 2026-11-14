@@ -180,6 +180,7 @@ const builtins = new Map<string, () => Promise<unknown>>([
   ],
   ["@opencode/ai/providers/xai", () => import("@opencode/ai/providers/xai")],
   ["@opencode/ai/providers/xai/images", () => import("@opencode/ai/providers/xai/images")],
+  ["@opencode/ai/providers/xai/videos", () => import("@opencode/ai/providers/xai/videos")],
   ["@opencode/ai/providers/zai", () => import("@opencode/ai/providers/zai")],
   ["@opencode/ai/providers/zai/chat", () => import("@opencode/ai/providers/zai/chat")],
   ["@opencode/ai/providers/zai/images", () => import("@opencode/ai/providers/zai/images")],
@@ -268,6 +269,14 @@ const decodeEncoding = Schema.decodeUnknownOption(Provider.Encoding)
 /** Request body encoding from provider or model settings; invalid values are dropped. */
 export function encoding(settings: Readonly<Record<string, unknown>>) {
   return Option.getOrUndefined(decodeEncoding(settings.encoding))
+}
+
+const decodeTls = Schema.decodeUnknownOption(Provider.Tls)
+
+/** Client certificate from provider settings. An empty `cert` or `key`, such as a missing `{file:}`, leaves it unset. */
+export function tls(settings: Readonly<Record<string, unknown>>) {
+  const value = Option.getOrUndefined(decodeTls(settings.tls))
+  return value?.cert && value.key ? value : undefined
 }
 
 export const Request = Provider.Request

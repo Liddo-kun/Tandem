@@ -1,9 +1,10 @@
 import { LLMClient, RequestExecutor } from "@opencode/ai/route"
-import { Effect, Layer } from "effect"
-import { FetchHttpClient, HttpClient } from "effect/http"
+import { Effect, Layer, Option } from "effect"
+import { FetchHttpClient, HttpClient, HttpClientError } from "effect/http"
 import { Socket } from "effect/socket"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { httpClient } from "@opencode/util/effect/app-node-platform"
+import { ClientTls } from "#client-tls"
 import { WebSocketConstructor } from "./websocket-constructor.js"
 // UPSTREAM-DIVERGENCE: decorate the injected model HTTP client with owned final-send diagnostics.
 import { RequestDump } from "../plugin/tandem/request-dump/transport.js"
@@ -20,10 +21,45 @@ const withoutBunTimeout = Layer.effect(
   }),
 )
 
+// Presents the model's client certificate (provider `settings.tls`) on its HTTPS requests, through this runtime's
+// certificate-capable fetch. The TLS handshake only sends it to servers that request one.
+const withClientCertificate = Layer.effect(
+  HttpClient.HttpClient,
+  Effect.gen(function* () {
+    const client = yield* HttpClient.HttpClient
+    return HttpClient.transform(client, (effect, request) =>
+      Effect.gen(function* () {
+        const tls = yield* RequestExecutor.CurrentTls
+        if (!tls || !request.url.startsWith("https:")) return yield* effect
+        const sender = ClientTls.sender(tls)
+        if (!sender)
+          return yield* new HttpClientError.HttpClientError({
+            reason: new HttpClientError.TransportError({
+              request,
+              description: "Client certificates aren't supported on this runtime",
+            }),
+          })
+        const init: RequestInit = Option.getOrElse(yield* Effect.serviceOption(FetchHttpClient.RequestInit), () => ({}))
+        return yield* HttpClient.execute(request).pipe(
+          Effect.provide(FetchHttpClient.layer),
+          Effect.provideService(FetchHttpClient.Fetch, sender.fetch),
+          Effect.provideService(FetchHttpClient.RequestInit, {
+            ...init,
+            ...sender.init,
+            // A followed redirect keeps the TLS options, so it would present the certificate to whatever host the
+            // server names.
+            redirect: init.redirect === "manual" ? "manual" : "error",
+          }),
+        )
+      }),
+    )
+  }),
+)
+
 export const requestExecutor = makeGlobalNode({
   service: RequestExecutor.Service,
   // UPSTREAM-DIVERGENCE: keep diagnostics out of @opencode/ai's network executor.
-  layer: RequestDump.executorLayer.pipe(Layer.provide(withoutBunTimeout)),
+  layer: RequestDump.executorLayer.pipe(Layer.provide(withoutBunTimeout), Layer.provide(withClientCertificate)),
   deps: [httpClient],
 })
 
