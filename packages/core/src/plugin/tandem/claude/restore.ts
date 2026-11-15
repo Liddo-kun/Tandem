@@ -32,7 +32,7 @@ export const restoredFile = (path: string, content: string) => {
   if (Token.estimate(lines.join("\n")) > 5000)
     return `Note: ${path} was read before the last conversation was summarized, but the contents are too large to include. Use Read tool if you need to access it.`
   const output = ReadTool.toModelContent(path, 1, {
-    type: "text-page", content: lines.join("\n"), offset: 1, mime: "text/plain",
+    type: "text-page", content: lines.join("\n"), lineCount: lines.length, offset: 1, mime: "text/plain",
     truncated: all.length > lines.length, next: all.length > lines.length ? lines.length + 1 : undefined,
   })
   return `${RESTORED_READ}${JSON.stringify({ file_path: path })}\nResult of calling the Read tool:\n${output}`
