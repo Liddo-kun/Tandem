@@ -14,7 +14,7 @@ const reasoning = (kind: string, text = "Checked the config; editing it next.") 
   ({ type: "reasoning" as const, text, providerMetadata: { anthropic: { signature: signature(kind) } } })
 
 let calls = 0
-const step = (id: string, extra: ReadonlyArray<Parameters<typeof Message.assistant>[0][number]> = []): LLMMessage[] => {
+const step = (id: string, extra: Extract<Parameters<typeof Message.assistant>[0], ReadonlyArray<unknown>> = []): LLMMessage[] => {
   const call = `call_${calls++}`
   return [
     Message.make({ id, role: "assistant", content: [...extra, { type: "tool-call", id: call, name: "shell", input: {} }] }),
