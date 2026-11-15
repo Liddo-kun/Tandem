@@ -98,7 +98,7 @@ export const Plugin = define({
 
     const correct = Effect.fn("PromptCorrector.correct")(function* (
       text: string,
-      parentID: Session.ID,
+      owner: Session.Info,
       model: Model.Ref,
     ) {
       return yield* Effect.scoped(
@@ -106,7 +106,9 @@ export const Plugin = define({
           const child = yield* Effect.acquireRelease(
             ctx.session
               .create({
-                ...(debug ? {} : { parentID }),
+                // No parent: upstream reports every child session to its parent when it goes idle, which would
+                // deliver the correction to the owner as a subagent report. The owner is recorded in metadata.
+                location: owner.location,
                 title: TITLE,
                 agent: Agent.ID.make(TandemAuxiliary.correctorAgent),
                 model,
@@ -114,7 +116,7 @@ export const Plugin = define({
                   tandemAuxiliary: "corrector",
                   tandemBareContext: true,
                   tandemCorrectorDisabled: true,
-                  tandemAuxiliaryOwner: parentID,
+                  tandemAuxiliaryOwner: owner.id,
                 }),
                 permissions: [{ action: "*", resource: "*", effect: "deny" }],
               })
@@ -226,7 +228,7 @@ export const Plugin = define({
         )
         const edits = model
           ? yield* Effect.forEach(eligible, (range) =>
-              correct(original.slice(range.start, range.end), event.sessionID, model).pipe(
+              correct(original.slice(range.start, range.end), session, model).pipe(
                 Effect.map((text) => ({ ...range, text })),
               ),
             )

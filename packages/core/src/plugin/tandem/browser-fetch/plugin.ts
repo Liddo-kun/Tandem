@@ -121,7 +121,7 @@ export const Plugin = define({
           const session = yield* ctx.session.get({ sessionID: context.sessionID })
           const metadata = yield* Schema.decodeUnknownEffect(TandemAuxiliary.Metadata)(session.metadata)
           const budget = budgets.get(context.sessionID)
-          if (context.agent !== TandemAuxiliary.readerAgent || session.agent !== TandemAuxiliary.readerAgent || metadata.tandemAuxiliary !== "browser-reader" || !budget || metadata.tandemAuxiliaryOwner !== budget.owner || session.parentID !== budget.owner)
+          if (context.agent !== TandemAuxiliary.readerAgent || session.agent !== TandemAuxiliary.readerAgent || metadata.tandemAuxiliary !== "browser-reader" || !budget || metadata.tandemAuxiliaryOwner !== budget.owner || session.parentID !== undefined)
             return yield* new Tool.Error({ message: "fetch_page is authorized only for the active owned browser reader" })
           yield* permission.assert({ action: TandemAuxiliary.fetchTool, resources: [input.url], save: ["*"], sessionID: context.sessionID, agent: context.agent, source: { type: "tool", messageID: context.messageID, id: context.id } })
           const host = yield* Effect.try({ try: () => new URL(input.url).hostname, catch: failure })
@@ -156,9 +156,12 @@ export const Plugin = define({
           const fetched = yield* capture(input, `${prefix}-initial`, profile, budget)
           const configured = yield* ctx.agent.get({ agentID: Agent.ID.make(TandemAuxiliary.readerAgent) })
           if (!configured.data?.model) return yield* new Tool.Error({ message: "web-fetcher is disabled or has no configured model" })
+          // No parent: upstream reports every child session to its parent when it goes idle, which would deliver the
+          // reader's answer to the caller as a subagent report. The owner is recorded in metadata.
+          const owner = yield* ctx.session.get({ sessionID: context.sessionID })
           const child = yield* Effect.acquireRelease(
             ctx.session.create({
-              parentID: context.sessionID, title: `fetch ${new URL(input.url).hostname}`,
+              location: owner.location, title: `fetch ${new URL(input.url).hostname}`,
               agent: Agent.ID.make(TandemAuxiliary.readerAgent), model: configured.data.model,
               metadata: { tandemAuxiliary: "browser-reader", tandemBareContext: true, tandemCorrectorDisabled: true, tandemAuxiliaryOwner: context.sessionID },
               permissions: [
