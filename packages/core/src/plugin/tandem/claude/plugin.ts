@@ -75,7 +75,7 @@ const nativeSystem = (id: string) => {
 /** The base prompt, plus Fable 5.2's own additions. */
 const basePrompt = (id: string) => {
   const version = claudeVersion(id)
-  if (version?.family === "fable" && version.major === 5 && version.minor === 2) return `${PROMPT.trimEnd()}\n\n${PROMPT_FABLE_5_2}`
+  if (version?.family === "fable" && version.major === 5 && version.minor === 2 && PROMPT_FABLE_5_2.trim()) return `${PROMPT.trimEnd()}\n\n${PROMPT_FABLE_5_2}`
   return PROMPT
 }
 

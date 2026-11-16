@@ -58,23 +58,6 @@ Jon has no iPhone and has never tested Tandem on iOS.
 - [ ] Wire iOS platform support, native storage and `createBrowserDraftStore`; adapt the native bridge as needed.
 - [ ] Build and verify on an actual iOS device when one is available.
 
-## Interactive Chrome bridge
-
-The Codex-desktop-plugin import lives in `packages/chrome-bridge`. At the assessed v2 revision,
-upstream's `browser` drives a separate Electron profile and is desktop-only. Reassess its capabilities
-and extension points before porting the integration. Browser-backed webfetch remains in the initial port.
-
-- [ ] Register the bridge tool, bootstrap skill and documentation action as a v2 plugin, avoiding a name collision with upstream's `browser` namespace. Reuse the engine adapter, native host, journals, aliases, PNG checks and visible-controls behavior.
-- [ ] Integrate runner lifecycle and awaited cleanup through available hooks; assess whether a narrow core hook is necessary.
-- [ ] Port per-capability/origin permissions, ask-by-default behavior and request-local dismissal/cancellation. Check public APIs first and bring required permission/schema/client extensions to Jon.
-- [ ] Port private expiring screenshots, transient provider hydration and bounded UI display. Reuse upstream media infrastructure where it preserves the required ownership and expiry behavior.
-- [ ] Port browser-grant settings and the bounded browser-tool summary renderer.
-- [ ] Regenerate shared contracts only where needed and verify real browser workflows and cleanup.
-
-## Queued prompt editing
-
-- [ ] Look for bugs in queued prompt editing and resending.
-
 ## Android swipe lock
 
 - [ ] Reproduce Jon's original horizontal tab-strip swipe failure using only native touch input, then verify a fix in Tandem Dev. It happened before WebView debugging was enabled and may relate to the composer's cursor magnifier; its cause remains unconfirmed.
@@ -124,10 +107,3 @@ and extension points before porting the integration. Browser-backed webfetch rem
   that was missing: it loads the session context through the plugin API and caches metadata by message ID for image
   locations and the Claude compaction checkpoint. Check whether its callers can read `message.metadata` directly and
   the helper can go.
-
-## After the switch-over
-
-- [ ] Retire Tandem v1 when Jon no longer needs it: `~/.local/bin/tandem-v1-server`,
-  `/usr/local/bin/tandem-v1`, the Tandem v1 app (`ai.opencode.android.v1`) and `~/.local/share/tandem-v1/`
-  (about 6.7 GB including the September database backup). Jon explicitly kept this installed fallback
-  on 2026-10-14 while removing the old source checkout.
