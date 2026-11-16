@@ -27,7 +27,17 @@ owned tabs are closed. An existing profile owner is never killed or unlocked.
 On Linux, desktop unavailability or a persistent placeholder may fall back to Android, but
 an explicit desktop endpoint never does. Rate-limit pages are not retried.
 
-Each fetch captures at most four 1600px-high slices. Page text is capped at 2 MiB,
+The reader runs in a bare session without a parent, with its owner recorded as
+`tandemAuxiliaryOwner`: upstream reports every child session to its parent when it
+goes idle, which would deliver the answer to the caller a second time. The session
+shows in session lists while it runs.
+
+The engine follows redirects and reports the final URL, HTTP status and page state.
+Each fetch captures at most four 1600px-high slices, by scrolling one viewport at a
+time at 1 image pixel per CSS pixel (capturing beyond the viewport took over 20s on
+long pages). A failed capture is reported in the reader's page text, the tool result,
+its metadata and the server log, while the answer and earlier slices are kept.
+Page text is capped at 2 MiB,
 and only 100 KB is placed inline; overflow is saved. Downloads are capped at 50 MiB,
 each PNG at 12 MiB, and all artifacts for one call at 128 MiB. The reader may make
 12 follow-up fetches, including at most five search-engine fetches. Failed attempts
@@ -37,7 +47,7 @@ Artifacts live under `<Global.tmp>/webfetch/`. Idle retention keeps at most 300
 owned files, 512 MiB, and seven days; active calls pin their files. Documents use
 bounded HTTP with browser cookies and user agent, not Chromium's network stack, so
 browser-only headers, POST state, client certificates, or TLS state may not carry.
-Lazy below-fold content is not scrolled into view. Process death cannot run cleanup.
+Process death cannot run cleanup.
 
 ## Debugging
 

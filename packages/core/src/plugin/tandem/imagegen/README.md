@@ -39,15 +39,17 @@ and at most 3840; aspect ratio is limited to 3:1 and total area to
 `high`. It requests `gpt-image-2.5-sunburst` directly from OpenAI's
 `/v1/images/generations` and `/v1/images/edits` endpoints.
 
-OAuth generation and unmasked edits use native Codex Images with backend-managed
-size, quality, and serving model. Masked OAuth edits use the Responses image tool.
+OAuth generation and unmasked edits use native Codex Images (`/codex/images/...`)
+with backend-managed size, quality, and serving model. That service returns no revised
+prompt, and refuses prompts it would not render rather than rewriting them. Masked
+OAuth edits use the Responses image tool.
 Masked OAuth edits with transparency are rejected. Requested values and
 backend-reported values remain separate; absent backend values are omitted from
 durable metadata. A `revised_prompt` returned by the backend is always shown, even
 when it matches the prompt sent.
 
-The full PNG is saved under `<session directory>/imagegen/` without overwriting
-existing files. An optional same-dimension JPEG display copy is made for opaque
+The full PNG is saved as `<session directory>/imagegen/<callID>.png` without
+overwriting existing files. An optional same-dimension JPEG display copy is made for opaque
 images, or WebP for images with alpha. Codec or compression failure keeps the PNG as
 the display path. A requested transparent image must contain real alpha pixels.
 

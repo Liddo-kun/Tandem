@@ -56,6 +56,45 @@ Clear-thinking is emitted only for final `enabled` or `adaptive` thinking. Bedro
 cache behavior is unchanged. Supported inline-cache routes cap combined manual and
 automatic markers at four.
 
+## Cold prompt cache
+
+Claude's summary request is the main request unchanged, so that it reads the prompt
+cache. `cold.ts` decides when the cache no longer holds the conversation: the last
+measured request is older than the model's `cache.ttl` (five minutes when unset), or
+went to another model, or to another variant. A switch between effort variants that
+the route sends as a per-turn effort message keeps the cached prefix (Claude Opus 5
+and later, Claude 5.1 and later; the summary request carries model switches from the
+groups it leaves out, so that message still goes out) and does not count. After a
+"too long" rejection the cache is never treated as cold.
+
+On a cold cache a small request is sent instead, to the compaction agent's model or,
+when it names none, Claude Sonnet 5.5 on the session's provider. It is built from the
+prepared main request:
+`[system: two sentences] [user: AGENTS.md reminder, <transcript>, the compaction prompt with a note on the cuts]`,
+with no tool definitions and no cache breakpoints. It covers everything but the last
+response group, which is kept verbatim as usual. The restored files are chosen before
+the request, and a read of a file that comes back with its contents becomes a one-line
+note. Nothing is cut to reach a size: if the summary model rejects the transcript as
+too long, the usual request goes out instead. The compaction message's metadata
+records the model and the replaced context's size under `tandem.compaction-pruned`;
+upstream's divider shows the request's tokens.
+
+`../prune.ts` shortens the transcript by fixed rules, in characters, not towards a size:
+
+| Content | Rule |
+| --- | --- |
+| Text the user or model wrote | Whole. |
+| Tool output | Up to 3,000 whole. A longer one keeps 1,500 from each end, cut back to a line break (a file read: only the first 1,500), with a note of what was left out. |
+| Tool output within the newest 60,000 characters of outputs | The same with 20,000 and 10,000. |
+| Tool input over 2,000 | Its first 1,000. |
+| Reasoning, images, other system reminders | Left out. |
+
+Trimmed tool results (the app's Trim and send) apply the same output rules to every
+request's tool results before the prompt named by the session's `tandemTrimBefore`
+metadata, before the Claude layout, so the shorter prefix is cached as usual.
+Attachments in older results become a one-line note; tool inputs, replies and
+reasoning are untouched.
+
 ## Debugging
 
 Bash-search activation failures log a warning and add request guidance explaining

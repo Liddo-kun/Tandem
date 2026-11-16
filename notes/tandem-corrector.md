@@ -22,8 +22,8 @@ Set in the server environment (or the development launcher's `environment.json`)
 | `TANDEM_PROMPT_CORRECTOR_MAX` | `600` | Maximum trimmed length (UTF-16) of each authored text range; `0` is uncapped. |
 | `TANDEM_PROMPT_CORRECTOR_MODEL` | unset | Explicit `provider/model`, optionally `#variant`. |
 | `TANDEM_PROMPT_CORRECTOR_VARIANT` | unset | Overrides the selected model's variant. |
-| `TANDEM_PROMPT_CORRECTOR_DEBUG` | off | Keeps visible debug root sessions instead of hidden children. |
-| `TANDEM_PROMPT_CORRECTOR_DEBUG_KEEP` | `2` | Newest inactive debug roots kept; `0` is unlimited. |
+| `TANDEM_PROMPT_CORRECTOR_DEBUG` | off | Keeps each correction session (interrupted) instead of deleting it. |
+| `TANDEM_PROMPT_CORRECTOR_DEBUG_KEEP` | `2` | Newest inactive kept sessions retained; `0` is unlimited. Pruning uses upstream's public plugin session-list API and follows every page. |
 
 Model selection, reevaluated per prompt: environment override → configured `tandem-corrector` agent
 model → a cheap available model for the session's provider
@@ -47,8 +47,10 @@ provider. Only the default model and the 600 limit have been tested live.
 - Submission snapshots the toggle as `tandemCorrectorDisabled` true/false, so toggling later affects new
   drafts, not already-queued prompts. Queue edit, reorder, steer, undo/resend and failed-send restore keep
   the snapshot; undo appended to an existing draft keeps the recovered item's setting.
-- Each correction runs in a fresh auxiliary child session (see `auxiliary.ts`): copy-editor system
-  prompt and raw text only, no tools, no instruction files, no recursive correction. Browser-fetch reader
-  prompts bypass Corrector. The child is removed on completion or when the admission is cancelled;
-  process death leaves it behind. Pressing Stop on the parent before admission does nothing.
+- Each correction runs in a fresh auxiliary session (see `auxiliary.ts`): copy-editor system
+  prompt and raw text only, no tools, no instruction files, no recursive correction. It has no parent,
+  because upstream reports every child session to its parent when it goes idle; its owner is recorded as
+  `tandemAuxiliaryOwner`, and it shows in session lists while it runs. Browser-fetch reader
+  prompts bypass Corrector. The session is removed on completion or when the admission is cancelled;
+  process death leaves it behind. Pressing Stop on the owning session before admission does nothing.
 - Correcting fragments around mentions can leave awkward punctuation or capitalization.
