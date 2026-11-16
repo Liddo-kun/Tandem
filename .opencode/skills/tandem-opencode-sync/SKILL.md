@@ -27,7 +27,6 @@ Read `contextL.md` (or `contextW.md` on Windows), `logv2.md` and `notes/todo-aft
 - Use merge, not rebase, for normal sync work.
 - Do not use `origin/tandem-v2` to choose the next upstream batch; it may be stale.
 - Do not run tests or typechecks from the repo root.
-- Do not install to the daily setup, restart the daily server, or push without the user's explicit instruction.
 
 ## Preflight
 
@@ -109,7 +108,7 @@ Do not review with `git diff tandem-v2..<target>`; Tandem has fork-only files, s
 Use these priorities:
 
 - Core OpenCode/server behavior: prefer current upstream unless Tandem has a documented compatibility reason.
-- Upstream architectural changes, simplifications, and refactors must be incorporated. Adopt the upstream structure first, then reapply Tandem customizations only where they still make sense. if you are not absolutly sure, consult the user.
+- Upstream architectural changes, simplifications, and refactors must be incorporated. Adopt the upstream structure first, then reapply Tandem customizations only where they still make sense. If you are not absolutely sure, consult the user. If Tandem customizations are dropped, remove their entries from `logv2.md`.
 - Do not preserve an old Tandem implementation shape just because it is already in the fork. Understand the original intent, preserve documented behavior that is still needed, and drop obsolete code paths instead of keeping needless parallel implementations.
 - If upstream now offers a hook, setting or plugin API that can carry a Tandem customization, prefer moving the customization onto it over keeping an edit to shared code.
 - If upstream makes a significant UI or behavior change, reassess Tandem customizations against that new design. Some Tandem changes may no longer fit and can be removed, but only after understanding why they existed and confirming they are no longer useful.
@@ -117,6 +116,7 @@ Use these priorities:
 - Tandem includes a dedicated Android app (`packages/android`) that uses the shared web UI. be extra careful in the context of merging web UI changes, review what special customizations Tandem has to the web UI relative to the mobile app.
 - Shared web UI conflicts: manually produce the smallest combined final state.
 - Preserve `UPSTREAM-DIVERGENCE` comments. Remove UPSTREAM-DIVERGENCE comments, and their `logv2.md` entries, when we fully adopt upstream. Drop `UPSTREAM-DIVERGENCE(temporary)` fixes once upstream ships an equivalent fix.
+- While working, have an eye out for opportunities to reduce divergence from upstream by simplifying Tandem customizations, dropping unneeded Tandem customizations, or moving Tandem customizations into a plugin format that needs little or no upstream divergence.
 
 Dry-run before merging:
 
