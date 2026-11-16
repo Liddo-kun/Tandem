@@ -8,7 +8,7 @@ export const dict = {
   // Explain local-only chat after a delegated job ends; the back link follows that sentence.
   "session.child.chatNotice": "Replies here are also reported to the main session.",
   "session.child.backToParent": "Back to main session.",
-  // Corrector, the composer context button, Android zoom and native server connection.
+  // Corrector, the composer context button and native server connection.
   "prompt.corrector.title": "Corrector",
   "prompt.corrector.description": "Correct spelling, punctuation and dictation errors before sending. Keeps your meaning and leaves attachments and context intact. Changes apply to new prompts; queued prompts keep their original setting.",
   "prompt.context.view": "View context usage",
@@ -28,9 +28,6 @@ export const dict = {
   "prompt.cold.compact.failed": "Compaction did not finish. Your prompt was not sent.",
   "prompt.cold.send": "Send as is",
   "prompt.cold.send.description": "Sends the whole conversation.",
-  "settings.android.zoom.title": "Page zoom",
-  "settings.android.zoom.description": "Scale the app from 80% to 150% in 2% steps. Volume keys also adjust zoom. Default: 100%.",
-  "settings.android.zoom.reset": "Reset",
   "server.connect.credentialsRequired": "Server is reachable but requires valid credentials. Enter its password or paste a fresh pairing link.",
   "server.connect.v2Required": "This Android app requires a v2 server. Choose a server running version 2.",
   "server.connect.discovery.start": "Find LAN servers",

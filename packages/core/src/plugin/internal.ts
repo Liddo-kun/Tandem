@@ -127,6 +127,7 @@ import { ImagegenPlugin } from "./tandem/imagegen/plugin.js"
 import { OpenAICompactionPlugin } from "./tandem/openai-compaction.js"
 import { BashSearch } from "./tandem/bash-search/plugin.js"
 import { ClaudePlugin } from "./tandem/claude/plugin.js"
+import { ClaudeClearThinking } from "./tandem/claude/clear-thinking.js"
 import { ToolGuidancePlugin } from "./tandem/tool-guidance/plugin.js" // UPSTREAM-DIVERGENCE: keep tool wording in a Tandem-owned transform.
 import { SessionStartPlugin } from "./tandem/session-start.js" // UPSTREAM-DIVERGENCE: Tandem-owned opencode.session_start tool.
 import { ImageLocationPlugin } from "./tandem/image-location.js" // UPSTREAM-DIVERGENCE: expose saved image paths through request hooks.
@@ -268,6 +269,7 @@ const pre = [
   // UPSTREAM-DIVERGENCE: install auxiliary defaults and Corrector before normal prompt handling.
   TandemAuxiliaryPlugin.Defaults,
   PromptCorrectorPlugin.Plugin,
+  ClaudeClearThinking.Plugin, // UPSTREAM-DIVERGENCE: before configured plugins, whose hooks sign the final request body.
   ForkNoticePlugin.Plugin,
   PlanPlugin.Plugin,
   CommandPlugin.Plugin,

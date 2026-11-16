@@ -2,8 +2,6 @@ import { Component, Show, createMemo } from "solid-js"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Select } from "@opencode/ui/select"
 import { Switch } from "@opencode/ui/switch"
-// UPSTREAM-DIVERGENCE: Reset button for Android page zoom.
-import { Button } from "@opencode/ui/button"
 import { TimelineDetailControl } from "@/settings/timeline-detail"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
@@ -255,30 +253,6 @@ export const SettingsGeneral: Component = () => {
       <SettingsList>
         <InterfaceModeSetting />
         <LanguageSetting />
-        {/* UPSTREAM-DIVERGENCE: Android page zoom control with the native 80–150% range and 2% steps. */}
-        <Show when={platform.platform === "android"}>
-          <SettingsRow
-            title={language.t("settings.android.zoom.title")}
-            description={language.t("settings.android.zoom.description")}
-          >
-            <div class="flex items-center gap-2">
-              <input
-                type="range"
-                min="80"
-                max="150"
-                step="2"
-                aria-label={language.t("settings.android.zoom.title")}
-                disabled={!settings.ready()}
-                value={Math.round(settings.appearance.displayScale() * 100)}
-                onInput={(event) => settings.appearance.setDisplayScale(Number(event.currentTarget.value) / 100)}
-              />
-              <bdi dir="ltr">{Math.round(settings.appearance.displayScale() * 100)}%</bdi>
-              <Button variant="neutral" disabled={!settings.ready()} onClick={() => settings.appearance.setDisplayScale(1)}>
-                {language.t("settings.android.zoom.reset")}
-              </Button>
-            </div>
-          </SettingsRow>
-        </Show>
 
         <WorkspaceDestinationSetting />
         <AutoApprovePermissionsSetting />

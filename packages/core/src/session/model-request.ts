@@ -48,9 +48,8 @@ import { SessionSchema } from "./schema.js"
 import { SessionSystemPrompt } from "./system-prompt.js"
 import { toLLMMessages } from "./runner/to-llm-message.js"
 import type { SessionMessage } from "./message.js"
-// UPSTREAM-DIVERGENCE: delegate Claude presentation and request-local Bash-search guidance to owned modules.
+// UPSTREAM-DIVERGENCE: delegate Claude presentation to an owned module.
 import { ClaudePresentation } from "../plugin/tandem/claude/presentation.js"
-import { BashSearch } from "../plugin/tandem/bash-search/plugin.js"
 
 const IMAGE_BYTES_TRIGGER = 25 * 1024 * 1024 // 25 MiB
 const IMAGE_BYTES_TARGET = 15 * 1024 * 1024 // 15 MiB
@@ -280,7 +279,7 @@ export const layer = Layer.effect(
     >(kind: SessionRequestKind, input: Input, shape: (draft: SessionRequest, tools: Definitions) => Effect.Effect<S>) {
       const session = input.session
       const model = input.model
-      // UPSTREAM-DIVERGENCE: detect Claude across resolved/ref IDs and preserve the snapshot's Bash-search flag.
+      // UPSTREAM-DIVERGENCE: detect Claude across resolved/ref IDs.
       const claude = ClaudePresentation.isClaude(model.model.id) || ClaudePresentation.isClaude(model.ref.id)
       const scope = { sessionID: session.id, agent: input.agent, model: model.ref, kind }
       const tools: Tool.Snapshot = input.tools ?? {
@@ -313,16 +312,6 @@ export const layer = Layer.effect(
         },
         Object.fromEntries(Array.from(given, ([d, t]) => [t.name, d])),
       )
-      // UPSTREAM-DIVERGENCE: align Claude search prose with the effective request-local catalog.
-      if (claude) {
-        if (tools.bashSearch) {
-          for (const tool of Object.values(shaped.tools ?? {})) tool.description = BashSearch.stripGuidance(tool.description)
-          shaped.system = shaped.system.map((part) => ({ ...part, text: BashSearch.stripGuidance(part.text) }))
-          shaped.system.push(SystemPart.make(BashSearch.guidance() ?? "Use plain grep and find through Bash for searches."))
-        } else if (BashSearch.enabled() && shaped.tools?.shell) {
-          shaped.system.push(SystemPart.make("Bash search is inactive for this request; use the available search tools. " + (BashSearch.guidance(false) ?? "")))
-        }
-      }
       // Match by identity first, then by key. Entries matching neither were invented by a
       // hook and are dropped. `t.name` stays the real name so execution can map renames back.
       const byName = new Map(tools.definitions.map((t) => [t.name, t]))

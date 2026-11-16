@@ -128,6 +128,5 @@ export function request(input: LLMRequest, selectedClaude = isClaude(input.model
     model, tools, messages,
     system: input.system.map((part) => ({ ...part, text: executeReferences(part.text) })),
     toolChoice: input.toolChoice?.name ? new ToolChoice({ ...input.toolChoice, name: outbound.get(input.toolChoice.name)?.name ?? input.toolChoice.name }) : input.toolChoice,
-    providerOptions: { ...input.providerOptions, clearThinking: true },
   }
 }

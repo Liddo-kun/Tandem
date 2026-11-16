@@ -6,7 +6,6 @@ import type { Schema } from "effect"
 import { Global } from "@opencode/util/global"
 import type { Instructions } from "../../../instructions/index.js"
 import { ClaudePresentation } from "./presentation.js"
-import { BashSearch } from "../bash-search/plugin.js"
 
 const ENVIRONMENT = /^(?:Here is some useful information about the environment you are running in:|The environment you are running in is now:)\n<env>\n[\s\S]*?\n<\/env>/m
 
@@ -77,7 +76,7 @@ export function split(text: string) {
 }
 
 /** Presentation-only renderers: stored source values/hashes and frozen updates remain v2-owned. */
-export function present(sources: Instructions.List, shellSearch: boolean): Instructions.List {
+export function present(sources: Instructions.List): Instructions.List {
   return [...sources].sort((a, b) => rank(a.key) - rank(b.key)).map((source) => {
     const render = (text: string | undefined, current?: Schema.Json, previous?: Schema.Json) => {
       if (text === undefined) return text
@@ -89,7 +88,7 @@ export function present(sources: Instructions.List, shellSearch: boolean): Instr
       // Only harness-owned guidance is rewritten. File instructions and arbitrary prose are not.
       if (source.key === "core/skill-guidance") text = ClaudePresentation.references(text)
       if (source.key === "core/codemode") text = ClaudePresentation.executeReferences(text)
-      return shellSearch && source.key.startsWith("core/") ? BashSearch.stripGuidance(text) : text
+      return text
     }
     return { ...source, initial: (value) => render((source.key === "core/instructions" ? files(value) : undefined) ?? source.initial(value), value), changed: (before, after) => render(source.changed(before, after), after, before), removed: (before) => render(source.removed(before)) }
   })

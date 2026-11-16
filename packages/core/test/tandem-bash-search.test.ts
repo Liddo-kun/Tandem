@@ -73,7 +73,8 @@ run(
           const original = (yield* tools.list()).filter((tool) => tool.name === "glob" || tool.name === "grep")
           expect(original.map((tool) => tool.name).sort()).toEqual(["glob", "grep"])
 
-          for (const codemode of [false, true]) {
+          // Glob and Grep are outside Code Mode unless a plugin moves them there; that case is not filtered.
+          for (const codemode of [false]) {
             yield* Effect.scoped(
               Effect.gen(function* () {
                 yield* tools.transform((editor) => {
@@ -109,7 +110,6 @@ run(
                         }),
                       })
                       const selected = yield* context.select(session.id)
-                      expect(selected.tools.bashSearch === true).toBe(scenario.removed)
                       const observed = yield* Instructions.read(selected.instructions)
                       const initial = Instructions.renderInitial(
                         selected.instructions,

@@ -1,6 +1,5 @@
 import { produce, reconcile, unwrap } from "solid-js/store"
-// UPSTREAM-DIVERGENCE: Cleanup native hardware-zoom event listeners.
-import { createEffect, createMemo, onCleanup } from "solid-js"
+import { createEffect, createMemo } from "solid-js"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Effect, Option, Predicate, Schema, SchemaGetter } from "effect"
 import { createSimpleContext } from "@opencode/ui/context"
@@ -44,11 +43,6 @@ export const sansDefault = "Inter"
 
 export const terminalDefault = "JetBrainsMono Nerd Font Mono"
 
-// UPSTREAM-DIVERGENCE: Android zoom uses 80–150%, 2% steps and a 100% default.
-export function normalizeDisplayScale(value: number = 1) {
-  const percent = Number.isFinite(value) ? Math.round(value * 100 / 2) * 2 : 100
-  return Math.min(150, Math.max(80, percent)) / 100
-}
 const monoFallback =
   '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
 
@@ -154,8 +148,6 @@ const generalSchema = Persistence.struct({
 })
 
 const appearanceSchema = Persistence.struct({
-  // UPSTREAM-DIVERGENCE: Persist Android page zoom.
-  displayScale: Persistence.optional(Schema.Number),
   fontSize: Schema.Number,
   mono: Schema.String,
   sans: Schema.String,
@@ -328,16 +320,7 @@ export const defaultSettings: Settings = {
     // UPSTREAM-DIVERGENCE: Corrector defaults off for new prompts.
     corrector: false,
   },
-  // UPSTREAM-DIVERGENCE: Android page zoom defaults to 100%.
-  appearance: {
-    displayScale: 1,
-    fontSize: 14,
-    mono: "",
-    sans: "",
-    terminal: "",
-    tabLayout: "horizontal",
-    reduceMotion: "system",
-  },
+  appearance: { fontSize: 14, mono: "", sans: "", terminal: "", tabLayout: "horizontal", reduceMotion: "system" },
   keybinds: {},
   permissions: { autoApprove: false, autoApproveProjects: {} },
   workspaces: { defaultDestination: "last-used", lastUsed: {} },
@@ -368,28 +351,14 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
   name: "Settings",
   gate: false,
   init: () => {
-    // UPSTREAM-DIVERGENCE: Native Android zoom capability backs persisted appearance settings.
-    const platform = usePlatform()
     const [store, setStore, , ready] = persisted({ key: "settings.v3" }, settingsPersistence, defaultSettings)
-    // UPSTREAM-DIVERGENCE: Sync persisted Android zoom and hardware-key changes with the native inset owner.
-    // Sync the persisted Android scale with the native wrapper's viewport/inset owner.
-    createEffect(() => {
-      if (platform.platform !== "android" || !ready()) return
-      platform.setWebviewZoom?.(normalizeDisplayScale(store.appearance.displayScale))
-    })
-    if (platform.platform === "android") {
-      const hardwareZoom = (event: Event) => {
-        if (!ready() || !(event instanceof CustomEvent)) return
-        const direction = event.detail?.direction
-        if (direction !== -1 && direction !== 1) return
-        setStore("appearance", "displayScale", normalizeDisplayScale(normalizeDisplayScale(store.appearance.displayScale) + direction * 0.02))
-      }
-      window.addEventListener("opencode:hardware-zoom", hardwareZoom)
-      onCleanup(() => window.removeEventListener("opencode:hardware-zoom", hardwareZoom))
-    }
 
     // UPSTREAM-DIVERGENCE: Android, like web, has no Recent sidebar.
-    const sidebarOrganizeOptions: SidebarOrganize[] = recentSessionsAvailable(platform.platform === "android" ? "web" : platform.platform, import.meta.env.VITE_OPENCODE_CHANNEL)
+    const platform = usePlatform().platform
+    const sidebarOrganizeOptions: SidebarOrganize[] = recentSessionsAvailable(
+      platform === "android" ? "web" : platform,
+      import.meta.env.VITE_OPENCODE_CHANNEL,
+    )
       ? ["list", "projects", "customize", "recent"]
       : ["list", "projects", "customize"]
 
@@ -514,11 +483,6 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         customAgents: showCustomAgents,
       },
       appearance: {
-        // UPSTREAM-DIVERGENCE: Expose normalized Android zoom and its persisted setter.
-        displayScale: () => normalizeDisplayScale(store.appearance.displayScale),
-        setDisplayScale(value: number) {
-          setStore("appearance", "displayScale", normalizeDisplayScale(value))
-        },
         fontSize: withFallback(() => store.appearance?.fontSize, defaultSettings.appearance.fontSize),
         setFontSize(value: number) {
           setStore("appearance", "fontSize", value)

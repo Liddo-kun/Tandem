@@ -89,13 +89,10 @@ type PlatformBase = {
   /** Fetch override */
   fetch?: typeof fetch
 
-  // UPSTREAM-DIVERGENCE: Optional native Android zoom and discovery.
-  /** Native webview zoom level. */
+  /** Webview zoom level (desktop only) */
   webviewZoom?: Accessor<number>
 
-  /** Native page zoom; browsers can omit this capability. */
-  setWebviewZoom?(scale: number): void
-
+  // UPSTREAM-DIVERGENCE: Optional native Android discovery.
   /** Native LAN discovery. A credential-required server is still reachable. */
   discoverServers?(onServer: (server: { url: string; authenticationRequired: boolean }) => void): Promise<void>
   cancelServerDiscovery?(): Promise<void>

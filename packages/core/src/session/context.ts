@@ -1,10 +1,8 @@
 export * as SessionContext from "./context.js"
 
-// UPSTREAM-DIVERGENCE: select Claude instruction presentation and shell-compatible Bash-search catalogs.
-import { BashSearch } from "../plugin/tandem/bash-search/plugin.js"
+// UPSTREAM-DIVERGENCE: select Claude instruction presentation.
 import { ClaudeInstructions } from "../plugin/tandem/claude/instructions.js"
 import { ClaudePresentation } from "../plugin/tandem/claude/presentation.js"
-import { ShellSelect } from "../shell/select.js"
 
 import { Model } from "../model.js"
 import { Permission } from "../permission.js"
@@ -98,8 +96,7 @@ const layer = Layer.effect(
     const skillInstructions = yield* SkillInstructions.Service
     const store = yield* SessionStore.Service
     const registry = yield* Tool.Service
-    // UPSTREAM-DIVERGENCE: acquire shell selection and instruction policy for request-local context.
-    const shells = yield* ShellSelect.Service
+    // UPSTREAM-DIVERGENCE: acquire the instruction policy hook for request-local context.
     const hooks = yield* PluginHooks.Service
 
     const resolveModel = (
@@ -163,21 +160,20 @@ const layer = Layer.effect(
       yield* mcpTools.flush
       // Session permissions narrow discovery the same way they narrow the tool snapshot.
       const permissions = Permission.merge(agent.info.permissions, session.permissions ?? [])
-      // UPSTREAM-DIVERGENCE: snapshot Bash-search before Code Mode; agent-only sessions get no ambient baseline.
-      const selectedModel = yield* resolveModel(session, { kind: "primary", agent: agent.id }).pipe(Effect.orElseSucceed(() => undefined))
-      const modelID = selectedModel?.model.id ?? session.model?.id ?? ""
-      const snapshot = () => BashSearch.snapshot(registry, permissions, location.workspaceID === undefined ? modelID : "", shells)
+      // UPSTREAM-DIVERGENCE: agent-only sessions get no ambient baseline.
       if (policy.mode === "agent-only")
         return {
           session,
           agent: { ...agent, info: agent.info },
           instructions: Instructions.empty,
-          tools: yield* snapshot(),
+          tools: yield* registry.snapshot(permissions),
         }
+      // UPSTREAM-DIVERGENCE: the session's model selects Claude instruction presentation.
+      const selectedModel = yield* resolveModel(session, { kind: "primary", agent: agent.id }).pipe(Effect.orElseSucceed(() => undefined))
+      const modelID = selectedModel?.model.id ?? session.model?.id ?? ""
       const loaded = yield* Effect.all(
         {
-          // UPSTREAM-DIVERGENCE: load the request-local filtered catalog instead of the raw registry snapshot.
-          tools: snapshot(),
+          tools: registry.snapshot(permissions),
           builtins: builtins.load(),
           discovery: discovery.load(),
           skills: skillInstructions.load(permissions),
@@ -206,7 +202,7 @@ const layer = Layer.effect(
         // the date and environment, which vary by day and directory.
         // UPSTREAM-DIVERGENCE: present Claude guidance without altering durable instruction values or ordering.
         instructions: ClaudePresentation.isClaude(modelID)
-          ? ClaudeInstructions.present(instructions, loaded.tools.bashSearch === true)
+          ? ClaudeInstructions.present(instructions)
           : instructions,
         tools: loaded.tools,
       }
@@ -268,8 +264,7 @@ export const node = makeLocationNode({
     SessionStore.node,
     SkillInstructions.node,
     Tool.node,
-    // UPSTREAM-DIVERGENCE: wire the instructions hook and shell selection into context loading.
+    // UPSTREAM-DIVERGENCE: wire the instructions hook into context loading.
     PluginHooks.node,
-    ShellSelect.node,
   ],
 })
