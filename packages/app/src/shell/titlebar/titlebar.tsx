@@ -1,5 +1,6 @@
-import { createEffect, createMemo, Match, onCleanup, Show, Switch } from "solid-js"
+import { createEffect, createMemo, createSignal, Match, on, onCleanup, Show, Switch, untrack } from "solid-js"
 import { Portal } from "solid-js/web"
+import { useLocation } from "@solidjs/router"
 import { uuid } from "@opencode/util/uuid"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { IconButton } from "@opencode/ui/icon-button"
@@ -28,9 +29,21 @@ import { ServerConnection } from "@/runtime/server/registry"
 import { tabKey, useTabs } from "@/shell/tabs/tabs"
 import type { ComposerState } from "@/composer/persistence"
 import "./titlebar.css"
+import { MobileDrawer, MobileDrawerContent, MobileDrawerLabel, MobileDrawerTrigger } from "@/shell/mobile-drawer"
+import { sessionTabTitle } from "./tab-title"
+import { SessionTabAvatarView } from "@/shell/layout/session-tab-avatar"
+import { useSessionTabAvatarState } from "@/shell/layout/project-avatar-state"
+import { ActivityRing } from "@opencode/ui/activity-ring"
 import { RecentlyClosedTabsMenu } from "./recently-closed-tabs-menu"
+import { useSettingsDialog } from "@/settings/command"
 import { TitlebarItems, useTitlebarItems } from "@/runtime/plugin/titlebar-items"
 import { createRouteTabSync } from "./route-sync"
+import {
+  INITIAL_MOBILE_TABS_STATE,
+  selectMobileTabsOpen,
+  transitionMobileTabs,
+  type MobileTabsEvent,
+} from "./mobile-tabs-machine"
 
 export const newTabCommand = { id: "tab.new", keybind: "mod+t,mod+n" }
 
@@ -57,12 +70,18 @@ const macTrafficLightsTopClearance = 28
 // titlebar row stays 16px clear of it, as ChatGPT's phone header does. Without one, 8px matches the content gap below.
 const mobileTopClearance = "max(8px, min(16px, env(safe-area-inset-top, 0px) * 1000))"
 
+// UPSTREAM-DIVERGENCE: selects Tandem's mobile tab strip over upstream's tabs drawer (kept below, never rendered).
+const TANDEM_MOBILE_TAB_STRIP = true
+
 export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
   const platform = usePlatform()
   const command = useCommand()
   const language = useLanguage()
   const settings = useSettings()
+
+  const openSettings = useSettingsDialog()
   const dialog = useDialog()
+  const location = useLocation()
   const mobile = createMediaQuery("(max-width: 767px)")
   const bottom = createMemo(() => mobile() && settings.general.mobileTitlebarPosition() === "bottom")
   const mobileTop = createMemo(() => platform.platform === "web" && mobile() && !bottom())
@@ -122,9 +141,8 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
     onCleanup(() => cancelAnimationFrame(frame))
   })
 
-  // UPSTREAM-DIVERGENCE: the mobile tabs drawer, the only reader of the route path and the store, is replaced by the
-  // tab strip.
   const history = createTitlebarHistory()
+  const path = () => `${location.pathname}${location.search}${location.hash}`
 
   const titlebarItems = useTitlebarItems()
   const hideVerticalTitlebar = createMemo(() => !!props.verticalTabs && !windows())
@@ -205,6 +223,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
             const tabsStoreActions = tabs
 
             const routeSync = createRouteTabSync()
+            const preparing = routeSync.preparing
             const session = routeSync.session
             const currentTab = routeSync.currentTab
 
@@ -495,6 +514,66 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
               },
             ])
 
+            const [mobileTabsState, setMobileTabsState] = createSignal(INITIAL_MOBILE_TABS_STATE)
+            let closeTimer: ReturnType<typeof setTimeout> | undefined
+
+            const dispatchMobileTabs = (event: MobileTabsEvent) => {
+              const previous = untrack(mobileTabsState)
+              const next = transitionMobileTabs(previous, event)
+
+              if (next.state !== previous) setMobileTabsState(next.state)
+              next.effects.forEach((effect) => {
+                if (effect.type === "settings.open") return openSettings()
+                clearTimeout(closeTimer)
+                closeTimer = undefined
+
+                if (effect.type === "timer.clear") return
+                const attempt = effect.attempt
+                closeTimer = setTimeout(
+                  () => dispatchMobileTabs({ type: "close.timed-out", attempt }),
+                  effect.timeoutMs,
+                )
+              })
+            }
+
+            const closeMobileTabs = () => dispatchMobileTabs({ type: "close" })
+
+            // The current tab's project avatar stays put; while it works, its activity ring shows beside the tab count.
+            const currentStatus = useSessionTabAvatarState(
+              () => currentTab()?.server,
+              () => session()?.id ?? "",
+              () => true,
+            )
+
+            const currentProject = createMemo(() => {
+              const tab = currentTab()
+              const value = session()
+
+              if (!tab || !value) return
+
+              return global.serverCtx(tab.server)?.projects.forSession(value)
+            })
+
+            const currentTitle = () => {
+              const tab = currentTab()
+
+              if (!tab) return language.t("home.title")
+
+              if (tab.type === "draft") return language.t("session.tab.session")
+              const value = session()
+
+              return sessionTabTitle(
+                value ? value.title : tabs.info[tabKey(tab)]?.title,
+                language.t("session.tab.session"),
+              )
+            }
+
+            createEffect(on(path, () => dispatchMobileTabs({ type: "route.changed" }), { defer: true }))
+            createEffect(
+              on(mobile, (value) => dispatchMobileTabs({ type: "viewport.changed", mobile: value }), { defer: true }),
+            )
+            onCleanup(() => dispatchMobileTabs({ type: "disposed" }))
+
             return (
               <div
                 ref={titlebarRow}
@@ -528,45 +607,172 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                 <Show
                   when={!mobile()}
                   fallback={
-                    <>
-                      {/* UPSTREAM-DIVERGENCE: Tandem shows every tab in a swipeable strip on mobile, and the
-                          button before it opens Home directly instead of a tabs drawer; Home carries
-                          Settings and Help. Tapping it on Home returns to the current tab, as on desktop. */}
-                      <IconButton
-                        type="button"
-                        variant="ghost-muted"
-                        size="large"
-                        class="shrink-0 [app-region:no-drag]"
-                        icon={<Icon name="grid-plus" />}
-                        state={layout.route().type === "home" ? "pressed" : undefined}
-                        onClick={toggleHome}
-                        aria-label={language.t("home.title")}
-                        aria-pressed={layout.route().type === "home"}
-                      />
-                      <TitlebarTabStrip
-                        tabs={tabsStore}
-                        currentTab={currentTab()}
-                        onNavigate={(tab, el) => {
-                          tabs.select(tab)
-                          el?.scrollIntoView({ behavior: "instant", block: "nearest", inline: "nearest" })
-                        }}
-                        onClose={(tab) => {
-                          const index = tabsStore.findIndex((item) => tabKey(item) === tabKey(tab))
-                          if (index !== -1) tabsStoreActions.closeTab(index)
-                        }}
-                        onCloseTabs={(items, keep) => tabsStoreActions.closeTabs(items.map(tabKey), keep)}
-                        onReorder={(keys) => tabsStoreActions.reorder(keys)}
-                      />
-                      <IconButton
-                        type="button"
-                        variant="ghost-muted"
-                        size="large"
-                        class="shrink-0"
-                        icon={<Icon name="plus" />}
-                        onClick={openNewTab}
-                        aria-label={language.t("command.session.new")}
-                      />
-                    </>
+                    // UPSTREAM-DIVERGENCE: Tandem shows every tab in a swipeable strip on mobile, and the button
+                    // before it opens Home directly instead of a tabs drawer; Home carries Settings and Help.
+                    // Tapping it on Home returns to the current tab, as on desktop. Upstream's drawer below stays
+                    // verbatim but never renders.
+                    TANDEM_MOBILE_TAB_STRIP ? (
+                      <>
+                        <IconButton
+                          type="button"
+                          variant="ghost-muted"
+                          size="large"
+                          class="shrink-0 [app-region:no-drag]"
+                          icon={<Icon name="grid-plus" />}
+                          state={layout.route().type === "home" ? "pressed" : undefined}
+                          onClick={toggleHome}
+                          aria-label={language.t("home.title")}
+                          aria-pressed={layout.route().type === "home"}
+                        />
+                        <TitlebarTabStrip
+                          tabs={tabsStore}
+                          currentTab={currentTab()}
+                          onNavigate={(tab, el) => {
+                            tabs.select(tab)
+                            el?.scrollIntoView({ behavior: "instant", block: "nearest", inline: "nearest" })
+                          }}
+                          onClose={(tab) => {
+                            const index = tabsStore.findIndex((item) => tabKey(item) === tabKey(tab))
+                            if (index !== -1) tabsStoreActions.closeTab(index)
+                          }}
+                          onCloseTabs={(items, keep) => tabsStoreActions.closeTabs(items.map(tabKey), keep)}
+                          onReorder={(keys) => tabsStoreActions.reorder(keys)}
+                        />
+                        <IconButton
+                          type="button"
+                          variant="ghost-muted"
+                          size="large"
+                          class="shrink-0"
+                          icon={<Icon name="plus" />}
+                          onClick={openNewTab}
+                          aria-label={language.t("command.session.new")}
+                        />
+                      </>
+                    ) : (
+                    <MobileDrawer
+                      open={selectMobileTabsOpen(mobileTabsState())}
+                      onOpenChange={(open) => dispatchMobileTabs({ type: "drawer.changed", open })}
+                      onContentPresentChange={(present) => dispatchMobileTabs({ type: "content.present", present })}
+                    >
+                      <MobileDrawerTrigger
+                        data-slot="mobile-tabs-trigger"
+                        class="flex h-7 min-w-0 flex-1 items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-base focus-visible:outline-none [app-region:no-drag]"
+                        aria-label={language.t("titlebar.tabs")}
+                      >
+                        <Show when={currentTab()} fallback={<Icon name="grid-plus" class="shrink-0" />}>
+                          {(tab) => (
+                            <span
+                              data-slot="project-avatar-slot"
+                              class="flex size-4 shrink-0 items-center justify-center"
+                            >
+                              <Show
+                                when={session()}
+                                fallback={
+                                  tab().type === "draft" ? (
+                                    <Icon name="edit" />
+                                  ) : (
+                                    <span
+                                      class="block size-4 rounded-[3px] border border-v2-border-border-muted"
+                                      aria-hidden="true"
+                                    />
+                                  )
+                                }
+                              >
+                                {(value) => (
+                                  <SessionTabAvatarView
+                                    project={currentProject()}
+                                    directory={value().location.directory}
+                                    unread={currentStatus.unread() && !currentStatus.loading()}
+                                  />
+                                )}
+                              </Show>
+                            </span>
+                          )}
+                        </Show>
+                        <span data-slot="mobile-tab-title" dir="auto" class="min-w-0 flex-1 truncate text-start">
+                          {currentTitle()}
+                        </span>
+                        <Show when={preparing() || currentStatus.loading()}>
+                          <ActivityRing />
+                        </Show>
+                        <span class="shrink-0 text-v2-text-text-muted">{tabsStore.length}</span>
+                      </MobileDrawerTrigger>
+                      <MobileDrawerContent>
+                        <MobileDrawerLabel class="sr-only">{language.t("titlebar.tabs")}</MobileDrawerLabel>
+                        <div data-slot="mobile-tabs-drawer" data-corvu-no-drag>
+                          <div data-slot="mobile-tabs-drawer-list">
+                            <TitlebarTabStrip
+                              orientation="vertical"
+                              tabs={tabsStore}
+                              currentTab={currentTab()}
+                              onNavigate={(tab) => {
+                                tabs.select(tab)
+                                closeMobileTabs()
+                              }}
+                              onClose={(tab) => {
+                                const index = tabsStore.findIndex((item) => tabKey(item) === tabKey(tab))
+
+                                if (index !== -1) tabsStoreActions.closeTab(index)
+                              }}
+                              onCloseTabs={(items, keep) => tabsStoreActions.closeTabs(items.map(tabKey), keep)}
+                              onReorder={(keys) => tabsStoreActions.reorder(keys)}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            data-action="mobile-tabs-new-session"
+                            class="flex h-7 w-full shrink-0 items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-base hover:bg-v2-background-bg-layer-02 focus-visible:outline-none focus-visible:bg-v2-background-bg-layer-02"
+                            onClick={() => {
+                              openNewTab()
+                              closeMobileTabs()
+                            }}
+                          >
+                            <Icon name="plus" />
+                            {language.t("command.session.new")}
+                          </button>
+                          <div class="flex shrink-0 flex-col gap-1 border-t border-v2-border-border-muted pt-2">
+                            <button
+                              type="button"
+                              data-action="mobile-tabs-home"
+                              data-state={layout.route().type === "home" ? "pressed" : undefined}
+                              aria-current={layout.route().type === "home" ? "page" : undefined}
+                              class="flex h-7 w-full items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-faint data-[state=pressed]:text-v2-text-text-base focus-visible:outline-none"
+                              onClick={() => {
+                                if (layout.route().type !== "home") toggleHome()
+                                closeMobileTabs()
+                              }}
+                            >
+                              <Icon name="grid-plus" />
+                              {language.t("home.title")}
+                            </button>
+                            <div class="flex items-center gap-1">
+                              <button
+                                type="button"
+                                data-action="mobile-tabs-settings"
+                                class="flex h-7 min-w-0 flex-1 items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-faint hover:bg-v2-background-bg-layer-02 focus-visible:outline-none focus-visible:bg-v2-background-bg-layer-02"
+                                onClick={() => dispatchMobileTabs({ type: "settings.requested" })}
+                              >
+                                <Icon name="settings-gear" size="small" />
+                                {language.t("sidebar.settings")}
+                              </button>
+                              <button
+                                type="button"
+                                data-action="mobile-tabs-help"
+                                class="flex h-7 shrink-0 items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-faint hover:bg-v2-background-bg-layer-02 focus-visible:outline-none focus-visible:bg-v2-background-bg-layer-02"
+                                onClick={() => {
+                                  closeMobileTabs()
+                                  platform.openExternal("https://opencode.ai/desktop-feedback")
+                                }}
+                              >
+                                <Icon name="help" size="small" />
+                                {language.t("sidebar.help")}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </MobileDrawerContent>
+                    </MobileDrawer>
+                    )
                   }
                 >
                   <Show

@@ -14,7 +14,8 @@ import {
 } from "@opencode/ui/context/i18n"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
-import en from "@/runtime/i18n/en"
+// UPSTREAM-DIVERGENCE: Tandem's English strings live in a fork-owned layer over upstream's dictionary.
+import en from "@/runtime/i18n/tandem-en"
 // UPSTREAM-DIVERGENCE: Centralized Tandem product-copy overlays.
 import { productCopy, nativeProductCopy } from "./product-copy"
 import { dict } from "@opencode/ui/i18n/en"

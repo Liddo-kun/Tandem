@@ -1,0 +1,6 @@
+/* Tandem-owned (not in upstream): an accent bar marks Claude narration shown as text (session-ui's
+   timeline/tandem-narration.ts; current-message.tsx adds the data-tandem-narration wrapper). */
+[data-tandem-narration] > [data-component="text-part"] {
+  padding-inline-start: 10px;
+  border-inline-start: 2px solid var(--v2-text-text-accent);
+}

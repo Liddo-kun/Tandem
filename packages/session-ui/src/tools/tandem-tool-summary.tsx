@@ -1,6 +1,6 @@
 // Tandem-owned (not in upstream): Tandem v1's compact tool summaries in v2's font and size.
 // Rows read `● Name(subject)` with an optional `└ preview` line. Renderers mark each row's wrapper
-// with its state for the dot; tandem-tool-summary.css draws the dot, parentheses and branch.
+// with its state for the dot; gui-plugins' tandem/tool-summary.css draws the dot, parentheses and branch.
 import { createMemo, Show } from "solid-js"
 import stripAnsi from "strip-ansi"
 import type { SessionMessageAssistantTool } from "@opencode/client/promise"

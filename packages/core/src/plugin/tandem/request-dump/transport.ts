@@ -1,5 +1,5 @@
 // Tandem-owned (not in upstream): request attribution, terminal transport diagnostics and Anthropic trace headers.
-import { RequestExecutor, type StreamOptions, type WebSocketConnector } from "@opencode/ai/route"
+import { RequestExecutor, type StreamOptions } from "@opencode/ai/route"
 import { Effect, Layer, Stream } from "effect"
 import { HttpClient } from "effect/http"
 import { RequestDumpRecord, type Attribution } from "./record.js"
@@ -21,19 +21,6 @@ export const executorLayer = RequestExecutor.layer.pipe(
     ),
   ),
 )
-
-// Connection sends run in the exchange's fiber, not the socket-open fiber. This preserves
-// current attribution when a persistent socket is reused by later steps or other agents.
-export const connector = (inner: WebSocketConnector): WebSocketConnector => ({
-  open: (input) =>
-    inner.open(input).pipe(
-      Effect.map((connection) => ({
-        ...connection,
-        sendText: (message: string) =>
-          RequestDumpRecord.webSocket(input.url, message).pipe(Effect.andThen(connection.sendText(message))),
-      })),
-    ),
-})
 
 export const options = (
   scope: {

@@ -7,6 +7,7 @@ import { Cause, Clock, DateTime, Effect, FiberMap } from "effect"
 import { TandemAuxiliary } from "@opencode/util/tandem-auxiliary"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Global } from "@opencode/util/global"
+import { isRecord } from "@opencode/util/record"
 import { Environment } from "../../../environment/index.js"
 import { FileAccess } from "../../../file-access.js"
 import { ClaudeCheckpoint } from "./checkpoint.js"
@@ -245,9 +246,12 @@ export const Plugin = define({
       const bash = workdir.present(event, primary)
       const agent = (yield* ctx.agent.get({ agentID: event.agent }).pipe(Effect.orDie)).data
       if (!agent.system && event.system[0]) event.system[0] = SystemPart.make(basePrompt(id))
-      // Identity and configured hooks insert/reorder blocks, so use the assembly marker,
-      // not a positional guess. Chronological frozen updates remain in place.
-      const index = event.system.findIndex((part) => part.metadata?.["tandem.instruction-baseline"] === true)
+      // Identity and configured hooks insert/reorder blocks, so find the instructions part by the
+      // metadata upstream's baseTranscript gives only it, not a positional guess. Chronological frozen updates remain in place.
+      const index = event.system.findIndex((part) => {
+        const experimental = part.metadata?.experimental
+        return isRecord(experimental) && Array.isArray(experimental.instructions)
+      })
       const initial = event.system[index]
       const metadata = yield* messageMetadata(event.sessionID, event.messages, isCheckpoint)
       const marked = event.messages.findIndex((message) => ClaudeCheckpoint.read(metadata(message)) !== undefined)

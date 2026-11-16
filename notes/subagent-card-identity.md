@@ -6,7 +6,7 @@ The subagent tool still accepts its existing invocation fields. Cards now resolv
 
 A call containing `sessionID` gets a localized **Follow-up** label. Session titles use bidi isolation and shrink before the follow-up label and navigation arrow. No per-call description disclosure is shown.
 
-Files: `packages/session-ui/src/tools/tool-renderer.tsx`, `packages/ui/src/i18n/en.ts`, and fork-owned `packages/session-ui/src/styles/tandem-tool-summary.css`.
+Files: `packages/session-ui/src/tools/tool-renderer.tsx`, `packages/ui/src/i18n/en.ts`, and fork-owned `packages/gui-plugins/src/tandem/tool-summary.css`.
 
 ## Verification
 

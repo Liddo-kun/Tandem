@@ -1,6 +1,7 @@
 /* Tandem-owned (not in upstream): compact chat spacing. Each value sits 20% of the way from
    the tightest tried value (v1's, with an 8px turn gap) back to upstream's, rounded to whole pixels.
-   Imported unlayered from index.css so it wins over upstream's layered component and utility styles. */
+   Contributed unlayered by the tandem plugin (renderer.tsx) so it wins over upstream's layered component and utility
+   styles. */
 
 /* Between turns: upstream 24px (TurnGap h-6). */
 [data-timeline-row="TurnGap"] {

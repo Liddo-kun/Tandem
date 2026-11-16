@@ -1195,8 +1195,7 @@ export interface ToolProps {
   locked?: boolean
 }
 
-// UPSTREAM-DIVERGENCE: exported for Tandem's tool cards (tandem-tools.ts).
-export type ToolComponent = Component<ToolProps>
+type ToolComponent = Component<ToolProps>
 
 const state: Record<
   string,
@@ -1206,15 +1205,13 @@ const state: Record<
   }
 > = {}
 
-// UPSTREAM-DIVERGENCE: exported so Tandem registers its tool cards after the built-ins.
-export function registerTool(input: { name: string; render?: ToolComponent }) {
+function registerTool(input: { name: string; render?: ToolComponent }) {
   state[input.name] = input
 
   return input
 }
 
-// UPSTREAM-DIVERGENCE: exported so Tandem can wrap a built-in card (Execute).
-export function getTool(name: string) {
+function getTool(name: string) {
   return state[name]?.render
 }
 
@@ -2741,4 +2738,4 @@ ToolRegistry.register({
 })
 
 // UPSTREAM-DIVERGENCE: Register owned cards last so Tandem webfetch overrides the upstream card.
-registerTandemTools(registerTool)
+registerTandemTools(ToolRegistry)

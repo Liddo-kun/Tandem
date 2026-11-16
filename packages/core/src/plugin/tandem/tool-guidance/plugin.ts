@@ -34,18 +34,27 @@ export const Plugin = define({
       })
     }).pipe(Effect.orDie)
 
-    // Upstream refreshes shell wording with the selected shell in these hooks.
+    // Upstream refreshes shell wording with the selected shell in these hooks, and Code Mode's `execute`
+    // is built per snapshot outside the registry, so `transform` cannot reach it.
     // Run afterward, before Claude's request-local name/description presentation.
     const hook = (event: SessionHooks["context"]) =>
       Effect.sync(() => {
         const tool = event.tools.shell
         if (tool) tool.description = shellGuidance(tool.description)
+        const execute = event.tools.execute
+        if (execute) execute.description = execute.description.replace(CODEMODE_CATALOG, () => CODEMODE_CATALOG_GUIDANCE)
       })
     yield* ctx.session.hook("context", hook)
     yield* ctx.session.hook("compaction", hook)
     yield* ctx.session.hook("generate", hook)
   }),
 })
+
+// Say where the catalog is, tie `search` to it, and state plainly that regular tools are unavailable.
+const CODEMODE_CATALOG =
+  "Inside `execute`, the only callable tools are those explicitly listed in the Code Mode catalog instructions or returned by the `search` function. Ignore tools shown outside the Code Mode catalog. They are not available in the Code Mode runtime."
+const CODEMODE_CATALOG_GUIDANCE =
+  'Within `{ code }`, `tools` exposes only the tools listed under the "# Code Mode" heading in your instructions (and any found with `search`, when that section says it is available). Your other tools cannot be called from inside `{ code }`.'
 
 function shellGuidance(description: string) {
   return description

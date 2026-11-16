@@ -1,8 +1,8 @@
 /* Tandem-owned (not in upstream): Tandem v1's tool summaries in v2's font and size:
-   `● Name(subject)` with an optional `└ preview` line (tools/tandem-tool-summary.tsx).
-   Imported unlayered from index.css so it wins over upstream's layered component styles. */
+   `● Name(subject)` with an optional `└ preview` line (session-ui's tools/tandem-tool-summary.tsx).
+   Contributed unlayered by the tandem plugin (renderer.tsx) so it wins over upstream's layered component styles. */
 
-/* Status dot. Wrappers carry the state (tools/tandem-tool-summary.tsx); the nearest wrapper wins. */
+/* Status dot. Wrappers carry the state (session-ui's tools/tandem-tool-summary.tsx); the nearest wrapper wins. */
 [data-tandem-tool-state] {
   --tandem-tool-dot: var(--icon-weak-base);
 }
@@ -130,7 +130,7 @@
   }
 }
 
-/* `└ Session started (title)` under an Execute row (tools/tandem-session-start.tsx). */
+/* `└ Session started (title)` under an Execute row (session-ui's tools/tandem-session-start.tsx). */
 button[data-tandem-session-start] {
   width: fit-content;
   max-width: 100%;

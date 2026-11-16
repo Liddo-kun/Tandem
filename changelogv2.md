@@ -6,6 +6,10 @@ Dated user-visible changes and published releases of Tandem v2, and the source f
 
 Baseline: OpenCode `upstream/dev` at `9f1639c732` (2026-11-14, `@opencode/cli` 2.3.0), synced on 2026-11-15; upstream promoted v2 to `dev` on 2026-10-10 and froze `v2`. No v2 GitHub release has been published. Source is on branch `tandem-v2`. Verified behavior and unverified cases are recorded in [notes/archive/v2-readiness.md](notes/archive/v2-readiness.md).
 
+### 2026-11-16
+
+- **Changed - Fewer edits to upstream files, same behavior:** Tandem's chat stylesheets (compact spacing, tool summaries, narration bar) are now contributed by a built-in `tandem` GUI plugin instead of edits to session-ui's CSS; Tandem's English app strings moved to a fork-owned dictionary, leaving upstream's `en.ts` untouched; tool cards register through upstream's `ToolRegistry`; the mobile tab strip keeps upstream's drawer code in place, unrendered; the Claude layout finds the instruction baseline by upstream's own metadata; request-dump diagnostics record WebSocket frames through plugin hooks; and the Code Mode description sentence is applied by the tool-guidance plugin. Requests sent to Anthropic and OpenAI and the rendered app were compared before and after and are unchanged.
+
 ### 2026-11-15
 
 - **Fixed - Corrector and page reads no longer answer twice:** since the November 13 sync, upstream reports every child session to its parent when it finishes, so the Corrector's corrected text and the browser reader's page answer arrived in the session as `<subagent>` reports and started an extra turn. Both helpers now run in sessions without a parent, with their owner kept in Tandem's metadata. While one runs, it shows briefly in Home's session list ("Prompt corrector (Tandem)", or "fetch <host>" for as long as the page reading takes). Checked on the development server: a corrected prompt and a page read with a question each produced one answer and no report. [Corrector](logv2.md#prompt-corrector).

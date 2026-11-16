@@ -131,6 +131,7 @@ import { ToolGuidancePlugin } from "./tandem/tool-guidance/plugin.js" // UPSTREA
 import { SessionStartPlugin } from "./tandem/session-start.js" // UPSTREAM-DIVERGENCE: Tandem-owned opencode.session_start tool.
 import { ImageLocationPlugin } from "./tandem/image-location.js" // UPSTREAM-DIVERGENCE: expose saved image paths through request hooks.
 import { HiddenModelsPlugin } from "./tandem/hidden-models.js" // UPSTREAM-DIVERGENCE: drop retired model versions from every catalog.
+import { RequestDumpPlugin } from "./tandem/request-dump/plugin.js" // UPSTREAM-DIVERGENCE: opt-in WebSocket request diagnostics.
 
 const services = [
   Agent.Service,
@@ -337,6 +338,7 @@ const post = [
   ToolGuidancePlugin.Plugin, // UPSTREAM-DIVERGENCE: customize tool wording before Bash-search and Claude presentation.
   BashSearch.Plugin,
   ClaudePlugin.Plugin,
+  RequestDumpPlugin.Plugin, // UPSTREAM-DIVERGENCE: last, so it records the WebSocket handshake URL and frame after every other hook.
 ] as const satisfies readonly InternalPlugin[]
 
 // Repository config must not switch off policy enforcement or the Console connection that delivers

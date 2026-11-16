@@ -1,11 +1,11 @@
 // Tandem-owned (not in upstream): under an Execute row, link the sessions its
 // opencode.session_start calls started. Core copies their IDs into the Execute metadata.
-import { For } from "solid-js"
+import { For, type Component } from "solid-js"
 import { useData } from "../context/data"
 import { useMarkdown } from "../context/markdown"
-import type { ToolComponent, ToolProps } from "./tool-renderer"
+import type { ToolProps } from "./tool-renderer"
 
-export function withStartedSessions(Execute: ToolComponent): ToolComponent {
+export function withStartedSessions(Execute: Component<ToolProps>): Component<ToolProps> {
   return (props: ToolProps) => {
     const data = useData()
     const markdown = useMarkdown()

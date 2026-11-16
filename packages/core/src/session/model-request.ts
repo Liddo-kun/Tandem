@@ -118,7 +118,6 @@ export const baseTranscript = (input: {
   const providerMetadataKey = input.model.model.route.providerMetadataKey ?? input.model.model.provider
   return {
     providerMetadataKey,
-    // UPSTREAM-DIVERGENCE: tag only the rendered instruction baseline for Claude's first-user reminder.
     system: [
       SystemPart.make(
         input.agent.system
@@ -127,7 +126,7 @@ export const baseTranscript = (input: {
       ),
       {
         ...SystemPart.make(Instructions.join(input.initial)),
-        metadata: { experimental: { instructions: input.initial }, "tandem.instruction-baseline": true },
+        metadata: { experimental: { instructions: input.initial } },
       },
     ].filter((part) => part.text.length > 0),
     // Hooks read each stored message's metadata on the messages built from it; `prepare` strips it before the request.
