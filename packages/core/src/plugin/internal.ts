@@ -268,6 +268,7 @@ const pre = [
   AgentPlugin.Plugin,
   // UPSTREAM-DIVERGENCE: install auxiliary defaults and Corrector before normal prompt handling.
   TandemAuxiliaryPlugin.Defaults,
+  HiddenModelsPlugin.FreeModels, // UPSTREAM-DIVERGENCE: before the provider plugins, so OpenCode's free models stay off by default.
   PromptCorrectorPlugin.Plugin,
   ClaudeClearThinking.Plugin, // UPSTREAM-DIVERGENCE: before configured plugins, whose hooks sign the final request body.
   ForkNoticePlugin.Plugin,
