@@ -196,7 +196,7 @@ export function McpDialog(props: {
                   onClick={back}
                   aria-label={language.t("common.goBack")}
                 >
-                  <Icon name="arrow-left" size="small" />
+                  <Icon name="arrow-left" />
                 </button>
                 <DialogTitleGroup
                   title={

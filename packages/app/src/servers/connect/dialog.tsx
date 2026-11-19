@@ -111,7 +111,7 @@ export function DialogServer(props: {
             </Show>
             <Show when={view().signedOut}>
               <p class="settings-server-dialog-notice" role="status">
-                <Icon name="lock" size="small" />
+                <Icon name="lock" />
                 <span>{language.t("dialog.server.signedOut")}</span>
               </p>
             </Show>
