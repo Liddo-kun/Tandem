@@ -671,8 +671,10 @@ export function TitlebarTabStrip(props: {
   tabMenu?: (tab: SessionTab) => JSX.Element
   /** Vertical only: whether a session tab is muted, which swaps its unread dot for a muted mark. */
   tabMuted?: (tab: SessionTab) => boolean
-  /** Vertical only: rows rendered above the tabs that share their shortcuts, numbered first (e.g. pinned sessions). */
+  /** Rows that share the tabs' shortcuts and are numbered first (e.g. pinned sessions). Side tabs only render `content`. */
   leading?: TabStripLeading
+  /** Open tabs shown elsewhere (e.g. pinned), kept in the tab order but not rendered here. */
+  hidden?: (tab: Tab) => boolean
   currentTab: Tab | undefined
   onNavigate: (tab: Tab, el?: HTMLDivElement) => void
   onClose: (tab: Tab) => void
@@ -686,7 +688,11 @@ export function TitlebarTabStrip(props: {
   const sections = () => (vertical() ? props.sections : undefined)
   const customDrag = () => (vertical() ? props.customVerticalDrag : undefined)
 
-  const displayTabs = createMemo(() => sections()?.flatMap((section) => section.tabs) ?? props.tabs)
+  const displayTabs = createMemo(
+    () =>
+      sections()?.flatMap((section) => section.tabs) ??
+      (props.hidden ? props.tabs.filter((tab) => !props.hidden?.(tab)) : props.tabs),
+  )
 
   const sectionOf = createMemo(
     () => new Map(sections()?.flatMap((section) => section.tabs.map((tab) => [tabKey(tab), section.key] as const))),
@@ -849,7 +855,7 @@ export function TitlebarTabStrip(props: {
     })
   })
 
-  const leading = () => (vertical() ? props.leading : undefined)
+  const leading = () => props.leading
 
   const leadingKeys = () => leading()?.keys ?? []
 
@@ -1004,7 +1010,7 @@ export function TitlebarTabStrip(props: {
         customDrag()?.onPointerDown(event, listRef, scrollRef)
       }}
     >
-      <Show when={sections()} fallback={<For each={props.tabs}>{(tab) => renderTab(tab)}</For>}>
+      <Show when={sections()} fallback={<For each={displayTabs()}>{(tab) => renderTab(tab)}</For>}>
         {(list) => (
           <Key each={list()} by={(section) => section.key}>
             {(section) => (
@@ -1097,7 +1103,7 @@ export function TitlebarTabStrip(props: {
           }
         }}
       >
-        {leading()?.content}
+        {vertical() ? leading()?.content : undefined}
         <Show
           when={!customDrag()}
           fallback={renderList()}
