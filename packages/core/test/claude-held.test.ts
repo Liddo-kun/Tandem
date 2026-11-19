@@ -83,6 +83,7 @@ const it = testEffect(
       Location.node.replace(Location.boundNode({ directory: AbsolutePath.make("/project") })),
       SessionRunnerModel.node.replace(
         Layer.mock(SessionRunnerModel.Service)({
+          select: (session) => Effect.fail(new SessionRunnerModel.ModelNotSelectedError({ sessionID: session.id })),
           resolve: (session) => Effect.succeed(session.model?.id === ClaudeCold.MODEL ? sonnet : resolved),
         }),
       ),

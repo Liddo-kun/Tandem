@@ -16,6 +16,7 @@ import { Environment } from "../environment/index.js"
 import { FileAccess } from "../file-access.js"
 import { FileMutation } from "../file-mutation.js"
 import { FileWrite } from "../file-write.js"
+import { Flag } from "../flag.js"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { InstructionDiscovery } from "../instruction-discovery.js"
 import { Instructions } from "../instructions/index.js"
@@ -28,6 +29,8 @@ import { SkillInstructions } from "../skill/instructions.js"
 import { Tool } from "../tool.js"
 // UPSTREAM-DIVERGENCE: consult the additive instructions hook before ambient baseline discovery.
 import { PluginHooks } from "../plugin/hooks.js"
+import { modelTools } from "../tool/model-policy.js"
+import { WebSearch } from "../websearch.js"
 import { AgentNotFoundError } from "./error.js"
 import { SessionHistory } from "./history.js"
 import { InstructionEntry } from "./instruction-entry.js"
@@ -92,6 +95,7 @@ const layer = Layer.effect(
     const db = (yield* Database.Service).db
     const discovery = yield* InstructionDiscovery.Service
     const entries = yield* InstructionEntry.Service
+    const flags = yield* Flag.Service
     const location = yield* Location.Service
     const mcpInstructions = yield* McpInstructions.Service
     const mcpTools = yield* McpTool.Service
@@ -103,7 +107,8 @@ const layer = Layer.effect(
     const registry = yield* Tool.Service
     // UPSTREAM-DIVERGENCE: acquire the instruction policy hook for request-local context.
     const hooks = yield* PluginHooks.Service
-    const codeMode = yield* CodeModeTool.services
+    const services = yield* CodeModeTool.services
+    const websearch = yield* WebSearch.Service
 
     const resolveModel = (
       session: SessionSchema.Info,
@@ -166,25 +171,33 @@ const layer = Layer.effect(
       yield* mcpTools.flush
       // Session permissions narrow discovery the same way they narrow the tool snapshot.
       const permissions = Permission.merge(agent.info.permissions, session.permissions ?? [])
+      const [selected, hasWebSearch, fullCodeMode] = yield* Effect.all(
+        [
+          models.select(session, model.available).pipe(Effect.orElseSucceed(() => undefined)),
+          websearch.available(),
+          flags.enabled("full_codemode"),
+        ],
+        { concurrency: "unbounded" },
+      )
+      const fallbackRef = session.model ?? agent.info.model
+      const policyModel = selected?.info ?? (fallbackRef && Model.Info.default(fallbackRef.providerID, fallbackRef.id))
+      const tools = yield* registry.snapshot(permissions, {
+        services,
+        tools: modelTools({ model: policyModel, websearch: hasWebSearch, fullCodeMode }),
+      })
       // UPSTREAM-DIVERGENCE: agent-only sessions get no ambient baseline.
       if (policy.mode === "agent-only")
-        return {
-          session,
-          agent: { ...agent, info: agent.info },
-          instructions: Instructions.empty,
-          tools: yield* registry.snapshot(permissions, codeMode),
-        }
-      // UPSTREAM-DIVERGENCE: the session's model selects Claude instruction presentation.
+        return { session, agent: { ...agent, info: agent.info }, instructions: Instructions.empty, tools }
+      // UPSTREAM-DIVERGENCE: the session's resolved model selects Claude instruction presentation.
       const selectedModel = yield* resolveModel(session, { kind: "primary", agent: agent.id }).pipe(Effect.orElseSucceed(() => undefined))
       const modelID = selectedModel?.model.id ?? session.model?.id ?? ""
       const loaded = yield* Effect.all(
         {
-          tools: registry.snapshot(permissions, codeMode),
           builtins: builtins.load(),
           discovery: discovery.load(),
           skills: skillInstructions.load(permissions),
           references: referenceInstructions.load(),
-          mcp: mcpInstructions.load(permissions),
+          mcp: mcpInstructions.load(tools),
           entries: entries.load(sessionID),
         },
         { concurrency: "unbounded" },
@@ -192,7 +205,7 @@ const layer = Layer.effect(
       // UPSTREAM-DIVERGENCE: extract the upstream-ordered baseline for Claude-only renderer presentation.
       // Preserve upstream source ordering and durable values; only Claude's renderers differ.
       const instructions = Instructions.combine([
-        CodeModeInstructions.make(loaded.tools.codeModeCatalog),
+        CodeModeInstructions.make(tools.codeModeCatalog),
         loaded.mcp,
         loaded.references,
         loaded.skills,
@@ -210,7 +223,7 @@ const layer = Layer.effect(
         instructions: ClaudePresentation.isClaude(modelID)
           ? ClaudeInstructions.present(instructions)
           : instructions,
-        tools: loaded.tools,
+        tools,
       }
     })
 
@@ -262,6 +275,7 @@ export const node = makeLocationNode({
     FileAccess.node,
     FileMutation.node,
     FileWrite.node,
+    Flag.node,
     InstructionBuiltIns.node,
     InstructionDiscovery.node,
     InstructionEntry.node,
@@ -276,5 +290,6 @@ export const node = makeLocationNode({
     Tool.node,
     // UPSTREAM-DIVERGENCE: wire the instructions hook into context loading.
     PluginHooks.node,
+    WebSearch.node,
   ],
 })

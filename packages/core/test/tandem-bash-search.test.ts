@@ -33,6 +33,7 @@ const layer = AppNodeBuilder.build(LayerNode.group([Session.node, LocationServic
   // Resolve locally without credentials; use the real provider request compiler, never send it.
   SessionRunnerModel.node.replace(
     Layer.succeed(SessionRunnerModel.Service, {
+      select: (session) => Effect.fail(new SessionRunnerModel.ModelNotSelectedError({ sessionID: session.id })),
       resolve: (session) =>
         Effect.succeed(
           SessionRunnerModel.resolved(
