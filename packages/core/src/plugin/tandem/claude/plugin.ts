@@ -8,6 +8,8 @@ import { TandemAuxiliary } from "@opencode/util/tandem-auxiliary"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Global } from "@opencode/util/global"
 import { isRecord } from "@opencode/util/record"
+import { Integration } from "@opencode/schema/integration"
+import { Credential } from "../../../credential.js"
 import { Environment } from "../../../environment/index.js"
 import { FileAccess } from "../../../file-access.js"
 import { ClaudeCheckpoint } from "./checkpoint.js"
@@ -133,6 +135,7 @@ export const Plugin = define({
     const environment = yield* Environment.Service
     const fs = yield* FSUtil.Service
     const global = yield* Global.Service
+    const credentials = yield* Credential.Service
     yield* ctx.tool.hook("execute.after", (event) => Effect.gen(function* () {
       if (event.status !== "completed" || !["read", "edit", "write", "patch"].includes(event.tool)) return
       const input = event.input
@@ -180,6 +183,9 @@ export const Plugin = define({
     const holds = yield* FiberMap.make<string>()
     // Set once it went wrong in a way that would repeat for every session, until the server restarts.
     let off = false
+    // A prompt cache belongs to one account: the selected login for the provider, or the newest when none is selected.
+    const login = (providerID: string) =>
+      credentials.list(Integration.ID.make(providerID)).pipe(Effect.map((list) => list.at(-1)?.id))
     yield* ctx.session.hook("experimental.idle", (event) => Effect.gen(function* () {
       const sessionID = event.sessionID
       const session = yield* ctx.session.get({ sessionID })
@@ -206,14 +212,18 @@ export const Plugin = define({
       const due = expires - Math.min(HOLD_MARGIN, lifetime / 10)
       const now = yield* Clock.currentTimeMillis
       if (due <= now) return
+      const account = yield* login(last.model.providerID)
       yield* FiberMap.run(holds, sessionID, Effect.gen(function* () {
         yield* Effect.sleep(due - now)
         // A device that slept through the timer wakes with the cache already gone.
         if (off || (yield* Clock.currentTimeMillis) >= expires) return
         if (ClaudeHeld.lastResponse(yield* ctx.session.context({ sessionID }))?.id !== last.id) return
+        // Another account cannot read this one's cache.
+        if ((yield* login(last.model.providerID)) !== account)
+          return yield* Effect.logInfo("idle compaction not sent", { sessionID, reason: "the login changed since the last response" })
         const written = yield* write(sessionID, last.id, expires)
         if (!written) return
-        yield* Effect.logInfo("idle compaction wrote a summary", { sessionID, read: written.read, sent: written.sent })
+        yield* Effect.logInfo("idle compaction wrote a summary", { sessionID, read: written.read, written: written.written, sent: written.sent })
         const at = yield* Clock.currentTimeMillis
         yield* fs.writeWithDirs(ClaudeHeld.file(global.data, sessionID), written.text)
         const current = yield* ctx.session.get({ sessionID })
@@ -223,7 +233,8 @@ export const Plugin = define({
         if (written.read * 2 >= written.sent) return
         off = true
         const count = (tokens: number) => tokens.toLocaleString("en-US")
-        yield* report(sessionID, `Idle compaction read only ${count(written.read)} of ${count(written.sent)} tokens from the prompt cache and paid full price for the rest. The summary is kept. Idle compaction is off until the server restarts.`)
+        const uncached = written.sent - written.read - written.written
+        yield* report(sessionID, `Idle compaction read only ${count(written.read)} of ${count(written.sent)} tokens from the prompt cache: ${count(written.written)} were written to the cache, which costs more than input, and ${count(uncached)} were sent uncached. The summary is kept. Idle compaction is off until the server restarts.`)
       }).pipe(Effect.catchCause(failed(sessionID, (reason) => `Idle compaction failed before the prompt cache expired: ${reason}`))))
     }).pipe(Effect.catchCause(failed(event.sessionID, (reason) => `Idle compaction could not be scheduled: ${reason}`))))
     const hook = (kind: "context" | "compaction" | "generate") => (event: SessionHooks["context"]) => Effect.gen(function* () {

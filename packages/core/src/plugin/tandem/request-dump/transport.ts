@@ -1,7 +1,9 @@
-// Tandem-owned (not in upstream): request attribution, terminal transport diagnostics and Anthropic trace headers.
+// Tandem-owned (not in upstream): request attribution, terminal transport diagnostics, Anthropic trace headers and
+// idle compaction's cache check.
 import { RequestExecutor, type StreamOptions } from "@opencode/ai/route"
 import { Effect, Layer, Stream } from "effect"
 import { HttpClient } from "effect/http"
+import { ClaudeHeld } from "../claude/held.js"
 import { RequestDumpRecord, type Attribution } from "./record.js"
 
 // The executor invokes this client only AFTER its per-request middleware calls handler(sent).
@@ -31,17 +33,26 @@ export const options = (
   },
   input: StreamOptions,
 ): StreamOptions => {
-  if (!RequestDumpRecord.enabled()) return input
+  const dump = RequestDumpRecord.enabled()
+  // Main and compaction requests also pass idle compaction's cache check (see `ClaudeHeld.sending`).
+  const held = scope.kind === "primary" || scope.kind === "compaction"
+  if (!dump && !held) return input
   const attribution: Attribution = {
     ...scope,
     model: { providerID: scope.model.providerID, modelID: scope.model.id },
   }
-  const webSocket = input.webSocket
+  const webSocket = dump ? input.webSocket : undefined
   return {
     ...input,
     http: (request, handler) => {
+      const final: typeof handler = (sent) =>
+        dump ? handler(sent).pipe(Effect.provideService(RequestDumpRecord.Current, attribution)) : handler(sent)
       const send: typeof handler = (sent) =>
-        handler(sent).pipe(Effect.provideService(RequestDumpRecord.Current, attribution))
+        held
+          ? ClaudeHeld.sending(scope, sent).pipe(
+              Effect.flatMap((stopped) => (stopped ? Effect.succeed(stopped) : final(sent))),
+            )
+          : final(sent)
       return input.http ? input.http(request, send) : send(request)
     },
     ...(webSocket

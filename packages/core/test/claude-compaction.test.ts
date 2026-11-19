@@ -26,7 +26,7 @@ test("summary prompt stays before trailing system messages and remains a separat
   const request: LLMRequest = { model, system: [], tools: [], messages: [Message.user("typed"), Message.system("date")] }
   const prompted = ClaudeCompaction.appendPrompt(request, "prompt")
   expect(prompted.messages.map((message) => message.role)).toEqual(["user", "system"])
-  expect(prompted.messages[0].content).toEqual([{ type: "text", text: "typed\n" }, { type: "text", text: "prompt" }])
+  expect(prompted.messages[0].content).toEqual([{ type: "text", text: "typed" }, { type: "text", text: "prompt" }])
   expect(request.messages[0].content).toEqual([{ type: "text", text: "typed" }])
   const toolRequest: LLMRequest = { ...request, messages: [Message.tool({ id: "call", name: "read", result: "output" }), Message.system("date")] }
   const toolPrompted = ClaudeCompaction.appendPrompt(toolRequest, "prompt")

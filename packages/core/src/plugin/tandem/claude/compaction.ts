@@ -105,18 +105,17 @@ const responseGroups = (messages: ReadonlyArray<SessionMessage.Info>) => {
   return result
 }
 
-/** Hooks see the unmodified prefix. Place the instruction only after preparation. */
+/**
+ * Hooks see the unmodified prefix. Place the instruction only after preparation. The last user message's own blocks
+ * stay exactly as sent, so the request still reads them from the prompt cache.
+ */
 export const appendPrompt = (request: LLMRequest, text: string) => {
   const messages = [...request.messages]
   let index = messages.length - 1
   while (index >= 0 && messages[index].role === "system") index--
   const last = messages[index]
-  if (last?.role === "user") {
-    const content = [...last.content]
-    const tail = content.at(-1)
-    if (tail?.type === "text") content[content.length - 1] = { ...tail, text: `${tail.text}\n` }
-    messages[index] = { ...last, content: [...content, { type: "text", text }] }
-  } else messages.splice(index + 1, 0, Message.user(text))
+  if (last?.role === "user") messages[index] = { ...last, content: [...last.content, { type: "text", text }] }
+  else messages.splice(index + 1, 0, Message.user(text))
   return { ...request, messages, toolChoice: undefined }
 }
 
@@ -349,19 +348,26 @@ export const register = (input: Omit<Common, "stream"> & {
   if (!built) return undefined
   const usage: SessionUsage.Recorded[] = []
   const background = { messages: [], usage: (recorded: SessionUsage.Recorded) => { usage.push(recorded) } }
+  // Stops the request before it is sent unless it continues the last main request exactly (see `ClaudeHeld.sending`).
+  const guard = new ClaudeHeld.Guard()
   const summary = yield* warm({
     ...input, context, groups: built.groups, transcript: built.transcript !== undefined, budget: yield* input.budget(context),
     stream: (context, request, options) => Effect.gen(function* () {
       if ((yield* Clock.currentTimeMillis) >= expires) return yield* Effect.fail<Failure>({ error: { type: "compaction.failed", message: "The prompt cache expired before the request could be sent" } })
-      return yield* input.stream(context, request, options, background)
+      return yield* input.stream(context, request, options, background).pipe(Effect.provideService(ClaudeHeld.Idle, guard))
     }),
-  })
+  }).pipe(Effect.catch((failure) => guard.stopped === undefined ? Effect.fail(failure) : Effect.succeed(undefined)))
+  if (!summary) {
+    yield* Effect.logInfo("idle compaction not sent", { sessionID, reason: guard.stopped })
+    return undefined
+  }
   // A "too long" rejection made it hold back more than the last group; a compaction would then not match it.
   if (summary.count !== built.groups.length - 1) return yield* Effect.fail<Failure>({ error: { type: "compaction.failed", message: "The request was rejected as too long" } })
   const tokens = usage.map((item) => item.tokens)
   return {
     text: summary.text,
     read: tokens.reduce((sum, item) => sum + item.cache.read, 0),
+    written: tokens.reduce((sum, item) => sum + item.cache.write, 0),
     sent: tokens.reduce((sum, item) => sum + item.input + item.cache.read + item.cache.write, 0),
   }
 }).pipe(Effect.mapError((failure) => "error" in failure ? failure.error.message : toSessionError(failure).message)))

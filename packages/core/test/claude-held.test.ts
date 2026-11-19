@@ -174,7 +174,7 @@ it.effect("idle compaction sends the request a manual compaction sends", () =>
     const id = Session.ID.make("ses_held_request")
     const last = yield* seed(id)
 
-    expect(yield* writer()(id, last, 60_000)).toEqual({ text: "Summary:\nwritten by the model", read: 90, sent: 100 })
+    expect(yield* writer()(id, last, 60_000)).toEqual({ text: "Summary:\nwritten by the model", read: 90, written: 8, sent: 100 })
     const idle = requests
     expect(idle).toHaveLength(1)
     // Nothing is published to the session but the usage.
