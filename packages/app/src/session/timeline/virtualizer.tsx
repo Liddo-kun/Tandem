@@ -15,7 +15,6 @@ import {
   createEffect,
   createMemo,
   createSignal,
-  For,
   on,
   onCleanup,
   onMount,
@@ -25,6 +24,7 @@ import {
   type JSX,
 } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
+import { Key } from "@solid-primitives/keyed"
 import { createMediaQuery } from "@solid-primitives/media"
 import type { createTimelineProjection } from "./projection"
 import { observeElementOffsetReconnectAware } from "./observe-element-offset"
@@ -80,6 +80,9 @@ const touchMomentumEvent = { type: "touch.end", scrolling: true } as const
 const pointerDownEvent = { type: "pointer.down" } as const
 
 const pointerUpEvent = { type: "pointer.up" } as const
+
+/** A row on screen: its key, the row it draws and where TanStack places it. */
+type MountedRow = { key: string; row: TimelineRow.TimelineRow; item: VirtualItem }
 
 const cache = new Map<
   string,
@@ -615,11 +618,19 @@ export function createTimelineVirtualizer(input: Input) {
     })
   }
 
-  const virtualItemByKey = createMemo(
-    () => new Map(virtualizer.getVirtualItems().map((item) => [item.key, item] as const)),
-  )
+  // A row mounts with the row and the place it draws, so it never has to find either. TanStack lists the rows it last
+  // read, which one flush can replace before it reads them again; a listed key the projection dropped is not a row.
+  // One row mounts per key: a turn interrupted twice has two dividers under one key, and one measurement.
+  const mountedRows = createMemo(() => [
+    ...new Map(
+      virtualizer.getVirtualItems().flatMap((item): [string, MountedRow][] => {
+        const key = String(item.key)
+        const row = rowByKey().get(key)
 
-  const virtualRowKeys = createMemo(() => virtualizer.getVirtualItems().map((item) => String(item.key)))
+        return row ? [[key, { key, row, item }]] : []
+      }),
+    ).values(),
+  ])
 
   // UPSTREAM-DIVERGENCE(temporary): reattaching a hidden view resets its scroller to 0, and upstream
   // restores only the pinned end (anomalyco/opencode#42806). Remember the row at the top of the
@@ -1086,13 +1097,13 @@ export function createTimelineVirtualizer(input: Input) {
   }
 
   function View(props: ViewProps) {
-    function VirtualRow(rowProps: { rowKey: string }) {
+    // `mounted` only ever holds this row's own key, up to the update that unmounts it.
+    function VirtualRow(rowProps: { mounted: Accessor<MountedRow> }) {
       let element: HTMLDivElement
-      const initialItem = virtualItemByKey().get(rowProps.rowKey)!
-      const initialRow = rowByKey().get(rowProps.rowKey)!
-      const item = createMemo(() => virtualItemByKey().get(rowProps.rowKey) ?? initialItem)
-      const row = createMemo(() => rowByKey().get(rowProps.rowKey) ?? rows()[item().index] ?? initialRow)
-      const [ready, setReady] = createSignal(initialItem.size <= fallbackItemSize || !props.deferred(initialRow))
+      const initial = rowProps.mounted()
+      const item = createMemo(() => rowProps.mounted().item)
+      const row = createMemo(() => rowProps.mounted().row)
+      const [ready, setReady] = createSignal(initial.item.size <= fallbackItemSize || !props.deferred(initial.row))
       let contentMeasureFrame: number | undefined
 
       onMount(() => virtualizer.measureElement(element))
@@ -1105,7 +1116,7 @@ export function createTimelineVirtualizer(input: Input) {
 
       return (
         <div
-          data-timeline-key={rowProps.rowKey}
+          data-timeline-key={initial.key}
           style={{
             position: "absolute",
             top: `${item().start - topOffset() - rendering.scrollAdjustment}px`,
@@ -1122,7 +1133,7 @@ export function createTimelineVirtualizer(input: Input) {
 
               if (
                 !Predicate.isTagged(row(), "UserMessage") ||
-                !addedKeys.has(rowProps.rowKey) ||
+                !addedKeys.has(initial.key) ||
                 !input.follow.following() ||
                 coldHidden()
               )
@@ -1140,7 +1151,7 @@ export function createTimelineVirtualizer(input: Input) {
               })
             }}
             data-index={item().index}
-            style={{ "min-height": ready() ? undefined : `${initialItem.size}px` }}
+            style={{ "min-height": ready() ? undefined : `${initial.item.size}px` }}
           >
             {props.renderRow(row, () => {
               setReady(true)
@@ -1230,7 +1241,9 @@ export function createTimelineVirtualizer(input: Input) {
                 width: "var(--panel-hold-width, 100%)",
               }}
             >
-              <For each={virtualRowKeys()}>{(rowKey) => <VirtualRow rowKey={rowKey} />}</For>
+              <Key each={mountedRows()} by={(mounted) => mounted.key}>
+                {(mounted) => <VirtualRow mounted={mounted} />}
+              </Key>
             </div>
             <div
               data-timeline-row="bottom-spacer"
