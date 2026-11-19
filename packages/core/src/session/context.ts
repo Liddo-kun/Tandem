@@ -173,7 +173,7 @@ const layer = Layer.effect(
       const modelID = selectedModel?.model.id ?? session.model?.id ?? ""
       const loaded = yield* Effect.all(
         {
-          tools: registry.snapshot(permissions),
+          tools: registry.snapshot(permissions, location),
           builtins: builtins.load(),
           discovery: discovery.load(),
           skills: skillInstructions.load(permissions),
