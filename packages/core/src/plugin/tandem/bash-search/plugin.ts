@@ -4,7 +4,7 @@ import { define } from "@opencode/plugin/effect/plugin"
 import { Global } from "@opencode/util/global"
 import { Context, Effect } from "effect"
 import { spawnSync } from "node:child_process"
-import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { which } from "../../../util/which.js"
 import { ShellSelect } from "../../../shell/select.js"
@@ -52,10 +52,15 @@ export const Plugin = define({
       mkdirSync(global.tmp, { recursive: true })
       const regex = ["findutils-default", "emacs"].find((mode) => probe(bfs, ["-S", "dfs", "-regextype", mode, global.tmp, "-maxdepth", "0"]))
       if (!regex) throw new Error("unsupported bfs")
-      const dir = mkdtempSync(path.join(global.tmp, "bash-search-"))
-      for (const [name, content] of [["grep", grepShim(bin)], ["find", findShim(bin, regex)]]) {
-        writeFileSync(path.join(dir, name), content, { mode: 0o755 })
-        chmodSync(path.join(dir, name), 0o755)
+      // The plugin loads once per instance; one shim directory serves the whole process and is removed when it exits.
+      const reuse = directory !== undefined && existsSync(directory)
+      const dir = reuse ? directory! : mkdtempSync(path.join(global.tmp, "bash-search-"))
+      if (!reuse) {
+        process.once("exit", () => rmSync(dir, { recursive: true, force: true }))
+        for (const [name, content] of [["grep", grepShim(bin)], ["find", findShim(bin, regex)]]) {
+          writeFileSync(path.join(dir, name), content, { mode: 0o755 })
+          chmodSync(path.join(dir, name), 0o755)
+        }
       }
       if (!probe(path.join(dir, "grep"), ["needle"], "needle\n") || !probe(grep, ["needle"], "needle\n") || !probe(path.join(dir, "find"), [dir, "-maxdepth", "0"])) throw new Error("shim probe failed")
       return dir
