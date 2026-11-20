@@ -235,7 +235,8 @@ const normalizeScript = (script?: string) => (script === "Aran" ? "Arab" : scrip
 
 // UPSTREAM-DIVERGENCE: Retain upstream English separately for the Tandem product-copy overlay.
 const upstreamEnglish = {
-  "desktop.microphoneUsage": "OpenCode uses your microphone for voice calls.",
+  "desktop.microphoneUsage": "OpenCode uses your microphone for voice calls and lets websites you allow in the browser pane use it.",
+  "desktop.cameraUsage": "OpenCode lets websites you allow in the browser pane use your camera.",
   "desktop.documentsFolderUsage":
     "OpenCode uses files in your Documents folder for projects you open and commands you run there.",
   "desktop.desktopFolderUsage": "OpenCode uses files on your Desktop for projects you open and commands you run there.",
