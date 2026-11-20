@@ -48,7 +48,8 @@ export const writeTranscript = Effect.fn("ClaudeCompaction.transcript")(function
 }) {
   const rows = yield* input.db.select().from(SessionMessageTable)
     .where(eq(SessionMessageTable.session_id, input.sessionID)).orderBy(asc(SessionMessageTable.seq)).all()
-  const messages = yield* Effect.forEach(rows, SessionHistory.decodeMessageRow)
+  // Assistant content lives in session_part rows; withParts puts it back into each message.
+  const messages = yield* Effect.forEach(yield* SessionHistory.withParts(input.db, rows), SessionHistory.decodeMessageRow)
   const path = join(input.tmp, "transcripts", `${input.sessionID}.md`)
   yield* input.fs.writeWithDirs(path, renderTranscript(messages, input.directory))
   return path

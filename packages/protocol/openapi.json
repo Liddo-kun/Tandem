@@ -17426,7 +17426,13 @@
               "mcp_events": {
                 "type": "boolean"
               },
+              "recommended_api": {
+                "type": "boolean"
+              },
               "full_codemode": {
+                "type": "boolean"
+              },
+              "machines": {
                 "type": "boolean"
               },
               "schedules": {
