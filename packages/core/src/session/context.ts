@@ -182,7 +182,12 @@ const layer = Layer.effect(
       const policyModel = selected?.info ?? (fallbackRef && Model.Info.default(fallbackRef.providerID, fallbackRef.id))
       const tools = yield* registry.snapshot(permissions, {
         services,
-        tools: modelTools({ model: policyModel, websearch: hasWebSearch, fullCodeMode }),
+        // An agent that can't run `execute` (such as explore) keeps every tool direct, so give it the flag-off policy.
+        tools: modelTools({
+          model: policyModel,
+          websearch: hasWebSearch,
+          fullCodeMode: fullCodeMode && Tool.codeModeAvailable(permissions),
+        }),
       })
       // UPSTREAM-DIVERGENCE: agent-only sessions get no ambient baseline.
       if (policy.mode === "agent-only")
