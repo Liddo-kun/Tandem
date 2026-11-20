@@ -12,6 +12,7 @@ import { Integration } from "@opencode/schema/integration"
 import { Credential } from "../../../credential.js"
 import { Environment } from "../../../environment/index.js"
 import { FileAccess } from "../../../file-access.js"
+import { ClaudeCacheStart } from "./cache-start.js"
 import { ClaudeCheckpoint } from "./checkpoint.js"
 import { ClaudeCold } from "./cold.js"
 import { ClaudeHeld } from "./held.js"
@@ -131,6 +132,7 @@ export const Plugin = define({
   id: "tandem.claude",
   effect: Effect.fn("ClaudePlugin.Plugin")(function* (ctx) {
     const workdir = yield* ClaudeWorkdir.make(ctx)
+    yield* ClaudeCacheStart.make(ctx)
     const messageMetadata = TandemMessageMetadata.make(ctx)
     const environment = yield* Environment.Service
     const fs = yield* FSUtil.Service

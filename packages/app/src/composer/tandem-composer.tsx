@@ -1,11 +1,13 @@
 // Tandem-owned (not in upstream): Tandem v1's composer-footer context button and shorter model labels.
-import { Show, createEffect, createMemo, onCleanup } from "solid-js"
+import { Show, createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { SessionMessageAssistant } from "@opencode/client/promise"
+import { TandemCache } from "@opencode/schema/tandem-cache"
 import { usePluginAttachment } from "@/runtime/plugin/attachment"
 import { usePluginHost } from "@/runtime/plugin/host"
 import { useLanguage } from "@/runtime/i18n/language"
 import { showToast } from "@/shell/notifications/toast"
+import * as Pulse from "./tandem-cache-pulse-machine"
 import "./tandem-composer.css"
 
 /** `Claude Opus 4.8` reads `Opus 4.8` in the composer's model button. */
@@ -61,8 +63,20 @@ const reported = new Set<string>()
 type Usage = SessionMessageAssistant & { tokens: NonNullable<SessionMessageAssistant["tokens"]> }
 
 /**
- * `48,213t  52m`: the last request's context tokens and the minutes left on its prompt cache. When a request
- * finishes in the shown session it briefly reads `cache 94%`, tinted green, amber or red, then fades back.
+ * How much of the previous request's cache a request read, so a large new write does not lower the score. The first
+ * request falls back to its own hit ratio.
+ */
+function cacheHealth(cache: { read: number; write: number }, input: number, previous: Usage | undefined) {
+  const before = previous ? previous.tokens.cache.read + previous.tokens.cache.write : 0
+  if (before > 0) return Math.min(1, cache.read / before)
+  const all = cache.read + cache.write + input
+  return all > 0 ? cache.read / all : undefined
+}
+
+/**
+ * `48,213t  52m`: the last request's context tokens and the minutes left on its prompt cache. When a request's
+ * response starts in the shown session (or, without the server's early report, when it completes) it briefly reads
+ * `cache 94%`, tinted green, amber or red, then fades back.
  * Opens the Context panel.
  */
 export function TandemContextButton() {
@@ -92,25 +106,12 @@ export function TandemContextButton() {
     return tokens.input + tokens.output + tokens.reasoning + tokens.cache.read + tokens.cache.write
   })
 
-  // How much of the previous request's cache this one read, so a large new write does not lower the score.
-  // The first request falls back to its own hit ratio.
   const health = createMemo(() => {
     const [message, previous] = requests()
-    if (!message) return undefined
-    const { cache, input } = message.tokens
-    const before = previous ? previous.tokens.cache.read + previous.tokens.cache.write : 0
-    if (before > 0) return Math.min(1, cache.read / before)
-    const all = cache.read + cache.write + input
-    return all > 0 ? cache.read / all : undefined
+    return message ? cacheHealth(message.tokens.cache, message.tokens.input, previous) : undefined
   })
 
-  const band = createMemo(() => {
-    const value = health()
-    if (value === undefined) return undefined
-    return value >= 0.9 ? "good" : value >= 0.5 ? "warn" : "bad"
-  })
-
-  const [store, setStore] = createStore({ now: Date.now(), pulse: false })
+  const [store, setStore] = createStore({ now: Date.now() })
 
   const ttl = createMemo(() => {
     const current = session()
@@ -141,26 +142,63 @@ export function TandemContextButton() {
     return Math.max(0, Math.floor((seconds * 1000 - (store.now - Math.max(completed, held?.at ?? 0))) / 60_000))
   })
 
-  // Pulse only for a request that finishes while its session is shown: switching sessions adopts the latest request
-  // silently, and a request still running at the switch pulses when it finishes.
-  let shown: string | undefined
-  let seen: string | undefined
-  let timer: ReturnType<typeof setTimeout> | undefined
-  createEffect(() => {
-    const id = session()?.id
-    const message = last()
-    if (id !== shown) {
-      shown = id
-      seen = message?.time.completed ? message.id : undefined
-      return
+  // Pulses when a request's response starts (Claude models, through the server's `TandemCache` event), or else when it
+  // completes. Only requests seen running in the shown session pulse (see the machine).
+  const [pulse, setPulse] = createSignal<Pulse.State>(Pulse.initial)
+  const timers = new Set<ReturnType<typeof setTimeout>>()
+  const dispatch = (event: Pulse.Event) => {
+    const state = untrack(pulse)
+    const result = Pulse.transition(state, event)
+    if (result.state !== state) setPulse(result.state)
+    for (const effect of result.effects) {
+      const timer = setTimeout(() => {
+        timers.delete(timer)
+        dispatch({ type: "faded", attempt: effect.attempt })
+      }, 1700)
+      timers.add(timer)
     }
-    if (!message?.time.completed || message.id === seen) return
-    seen = message.id
-    setStore("pulse", true)
-    clearTimeout(timer)
-    timer = setTimeout(() => setStore("pulse", false), 1700)
+  }
+  onCleanup(() => timers.forEach(clearTimeout))
+
+  createEffect(() => dispatch({ type: "shown", sessionID: session()?.id }))
+
+  // The shown session's newest request, measured or not.
+  const latest = createMemo(() => {
+    const current = session()
+    if (!current?.id) return
+    const messages = current.server.data.session.message.list(current.id) ?? []
+    return messages.findLast((message) => message.type === "assistant")
   })
-  onCleanup(() => clearTimeout(timer))
+
+  createEffect(() => {
+    const sessionID = session()?.id
+    const message = latest()
+    if (!sessionID || !message) return
+    if (!message.time.completed) return dispatch({ type: "running", sessionID, id: message.id })
+    dispatch({ type: "completed", sessionID, id: message.id, health: last()?.id === message.id ? health() : undefined })
+  })
+
+  const server = createMemo(() => session()?.server)
+  createEffect(() => {
+    const client = server()?.client
+    if (!client) return
+    const stop = client.rpc(TandemCache.Definition).events.on("started", (event) => {
+      const { sessionID, read, write, input } = event.data
+      // The request is still running, so the newest measured one is the one before it.
+      dispatch({ type: "started", sessionID, health: cacheHealth({ read, write }, input, last()) })
+    })
+    onCleanup(stop)
+  })
+
+  const shown = createMemo(() => pulse().pulse)
+  // The last pulse's value stays while its text fades out.
+  const value = createMemo((previous: number | undefined) => shown() ? shown()!.health : previous, undefined)
+
+  const band = createMemo(() => {
+    const health = value()
+    if (health === undefined) return undefined
+    return health >= 0.9 ? "good" : health >= 0.5 ? "warn" : "bad"
+  })
 
   // A report usually arrives while nobody is looking, so it stays until dismissed. Every open tab reports its own
   // session, so the toast names it.
@@ -186,7 +224,7 @@ export function TandemContextButton() {
         type="button"
         data-component="tandem-context-button"
         data-cache-band={band()}
-        data-cache-pulse={store.pulse ? "" : undefined}
+        data-cache-pulse={shown() ? "" : undefined}
         class="ms-1 inline-flex h-7 shrink-0 items-center whitespace-nowrap rounded-md border-0 bg-transparent px-1 text-[13px] leading-4 font-[440] tabular-nums text-v2-text-text-muted transition-colors hover:text-v2-text-text-base"
         aria-label={language.t("prompt.context.view")}
         onClick={open}
@@ -194,7 +232,7 @@ export function TandemContextButton() {
         <span class="grid">
           <span
             class="[grid-area:1/1] transition-opacity duration-[400ms]"
-            classList={{ "opacity-0": store.pulse }}
+            classList={{ "opacity-0": !!shown() }}
           >
             <span class="text-v2-text-text-faint">
               {language.t("prompt.context.tokens", { count: total().toLocaleString(language.intl()) })}
@@ -209,11 +247,11 @@ export function TandemContextButton() {
           </span>
           <span
             class="[grid-area:1/1] transition-opacity duration-[400ms]"
-            classList={{ "opacity-0": !store.pulse }}
+            classList={{ "opacity-0": !shown() }}
           >
             {language.t("prompt.context.cacheHit")}{" "}
             <span data-slot="tandem-cache-tint">
-              {health() === undefined ? "—" : `${Math.round(health()! * 100)}%`}
+              {value() === undefined ? "—" : `${Math.round(value()! * 100)}%`}
             </span>
           </span>
         </span>
