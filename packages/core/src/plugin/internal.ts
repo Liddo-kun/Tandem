@@ -134,7 +134,7 @@ import { BashSearch } from "./tandem/bash-search/plugin.js"
 import { ClaudePlugin } from "./tandem/claude/plugin.js"
 import { ClaudeClearThinking } from "./tandem/claude/clear-thinking.js"
 import { ToolGuidancePlugin } from "./tandem/tool-guidance/plugin.js" // UPSTREAM-DIVERGENCE: keep tool wording in a Tandem-owned transform.
-import { SessionStartPlugin } from "./tandem/session-start.js" // UPSTREAM-DIVERGENCE: Tandem-owned opencode.session_start tool.
+import { SessionStartPlugin } from "./tandem/session-start.js" // UPSTREAM-DIVERGENCE: Tandem-owned opencode.session.start tool.
 import { ImageLocationPlugin } from "./tandem/image-location.js" // UPSTREAM-DIVERGENCE: expose saved image paths through request hooks.
 import { HiddenModelsPlugin } from "./tandem/hidden-models.js" // UPSTREAM-DIVERGENCE: drop retired model versions from every catalog.
 import { RequestDumpPlugin } from "./tandem/request-dump/plugin.js" // UPSTREAM-DIVERGENCE: opt-in WebSocket request diagnostics.

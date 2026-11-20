@@ -1,4 +1,4 @@
-// Tandem-owned (not in upstream): when opencode.session_start creates a session, open it as a
+// Tandem-owned (not in upstream): when opencode.session.start creates a session, open it as a
 // background tab right after the starting session's tab. Only windows with that tab open react.
 import { createEffect, createRoot, onCleanup, untrack } from "solid-js"
 import { ServerConnection } from "@/runtime/server/registry"

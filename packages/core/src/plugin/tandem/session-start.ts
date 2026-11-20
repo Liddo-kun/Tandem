@@ -38,12 +38,12 @@ export const Plugin = define({
 
     yield* ctx.tool.transform((editor) =>
       editor.add({
-        name: "session_start",
+        name: "start",
         description:
           "Start a new session for the user and send it a prompt; returns immediately. Unset options match the current session.",
         input: Input,
         output: Output,
-        options: { namespace: "opencode", codemode: true },
+        options: { namespace: "opencode.session", codemode: true },
         execute: (input, context) =>
           Effect.gen(function* () {
             const current = yield* ctx.session.get({ sessionID: context.sessionID })

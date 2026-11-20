@@ -13,7 +13,7 @@ import Storybook from "../feature-plugins/system/storybook"
 import Stats from "../feature-plugins/system/stats"
 import Latex from "@opencode/latex/plugin"
 import Merman from "@opencode/merman/plugin"
-import TandemSessionStart from "../feature-plugins/tandem/session-start" // UPSTREAM-DIVERGENCE: Tandem session_start tabs.
+import TandemSessionStart from "../feature-plugins/tandem/session-start" // UPSTREAM-DIVERGENCE: Tandem session.start tabs.
 
 export const builtins = [
   HomeFooter,
@@ -33,6 +33,6 @@ export const builtins = [
   // normal launches and register it only for OPENCODE_STORY runs.
   ...(process.env.OPENCODE_STORY ? [Storybook] : []),
   DiffViewer,
-  // UPSTREAM-DIVERGENCE: open tabs for sessions started by opencode.session_start.
+  // UPSTREAM-DIVERGENCE: open tabs for sessions started by opencode.session.start.
   TandemSessionStart,
 ]

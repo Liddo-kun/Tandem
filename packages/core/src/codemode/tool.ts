@@ -121,7 +121,7 @@ export const create = (
         const callIndex = yield* Ref.make(0)
         const files = yield* Ref.make<Array<CollectedFiles>>([])
         const calls = yield* Ref.make<Array<ExecuteCall>>([])
-        // UPSTREAM-DIVERGENCE: keep sessions started by Tandem's session_start so the Execute row can link them.
+        // UPSTREAM-DIVERGENCE: keep sessions started by Tandem's session.start so the Execute row can link them.
         const startedSessions = yield* Ref.make<Array<string>>([])
         const lock = Semaphore.makeUnsafe(1)
         // Each update replaces the last, so send at most one per 100 ms; a trailing one carries the latest rows.

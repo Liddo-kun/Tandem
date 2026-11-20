@@ -1,4 +1,4 @@
-// Tandem-owned (not in upstream): when opencode.session_start creates a session from the session
+// Tandem-owned (not in upstream): when opencode.session.start creates a session from the session
 // shown here (or one of its open tabs), open it as a tab right after that session's tab and say so.
 import { Plugin } from "@opencode/plugin/tui"
 

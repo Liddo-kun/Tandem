@@ -1,5 +1,5 @@
 // Tandem-owned (not in upstream): under an Execute row, link the sessions its
-// opencode.session_start calls started. Core copies their IDs into the Execute metadata.
+// opencode.session.start calls started. Core copies their IDs into the Execute metadata.
 import { For, type Component } from "solid-js"
 import { useData } from "../context/data"
 import { useMarkdown } from "../context/markdown"

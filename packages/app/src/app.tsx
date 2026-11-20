@@ -27,7 +27,7 @@ import { LanguageProvider, UiI18nBridge, type Locale } from "@/runtime/i18n/lang
 import { ServerConnection, ServersProvider } from "@/runtime/server/registry"
 import { SettingsProvider } from "@/settings/model"
 import { TabsProvider } from "@/shell/tabs/tabs"
-import { TandemSessionStartTabs } from "@/shell/tandem-session-start-tabs" // UPSTREAM-DIVERGENCE: Tandem session_start tabs.
+import { TandemSessionStartTabs } from "@/shell/tandem-session-start-tabs" // UPSTREAM-DIVERGENCE: Tandem session.start tabs.
 import { ErrorPage } from "@/shell/errors/error"
 import { AppRoutes, File, preloadRoute } from "@/shell/routes/routes"
 import { PluginRoot } from "@/runtime/plugin/root"
@@ -111,7 +111,7 @@ export function AppInterface(props: {
       <GlobalProvider>
         <ProjectIconsProvider>
           <BodyTypography />
-          {/* UPSTREAM-DIVERGENCE: open tabs for sessions started by opencode.session_start. */}
+          {/* UPSTREAM-DIVERGENCE: open tabs for sessions started by opencode.session.start. */}
           <TandemSessionStartTabs />
           <CommandProvider>
             <DesktopCommands />
