@@ -5,6 +5,7 @@ import type { SessionMessageAssistant } from "@opencode/client/promise"
 import { TandemCache } from "@opencode/schema/tandem-cache"
 import { usePluginAttachment } from "@/runtime/plugin/attachment"
 import { usePluginHost } from "@/runtime/plugin/host"
+import { useServerSDK } from "@/runtime/server/client"
 import { useLanguage } from "@/runtime/i18n/language"
 import { showToast } from "@/shell/notifications/toast"
 import * as Pulse from "./tandem-cache-pulse-machine"
@@ -178,17 +179,16 @@ export function TandemContextButton() {
     dispatch({ type: "completed", sessionID, id: message.id, health: last()?.id === message.id ? health() : undefined })
   })
 
-  const server = createMemo(() => session()?.server)
-  createEffect(() => {
-    const client = server()?.client
-    if (!client) return
-    const stop = client.rpc(TandemCache.Definition).events.on("started", (event) => {
+  // Read from the server's main event feed. A listener of its own would join the shared event connection, and while it
+  // stays the app's reconnects reuse that connection even after it goes silent, leaving sessions "Working".
+  const started: `rpc.${typeof TandemCache.Definition.id}.started` = `rpc.${TandemCache.Definition.id}.started`
+  onCleanup(
+    useServerSDK().event.on(started, (event) => {
       const { sessionID, read, write, input } = event.data
       // The request is still running, so the newest measured one is the one before it.
       dispatch({ type: "started", sessionID, health: cacheHealth({ read, write }, input, last()) })
-    })
-    onCleanup(stop)
-  })
+    }),
+  )
 
   const shown = createMemo(() => pulse().pulse)
   // The last pulse's value stays while its text fades out.
